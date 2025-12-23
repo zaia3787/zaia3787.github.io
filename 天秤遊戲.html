@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>動物天秤排序挑戰 - 完整教學版</title>
+    <style>
+        :root {
+            --bg-color: #f7f9fc;
+            --table-color: #e0c097;
+            --accent-color: #2c3e50;
+            --success-color: #2ecc71;
+            --heavy-color: #e74c3c;
+        }
+        body {
+            font-family: "Microsoft JhengHei", sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 初始遮罩與結果視窗 */
+        #overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.92);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+        #start-btn {
+            padding: 20px 50px;
+            font-size: 1.8rem;
+            background: var(--success-color);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 30px;
+        }
+
+        #header {
+            width: 100%;
+            padding: 15px;
+            background: var(--accent-color);
+            color: white;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+        }
+
+        /* 桌面：自由擺放區 */
+        #tabletop {
+            width: 95%;
+            height: 380px;
+            background-color: var(--table-color);
+            margin: 10px;
+            border-radius: 8px;
+            position: relative; 
+            border: 5px solid #5d4037;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        /* 天秤區 */
+        #scale-area {
+            display: flex;
+            align-items: center;
+            gap: 40px;
+            margin: 10px 0;
+            background: #fff;
+            padding: 15px 30px;
+            border-radius: 50px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .pan-container { display: flex; flex-direction: column; align-items: center; }
+        .pan {
+            width: 85px; height: 85px;
+            border: 4px solid #7f8c8d;
+            border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            background: #ecf0f1;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        #scale-status { font-size: 2.5rem; min-width: 60px; text-align: center; }
+        .status-text { font-weight: bold; font-size: 0.9rem; height: 1.2rem; }
+
+        /* 底部 A-H 插槽 */
+        #dock {
+            display: flex;
+            gap: 10px;
+            background: #34495e;
+            padding: 15px;
+            border-radius: 15px 15px 0 0;
+            width: 90%;
+            justify-content: center;
+        }
+        .slot-container { display: flex; flex-direction: column; align-items: center; }
+        .slot {
+            width: 60px; height: 60px;
+            border: 2px dashed #bdc3c7;
+            display: flex; justify-content: center; align-items: center;
+            border-radius: 5px;
+            background: rgba(255,255,255,0.05);
+            transition: background 0.3s;
+        }
+        .slot.correct {
+            background: var(--success-color) !important;
+            box-shadow: 0 0 15px var(--success-color);
+            border: 2px solid white;
+        }
+        .slot-label { color: white; margin-top: 5px; font-weight: bold; }
+
+        /* 動物物件 */
+        .weight {
+            width: 60px; height: 60px;
+            font-size: 45px;
+            cursor: grab;
+            display: flex; justify-content: center; align-items: center;
+            user-select: none;
+            position: absolute;
+            z-index: 10;
+        }
+        .weight.in-container { position: static; }
+
+        .btn-submit {
+            padding: 12px 30px;
+            background: var(--success-color);
+            color: white; border: none; border-radius: 5px;
+            font-weight: bold; cursor: pointer; font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+
+<div id="overlay">
+    <h1 id="overlay-title">🦁 動物重量排序挑戰 🐘</h1>
+    <p id="overlay-msg">準備好使用合併排序法了嗎？<br>每次開始，所有動物的重量都會隨機大洗牌！</p>
+    <button id="start-btn" onclick="startGame()">開始遊戲</button>
+</div>
+
+<div id="header">
+    <div style="font-size: 1.2rem;">⏱️ 計時：<span id="timer">0</span> 秒</div>
+    <button class="btn-submit" onclick="checkAnswer()">提交答案</button>
+</div>
+
+<div id="tabletop" ondrop="dropToTable(event)" ondragover="allowDrop(event)">
+    </div>
+
+<div id="scale-area">
+    <div class="pan-container">
+        <div id="text-l" class="status-text"></div>
+        <div id="pan-left" class="pan" ondrop="dropToPan(event, 'left')" ondragover="allowDrop(event)"></div>
+    </div>
+    <div id="scale-status">⚖️</div>
+    <div class="pan-container">
+        <div id="text-r" class="status-text"></div>
+        <div id="pan-right" class="pan" ondrop="dropToPan(event, 'right')" ondragover="allowDrop(event)"></div>
+    </div>
+</div>
+
+<div id="dock">
+    </div>
+
+<script>
+    const labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    const animals = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼'];
+    let startTime;
+    let timerInterval;
+
+    function startGame() {
+        document.getElementById('overlay').style.display = 'none';
+        // 清理環境
+        document.getElementById('tabletop').innerHTML = '';
+        document.getElementById('dock').innerHTML = '';
+        document.getElementById('pan-left').innerHTML = '';
+        document.getElementById('pan-right').innerHTML = '';
+        updateScale();
+        
+        startTime = Date.now();
+        initGame();
+    }
+
+    function initGame() {
+        const table = document.getElementById('tabletop');
+        const dock = document.getElementById('dock');
+        
+        // 生成 8 個隨機重量
+        let values = [];
+        while(values.length < 8) {
+            let r = Math.floor(Math.random() * 800) + 10;
+            if(!values.includes(r)) values.push(r);
+        }
+
+        // 洗牌動物
+        const shuffledAnimals = [...animals].sort(() => Math.random() - 0.5);
+
+        // 生成動物並隨機放置在桌面
+        values.forEach((v, i) => {
+            const w = document.createElement('div');
+            w.className = 'weight';
+            w.id = 'animal-' + i;
+            w.draggable = true;
+            w.innerHTML = shuffledAnimals[i];
+            w.dataset.weight = v;
+            
+            // 隨機分佈座標
+            w.style.left = (Math.random() * 80 + 5) + '%';
+            w.style.top = (Math.random() * 60 + 5) + '%';
+            w.addEventListener('dragstart', drag);
+            table.appendChild(w);
+        });
+
+        // 生成底部插槽
+        labels.forEach(l => {
+            const container = document.createElement('div');
+            container.className = 'slot-container';
+            const slot = document.createElement('div');
+            slot.className = 'slot';
+            slot.id = 'slot-' + l;
+            slot.addEventListener('drop', (e) => dropToSlot(e, l));
+            slot.addEventListener('dragover', allowDrop);
+            const label = document.createElement('div');
+            label.className = 'slot-label';
+            label.innerText = l;
+            container.appendChild(slot);
+            container.appendChild(label);
+            dock.appendChild(container);
+        });
+
+        if(timerInterval) clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            document.getElementById('timer').innerText = Math.floor((Date.now() - startTime) / 1000);
+        }, 1000);
+    }
+
+    function allowDrop(ev) { ev.preventDefault(); }
+    function drag(ev) { ev.dataTransfer.setData("text", ev.target.id); }
+
+    // 自由擺放邏輯
+    function dropToTable(ev) {
+        ev.preventDefault();
+        const data = ev.dataTransfer.getData("text");
+        const el = document.getElementById(data);
+        const table = document.getElementById('tabletop');
+        
+        table.appendChild(el);
+        el.className = 'weight';
+        const rect = table.getBoundingClientRect();
+        
+        // 精確座標計算
+        el.style.left = (ev.clientX - rect.left - 30) + 'px';
+        el.style.top = (ev.clientY - rect.top - 30) + 'px';
+        el.style.position = 'absolute';
+        
+        updateScale();
+    }
+
+    function dropToPan(ev, side) {
+        ev.preventDefault();
+        const data = ev.dataTransfer.getData("text");
+        const el = document.getElementById(data);
+        const pan = document.getElementById('pan-' + side);
+        el.className = 'weight in-container';
+        el.style.position = 'static';
+        pan.innerHTML = '';
+        pan.appendChild(el);
+        updateScale();
+    }
+
+    function dropToSlot(ev, label) {
+        ev.preventDefault();
+        const data = ev.dataTransfer.getData("text");
+        const el = document.getElementById(data);
+        const slot = document.getElementById('slot-' + label);
+        el.className = 'weight in-container';
+        el.style.position = 'static';
+        slot.innerHTML = '';
+        slot.appendChild(el);
+        updateScale();
+    }
+
+    function updateScale() {
+        const lp = document.getElementById('pan-left');
+        const rp = document.getElementById('pan-right');
+        const st = document.getElementById('scale-status');
+        const tl = document.getElementById('text-l');
+        const tr = document.getElementById('text-r');
+
+        lp.style.transform = "translateY(0)";
+        rp.style.transform = "translateY(0)";
+        tl.innerText = ""; tr.innerText = "";
+
+        if (lp.firstChild && rp.firstChild) {
+            const wL = parseInt(lp.firstChild.dataset.weight);
+            const wR = parseInt(rp.firstChild.dataset.weight);
+            if (wL > wR) {
+                st.innerText = "◀️";
+                lp.style.transform = "translateY(20px)";
+                rp.style.transform = "translateY(-20px)";
+                tl.innerText = "重 HEAVY"; tl.style.color = "var(--heavy-color)";
+                tr.innerText = "輕 LIGHT"; tr.style.color = "var(--success-color)";
+            } else if (wL < wR) {
+                st.innerText = "▶️";
+                lp.style.transform = "translateY(-20px)";
+                rp.style.transform = "translateY(20px)";
+                tl.innerText = "輕 LIGHT"; tl.style.color = "var(--success-color)";
+                tr.innerText = "重 HEAVY"; tr.style.color = "var(--heavy-color)";
+            }
+        } else {
+            st.innerText = "⚖️";
+        }
+    }
+
+    function checkAnswer() {
+        let userOrder = [];
+        let isComplete = true;
+
+        labels.forEach(l => {
+            const s = document.getElementById('slot-' + l);
+            if (s.firstChild) {
+                userOrder.push({
+                    emoji: s.firstChild.innerHTML,
+                    weight: parseInt(s.firstChild.dataset.weight)
+                });
+            } else {
+                isComplete = false;
+            }
+        });
+
+        if (!isComplete) {
+            alert("請先將 8 隻動物全部放入 A-H 槽！");
+            return;
+        }
+
+        // 取得正確排序
+        let allWeights = [];
+        const allElements = document.querySelectorAll('.weight');
+        allElements.forEach(el => {
+            allWeights.push({
+                emoji: el.innerHTML,
+                weight: parseInt(el.dataset.weight)
+            });
+        });
+        allWeights.sort((a, b) => a.weight - b.weight);
+
+        // 判斷對錯
+        let isCorrect = true;
+        for (let i = 0; i < userOrder.length; i++) {
+            if (userOrder[i].weight !== allWeights[i].weight) {
+                isCorrect = false;
+                break;
+            }
+        }
+
+        clearInterval(timerInterval);
+        const time = document.getElementById('timer').innerText;
+
+        if (isCorrect) {
+            labels.forEach(l => document.getElementById('slot-' + l).classList.add('correct'));
+        }
+
+        // 顯示結果
+        setTimeout(() => {
+            let resultTitle = isCorrect ? "🏆 挑戰成功！" : "❌ 排序錯誤";
+            let userStr = userOrder.map(i => i.emoji).join(' → ');
+            let correctStr = allWeights.map(i => `${i.emoji}(${i.weight})`).join(' → ');
+            
+            let msg = isCorrect 
+                ? `太棒了！你花了 ${time} 秒完成正確排序。\n\n正確序列：\n${correctStr}`
+                : `再接再厲！\n\n你的排序：\n${userStr}\n\n正確序列(輕到重)：\n${correctStr}`;
+            
+            document.getElementById('overlay-title').innerText = resultTitle;
+            document.getElementById('overlay-msg').innerText = msg;
+            document.getElementById('overlay-msg').style.whiteSpace = "pre-wrap";
+            document.getElementById('start-btn').innerText = "再挑戰一次";
+            document.getElementById('overlay').style.display = 'flex';
+        }, 800);
+    }
+</script>
+
+</body>
+</html>
