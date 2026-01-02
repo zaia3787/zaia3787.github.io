@@ -61,6 +61,17 @@
         .spec-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease-out; }
         .spec-val { font-size: 0.7rem; color: #94a3b8; margin-top: 4px; font-weight: 600; }
 
+        /* Daily Persona Grid */
+        .daily-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px; }
+        .daily-item { 
+            background: white; border-radius: 8px; border: 1px solid #e2e8f0; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            padding: 6px; cursor: pointer; transition: all 0.15s; aspect-ratio: 1/1.1;
+        }
+        .daily-item:hover { transform: scale(1.05); z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .daily-date { font-size: 0.65rem; color: #64748b; font-weight: 600; margin-bottom: 2px; }
+        .daily-emoji { font-size: 1.5rem; line-height: 1; }
+        
         @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-5px); } 100% { transform: translateY(0px); } }
         @keyframes floatDelayed { 0% { transform: translateY(-3px); } 50% { transform: translateY(2px); } 100% { transform: translateY(-3px); } }
         
@@ -68,7 +79,7 @@
         .modal-content { max-height: 80vh; overflow-y: auto; }
         .low-data-day { opacity: 0.6; background-color: #f8fafc; border-left: 3px solid #cbd5e1; padding-left: 8px; }
         
-        /* New Tab Styles - High Contrast */
+        /* New Tab Styles */
         .tab-btn { 
             flex: 1; 
             padding: 16px; 
@@ -79,7 +90,7 @@
             cursor: pointer; 
             transition: all 0.2s; 
             border: 2px solid #e2e8f0; 
-            color: #94a3b8;
+            color: #64748b;
             background: white;
             display: flex;
             align-items: center;
@@ -119,9 +130,9 @@
         <div>
             <h1 class="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
                 VeriText Pro 
-                <span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold uppercase">v4.3 Ultimate</span>
+                <span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold uppercase">v4.5 Daily</span>
             </h1>
-            <p class="text-slate-500 text-sm mt-1">全方位心理語言分析：高容錯匯入 + 自然語言診斷。</p>
+            <p class="text-slate-500 text-sm mt-1">全方位心理語言分析：日曆檢視與情緒週期。</p>
         </div>
         <div class="flex gap-3">
              <label for="fileInput" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl cursor-pointer transition shadow-md shadow-indigo-200 text-sm font-bold flex items-center gap-2 hover:scale-105 active:scale-95">
@@ -264,6 +275,17 @@
                 </div>
             </div>
         </div>
+
+        <!-- NEW: Daily Persona Landscape -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+            <h3 class="text-xs font-bold text-slate-800 mb-4 uppercase tracking-wide flex items-center gap-2 border-b border-slate-100 pb-2">
+                <span class="bg-amber-100 text-amber-600 p-1.5 rounded-md">📅</span> 每日心理氣象 (Daily Mood Landscape)
+            </h3>
+            <div id="dailyPersonaContainer" class="daily-grid w-full">
+                <div class="text-xs text-slate-400 italic w-full text-center py-4">等待數據生成日曆...</div>
+            </div>
+        </div>
+
     </div>
 
     <!-- View 2: Chart Statistics -->
@@ -354,17 +376,17 @@
     };
 
     const PERSONAS = [
-        { id: 'hedgehog', name: '受傷刺蝟', icon: '🌵', desc: '防衛心強且敏感', color: '#f97316' },
-        { id: 'koala', name: '焦慮無尾熊', icon: '🐨', desc: '患得患失', color: '#a855f7' },
-        { id: 'actor', name: '討拍演員', icon: '🎭', desc: '渴望被看見與安慰', color: '#06b6d4' },
-        { id: 'prof', name: '嚴肅教授', icon: '👨‍🏫', desc: '語氣強硬，傾向講道理', color: '#475569' },
-        { id: 'soulmate', name: '靈魂伴侶', icon: '💖', desc: '互動直覺流暢', color: '#ec4899' },
-        { id: 'peacock', name: '自信獅子', icon: '🦁', desc: '自信爆棚，自我中心', color: '#eab308' },
-        { id: 'volcano', name: '宣洩火山', icon: '🌋', desc: '情緒起伏較大', color: '#ef4444' },
-        { id: 'owl', name: '慎重貓頭鷹', icon: '🦉', desc: '過度謹慎，客觀分析', color: '#3b82f6' },
-        { id: 'sunflower', name: '溫暖向日葵', icon: '🌻', desc: '樂於分享，關心他人', color: '#f59e0b' },
-        { id: 'robot', name: '靜謐觀察者', icon: '🧘', desc: '情緒平穩，話語簡潔', color: '#94a3b8' },
-        { id: 'coffee', name: '歲月靜好', icon: '☕️', desc: '情緒平穩，日常安穩', color: '#6366f1' }
+        { id: 'hedgehog', name: '受傷刺蝟', icon: '🌵', desc: '防衛心強且敏感', color: '#f97316', bg: '#fff7ed' },
+        { id: 'koala', name: '焦慮無尾熊', icon: '🐨', desc: '患得患失', color: '#a855f7', bg: '#faf5ff' },
+        { id: 'actor', name: '討拍演員', icon: '🎭', desc: '渴望被看見與安慰', color: '#06b6d4', bg: '#ecfeff' },
+        { id: 'prof', name: '嚴肅教授', icon: '👨‍🏫', desc: '語氣強硬，傾向講道理', color: '#475569', bg: '#f1f5f9' },
+        { id: 'soulmate', name: '靈魂伴侶', icon: '💖', desc: '互動直覺流暢', color: '#ec4899', bg: '#fdf2f8' },
+        { id: 'peacock', name: '自信獅子', icon: '🦁', desc: '自信爆棚，自我中心', color: '#eab308', bg: '#fefce8' },
+        { id: 'volcano', name: '宣洩火山', icon: '🌋', desc: '情緒起伏較大', color: '#ef4444', bg: '#fef2f2' },
+        { id: 'owl', name: '慎重貓頭鷹', icon: '🦉', desc: '過度謹慎，客觀分析', color: '#3b82f6', bg: '#eff6ff' },
+        { id: 'sunflower', name: '溫暖向日葵', icon: '🌻', desc: '樂於分享，關心他人', color: '#f59e0b', bg: '#fffbeb' },
+        { id: 'robot', name: '靜謐觀察者', icon: '🧘', desc: '情緒平穩，話語簡潔', color: '#94a3b8', bg: '#f8fafc' },
+        { id: 'coffee', name: '歲月靜好', icon: '☕️', desc: '情緒平穩，日常安穩', color: '#6366f1', bg: '#eef2ff' }
     ];
 
     let rawChatData = [];
@@ -383,7 +405,6 @@
         const reader = new FileReader();
         reader.onload = function(e) { 
             try {
-                // Remove BOM and parse
                 const text = e.target.result.replace(/^\uFEFF/, '');
                 parseLineText(text); 
             } catch (err) {
@@ -398,12 +419,8 @@
         const lines = text.split(/\r?\n/);
         rawChatData = [];
         let currentDate = '';
-        
-        // Robust Regex: Support 2025.10.06, 2025/10/06, 2025-10-06, with optional BOM/spaces
         const dateRegex = /^\s*(\d{4})[./-](\d{1,2})[./-](\d{1,2})/;
-        // Robust Msg Regex: Time Space Name Space Content
         const timeRegex = /^(\d{1,2}:\d{2})/;
-        
         const linkRegex = /(https?:\/\/[^\s]+)/g;
 
         lines.forEach(line => {
@@ -420,21 +437,17 @@
             }
 
             if (timeRegex.test(line) && currentDate) {
-                // Split logic: Time <space/tab> Name <space/tab> Content
-                // We use first whitespace to separate time, then next whitespace for name.
                 const firstSpace = line.search(/\s/);
                 if (firstSpace === -1) return;
                 
                 const time = line.substring(0, firstSpace);
                 const rest = line.substring(firstSpace).trim();
-                
                 const secondSpace = rest.search(/\s/);
-                if (secondSpace === -1) return; // Ignore system messages like "Name left chat" if they don't match format
+                if (secondSpace === -1) return;
                 
                 const name = rest.substring(0, secondSpace);
                 const content = rest.substring(secondSpace).trim();
                 
-                // Filters
                 if (content.includes('已收回訊息') || content.includes('通話時間') || content.includes('邀請') || content.includes('加入聊天')) return;
                 
                 const isSticker = content.includes('貼圖') || content.includes('(sticker)');
@@ -445,7 +458,7 @@
 
                 rawChatData.push({
                     date: currentDate,
-                    month: currentDate.substring(0, 7), // YYYY/MM
+                    month: currentDate.substring(0, 7),
                     time: time,
                     name: name,
                     content: content,
@@ -531,17 +544,17 @@
                 }
             });
 
+            // Dynamic Threshold
             const activeDaysCount = Object.keys(daysMap).length;
             const totalMessages = msgs.length;
-            
-            // Only apply low data filter if we have enough data points
-            if (activeDaysCount > 3) {
-                 const dailyAvg = activeDaysCount > 0 ? totalMessages / activeDaysCount : 0;
-                 const lowDataThreshold = Math.max(3, dailyAvg * 0.2); 
-                 Object.values(daysMap).forEach(day => {
-                    if (day.msgs.length < lowDataThreshold) day.isLowData = true;
-                 });
-            }
+            const dailyAvg = activeDaysCount > 0 ? totalMessages / activeDaysCount : 0;
+            const lowDataThreshold = Math.max(3, dailyAvg * 0.2); 
+
+            Object.values(daysMap).forEach(day => {
+                if (day.msgs.length < lowDataThreshold) {
+                    day.isLowData = true;
+                }
+            });
 
             const dailyStats = Object.values(daysMap).sort((a, b) => new Date(a.date) - new Date(b.date));
 
@@ -580,7 +593,8 @@
             processedData[speaker] = {
                 daily: dailyStats,
                 months: [...monthSet].sort(),
-                baseline: baseline
+                baseline: baseline,
+                dailyAvg: dailyAvg
             };
         });
         
@@ -687,6 +701,7 @@
 
         if (currentMonth === 'ALL') {
             if (data.daily.length > 0) {
+                // Use robust date parsing for range filling
                 const first = new Date(data.daily[0].date);
                 const last = new Date(data.daily[data.daily.length - 1].date);
                 activeDays = fillMissingDays(data.daily, first, last);
@@ -701,6 +716,10 @@
             activeDays = fillMissingDays(data.daily.filter(d => d.month === currentMonth), firstDay, lastDay);
         }
         
+        // Render New Daily Landscape
+        renderDailyLandscape(activeDays, baseline);
+
+        // Continue regular rendering
         if (activeDays.length === 0) return;
 
         let totalWordsInterval = 0;
@@ -746,6 +765,89 @@
         calculateAllPersonas(avg, baseline);
         generateInsight(avg, baseline, intTotals.validHappyDays, activeDays.length);
         renderChart(activeDays, baseline);
+    }
+    
+    // --- NEW: Calculate Single Day Persona ---
+    function getDailyPersona(dayMetrics, baseline) {
+        // Calculate deviation for this specific day
+        const dayWordCount = dayMetrics.wordCount || 1;
+        const daySelf = (dayMetrics.self / dayWordCount) * 100;
+        const dayCog = (dayMetrics.cog / dayWordCount) * 100;
+        const dayHedge = (dayMetrics.hedge / dayWordCount) * 100;
+        
+        const stickerScore = Math.log2(dayMetrics.sticker + 1) * 1.5; 
+        const exclScore = Math.log2(dayMetrics.exclamations + 1) * 0.5;
+        const dayHappy = (dayMetrics.pos_strong * 2) + (dayMetrics.pos_normal * 1) 
+                         - (dayMetrics.neg * 1.5) - (dayMetrics.dirty_pure * 2.0)
+                         + stickerScore + exclScore;
+        
+        const dayShare = dayMetrics.links * 2 + dayMetrics.media * 1.5 + dayMetrics.sharePhrase;
+
+        // Calc Devs
+        const dSelf = getDev(daySelf, baseline.self);
+        const dCog = getDev(dayCog, baseline.cog);
+        const dHedge = getDev(dayHedge, baseline.hedge);
+        const dHappy = getDev(dayHappy, baseline.happyScore);
+        const dShare = getDev(dayShare, baseline.shareScore);
+
+        // Find winner (Reuse logic but simplified)
+        let scores = PERSONAS.map(p => {
+            let score = 5; 
+            switch(p.id) {
+                case 'hedgehog': score += (-dSelf * 0.1) + (dCog * 0.1); break;
+                case 'koala': score += (dSelf * 0.1) + (dCog * 0.1) + (dHedge * 0.1); break;
+                case 'actor': score += (dShare * 0.1) + (dSelf * 0.1) + (-dHappy * 0.1); break;
+                case 'prof': score += (dCog * 0.1) + (-dHedge * 0.1) + (-dSelf * 0.1); break;
+                case 'peacock': score += (dSelf * 0.1) + (-dHedge * 0.1) + (-dCog * 0.1); break;
+                case 'volcano': score += (dSelf * 0.1) + (-dHappy * 0.1) + (-dCog * 0.1); break;
+                case 'owl': score += (-dSelf * 0.1) + (dCog * 0.1) + (dHedge * 0.1); break;
+                case 'sunflower': score += (-dSelf * 0.1) + (dHappy * 0.1) + (dShare * 0.1); break;
+                case 'robot': score += (-dSelf * 0.1) + (-dShare * 0.1) + (-dCog * 0.1); break;
+                case 'soulmate': score += (dHappy * 0.1) + (-dCog * 0.1) + (-dHedge * 0.1); break;
+                case 'coffee': 
+                    const stability = 50 - (Math.abs(dSelf) + Math.abs(dCog) + Math.abs(dHedge) + Math.abs(dHappy) + Math.abs(dShare))/5;
+                    score += Math.max(0, stability);
+                    break;
+            }
+            return { ...p, score: Math.max(0, score) }; 
+        });
+
+        scores.sort((a, b) => b.score - a.score);
+        return scores[0];
+    }
+    
+    // --- NEW: Render Daily Landscape ---
+    function renderDailyLandscape(days, baseline) {
+        const container = document.getElementById('dailyPersonaContainer');
+        container.innerHTML = '';
+        
+        days.forEach(day => {
+            const div = document.createElement('div');
+            div.className = 'daily-item';
+            
+            const dateLabel = document.createElement('div');
+            dateLabel.className = 'daily-date';
+            dateLabel.innerText = day.date.split('/').slice(1).join('/'); // MM/DD
+            
+            const iconLabel = document.createElement('div');
+            iconLabel.className = 'daily-emoji';
+            
+            if (day.isLowData) {
+                iconLabel.innerText = '💤';
+                div.style.backgroundColor = '#f1f5f9'; // Gray
+                div.title = `${day.date} 見面/忙碌日 (低數據)`;
+            } else {
+                const persona = getDailyPersona(day.metrics, baseline);
+                iconLabel.innerText = persona.icon;
+                div.style.backgroundColor = persona.bg;
+                div.style.borderColor = persona.color;
+                div.title = `${day.date} ${persona.name}`;
+            }
+            
+            div.appendChild(dateLabel);
+            div.appendChild(iconLabel);
+            container.appendChild(div);
+        });
     }
 
     function fillMissingDays(existingDays, startDate, endDate) {
@@ -847,7 +949,7 @@
         scores.forEach(s => {
             const div = document.createElement('div');
             div.className = 'spectrum-item';
-            div.innerHTML = `<div class="spec-icon">${s.icon}</div><div class="spec-name">${s.name}</div><div class="spec-bar-bg"><div class="spec-bar-fill" style="width:${s.percent}%; background:${s.color}"></div></div><div class="spec-val">${s.percent.toFixed(1)}%</div>`;
+            div.innerHTML = `<div class="spec-icon">${s.icon}</div><div class="spec-name">${s.name}</div><div class="spec-bar-container"><div class="spec-bar-bg"><div class="spec-bar-fill" style="width:${s.percent}%; background:${s.color}"></div></div></div><div class="spec-val">${s.percent.toFixed(1)}%</div>`;
             specContainer.appendChild(div);
         });
     }
@@ -862,7 +964,7 @@
         else { elTrend.innerText = "-"; elTrend.className = "stat-trend bg-slate-100 text-slate-500"; }
     }
 
-    // Natural Language Insight Generation (v4.1 Update)
+    // Natural Language Insight Generation (v4.3 Update)
     function generateInsight(cur, base, validDays, totalDays) { 
         const sentences = [];
         
