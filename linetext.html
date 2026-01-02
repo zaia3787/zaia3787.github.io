@@ -11,7 +11,7 @@
         
         /* Message Styles */
         .message-row { border-bottom: 1px solid #f1f5f9; padding: 6px 0; display: flex; align-items: flex-start; font-size: 0.85rem; }
-        .message-time { color: #94a3b8; font-size: 0.8em; min-width: 55px; margin-top: 2px; }
+        .message-time { color: #94a3b8; font-size: 0.8em; min-width: 40px; margin-top: 2px; }
         .message-content { flex-grow: 1; margin-left: 8px; line-height: 1.5; word-break: break-all; }
         
         /* Highlight Styles */
@@ -153,6 +153,12 @@
         .validity-high { background-color: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
         .validity-med { background-color: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
         .validity-low { background-color: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+        
+        /* Modal Headers */
+        .modal h3 { color: #4f46e5; margin-top: 1rem; margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.25rem; }
+        .modal h4 { color: #334155; font-weight: 700; margin-top: 0.5rem; }
+        .modal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+        .modal-item { background: #f8fafc; padding: 10px; border-radius: 8px; border-left: 4px solid #cbd5e1; }
     </style>
 </head>
 <body class="p-4 md:p-6 min-h-screen flex flex-col bg-slate-50">
@@ -163,9 +169,9 @@
         <div>
             <h1 class="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
                 LINE 對話分析儀 
-                <span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold uppercase">v5.2 iOS Fixed</span>
+                <span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold uppercase">v5.6 Complete</span>
             </h1>
-            <p class="text-slate-500 text-sm mt-1">全方位心理語言分析：支援 iOS/PC 匯出格式 + 信效度檢核。</p>
+            <p class="text-slate-500 text-sm mt-1">全方位心理語言分析：信效度檢核 + 歷史總體角色。透過大數據演算法，解析對話中的潛在心理動機與互動模式。</p>
         </div>
         <div class="flex gap-3">
              <label for="fileInput" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl cursor-pointer transition shadow-md shadow-indigo-200 text-sm font-bold flex items-center gap-2 hover:scale-105 active:scale-95">
@@ -291,21 +297,7 @@
                 </div>
             </div>
 
-            <!-- Overall Persona Card (Historical) -->
-            <div class="md:col-span-4 overall-card p-6 rounded-2xl shadow-xl flex flex-col justify-center items-center text-center relative overflow-hidden group min-h-[320px]">
-                <div class="absolute top-0 left-0 w-full h-full bg-white/5 group-hover:bg-white/10 transition-colors"></div>
-                <div class="relative z-10 flex flex-col items-center w-full">
-                    <div class="text-[10px] uppercase font-bold tracking-[0.2em] text-white/60 mb-4 border-b border-white/10 pb-1">HISTORICAL DOMINANT</div>
-                    <div id="histIcon" class="persona-icon mb-3" style="font-size: 2.5rem;">♾️</div>
-                    <h2 id="histTitle" class="text-2xl font-bold tracking-tight text-white mb-2">歷史總定調</h2>
-                    <div class="text-[10px] bg-white/10 px-2 py-0.5 rounded text-white/80 mb-4">累積大數據分析</div>
-                    <p id="histDesc" class="text-sm text-white/80 leading-relaxed px-4 font-medium">
-                        根據所有歷史紀錄，分析整體的心理傾向。
-                    </p>
-                </div>
-            </div>
-
-            <div class="md:col-span-3 flex flex-col gap-5">
+            <div class="md:col-span-7 flex flex-col gap-5">
                 <!-- Insight Text Box -->
                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                     <h3 class="text-xs font-bold text-slate-800 mb-3 uppercase tracking-wide flex items-center gap-2 border-b border-slate-100 pb-2">
@@ -319,7 +311,7 @@
                 <!-- Spectrum List -->
                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex-grow flex flex-col">
                     <h3 class="text-xs font-bold text-slate-800 mb-3 uppercase tracking-wide flex items-center gap-2">
-                        <span class="bg-pink-100 text-pink-600 p-1.5 rounded-md">🌈</span> 當月角色光譜
+                        <span class="bg-pink-100 text-pink-600 p-1.5 rounded-md">🌈</span> 心理角色佔比光譜 (全權重分佈)
                     </h3>
                     <div id="spectrumList" class="spectrum-container flex-grow items-center px-1">
                         <div class="text-xs text-slate-400 italic w-full text-center py-4">等待數據...</div>
@@ -376,41 +368,131 @@
             資料來源：初始化...
         </div>
         <button onclick="toggleModal('infoModal')" class="text-indigo-500 hover:text-indigo-600 font-medium underline decoration-indigo-200 hover:decoration-indigo-500 transition-all text-xs">
-            了解 10 種角色卡與佔比計算公式
+            了解 25 種角色卡與分析原理
         </button>
     </footer>
 </div>
 
 <!-- Info Modal -->
 <div id="infoModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onclick="if(event.target === this) toggleModal('infoModal')">
-    <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl modal-content transform transition-all">
+    <div class="bg-white w-full max-w-5xl rounded-2xl shadow-2xl modal-content transform transition-all">
         <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
-            <h2 class="text-lg font-bold text-slate-800">📊 10 大心理角色與計算公式</h2>
+            <h2 class="text-lg font-bold text-slate-800">📊 全方位心理分析說明</h2>
             <button onclick="toggleModal('infoModal')" class="text-slate-400 hover:text-slate-600">✕</button>
         </div>
-        <div class="p-6 space-y-6 text-slate-600 text-sm leading-relaxed overflow-y-auto max-h-[60vh]">
+        <div class="p-6 space-y-8 text-slate-600 text-sm leading-relaxed overflow-y-auto max-h-[75vh]">
             
-            <div class="bg-slate-50 p-4 rounded-lg border border-slate-100 text-xs mb-4 space-y-2">
-                <h3 class="font-bold text-slate-700 text-base mb-2">🧮 專有名詞計算公式</h3>
-                <p><strong>1. 自我擁抱度 (Self-References Density):</strong><br> `(第一人稱代名詞數 / 總字數) * 100`。反映自我關注程度。</p>
-                <p><strong>2. 認知過載 (Cognitive Load Density):</strong><br> `(因果邏輯連接詞數 / 總字數) * 100`。反映大腦處理複雜資訊或合理化的程度。</p>
-                <p><strong>3. 語氣猶豫度 (Hedge Density):</strong><br> `(模糊語詞數 / 總字數) * 100`。反映自信心與不確定感。</p>
-                <p><strong>4. 快樂三角指數 (Happiness Triad):</strong><br> 綜合 `強烈正面詞(x2) + 一般正面詞(x1) - 負面詞(x1.5) + log(貼圖/驚嘆號)`。反映情緒效價與喚起度。</p>
-                <p><strong>5. 綜合分享慾 (Sharing Desire):</strong><br> `連結 + 圖片 + 影片 + 分享語句` 的總頻次。反映主動互動意願。</p>
-            </div>
+            <!-- Formulas -->
+            <section>
+                <h3>📐 5 大心理計量構面 (Psychometrics)</h3>
+                <p class="mb-3 text-xs">基於 Pennebaker 的語言探索與字數統計 (LIWC) 理論。</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                    <div class="bg-blue-50 p-3 rounded border border-blue-100">
+                        <strong>1. 自我擁抱度 (Self-Ref)</strong><br>
+                        公式：`(我,我們 / 總字數) * 100`<br>
+                        意義：高分代表真誠、自我中心；低分代表疏離、防衛。
+                    </div>
+                    <div class="bg-orange-50 p-3 rounded border border-orange-100">
+                        <strong>2. 認知過載 (Cognitive)</strong><br>
+                        公式：`(因為,所以,但是 / 總字數) * 100`<br>
+                        意義：高分代表大腦正在進行複雜運算、解釋或找藉口。
+                    </div>
+                    <div class="bg-purple-50 p-3 rounded border border-purple-100">
+                        <strong>3. 語氣猶豫度 (Hedge)</strong><br>
+                        公式：`(可能,大概,或許 / 總字數) * 100`<br>
+                        意義：高分代表缺乏自信、焦慮或保留態度。
+                    </div>
+                    <div class="bg-green-50 p-3 rounded border border-green-100">
+                        <strong>4. 快樂三角指數 (Happy)</strong><br>
+                        公式：`Σ(正向詞權重) - Σ(負向詞) + log(貼圖)`<br>
+                        特點：具備「髒話校正」，若髒話伴隨笑聲視為正向。
+                    </div>
+                    <div class="bg-cyan-50 p-3 rounded border border-cyan-100">
+                        <strong>5. 綜合分享慾 (Share)</strong><br>
+                        公式：`連結x2 + 圖片/影片x1.5 + 分享詞`<br>
+                        意義：主動開啟話題與分享生活的意願指標。
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded border border-slate-200">
+                        <strong>⚖️ 信效度與基準線</strong><br>
+                        機制：系統會自動計算個人的「歷史平均值」。所有判定皆基於「偏離常態」的幅度，而非絕對數值。低數據日會被自動標記。
+                    </div>
+                </div>
+            </section>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="border-l-4 border-orange-500 pl-3 py-1"><h3 class="font-bold text-orange-700">1. 🌵 受傷刺蝟 (防衛)</h3><p class="text-xs">特徵：低自我 + 高認知。感到被誤解，用邏輯保護自己。</p></div>
-                <div class="border-l-4 border-purple-500 pl-3 py-1"><h3 class="font-bold text-purple-700">2. 🐨 焦慮無尾熊 (焦慮)</h3><p class="text-xs">特徵：高自我 + 高認知 + 高猶豫。患得患失，內心戲多。</p></div>
-                <div class="border-l-4 border-cyan-500 pl-3 py-1"><h3 class="font-bold text-cyan-700">3. 🎭 討拍演員 (求關注)</h3><p class="text-xs">特徵：高分享 + 高自我 + 低快樂。負能量強，渴望被安慰。</p></div>
-                <div class="border-l-4 border-slate-500 pl-3 py-1"><h3 class="font-bold text-slate-700">4. 👨‍🏫 嚴肅教授 (說教)</h3><p class="text-xs">特徵：高認知 + 低猶豫。語氣強硬講道理，情感連結弱。</p></div>
-                <div class="border-l-4 border-green-500 pl-3 py-1"><h3 class="font-bold text-green-700">5. 💖 靈魂伴侶 (共鳴)</h3><p class="text-xs">特徵：高快樂 + 低認知。對話直覺流暢，最舒服的狀態。</p></div>
-                <div class="border-l-4 border-yellow-500 pl-3 py-1"><h3 class="font-bold text-yellow-700">6. 🦁 自信獅子 (自信)</h3><p class="text-xs">特徵：高自我 + 低猶豫。自信爆棚，自我中心，說話直接。</p></div>
-                <div class="border-l-4 border-red-500 pl-3 py-1"><h3 class="font-bold text-red-700">7. 🌋 宣洩火山 (情緒化)</h3><p class="text-xs">特徵：高自我 + 低快樂。非理性抱怨，單純發洩情緒。</p></div>
-                <div class="border-l-4 border-blue-500 pl-3 py-1"><h3 class="font-bold text-blue-700">8. 🦉 慎重貓頭鷹 (客觀)</h3><p class="text-xs">特徵：低自我 + 高認知 + 高猶豫。過度謹慎，客觀分析。</p></div>
-                <div class="border-l-4 border-amber-500 pl-3 py-1"><h3 class="font-bold text-amber-600">9. 🌻 溫暖向日葵 (支持)</h3><p class="text-xs">特徵：低自我 + 高快樂 + 高分享。焦點在他人，樂於分享。</p></div>
-                <div class="border-l-4 border-gray-400 pl-3 py-1"><h3 class="font-bold text-gray-600">10. 🧘 靜謐觀察者 (冷淡)</h3><p class="text-xs">特徵：三項皆低。敷衍回應，不想投入對話。</p></div>
-            </div>
+            <!-- 25 Personas -->
+            <section>
+                <h3>🎭 25 種互動角色矩陣 (25-Persona Matrix)</h3>
+                <p class="mb-3 text-xs">透過雙構面交叉比對，精準定位當下的心理狀態。</p>
+                <div class="modal-grid text-xs">
+                    <!-- Family A -->
+                    <div class="modal-item border-green-400">
+                        <strong class="text-green-700 block mb-1">🟢 正向連結家族 (Happy & Share)</strong>
+                        <ul class="list-disc pl-4 space-y-1">
+                            <li>💖 <strong>靈魂伴侶：</strong>高快樂 + 低認知。直覺共鳴。</li>
+                            <li>🌻 <strong>溫暖向日葵：</strong>高快樂 + 低自我。利他支持。</li>
+                            <li>🎉 <strong>派對嗨咖：</strong>高快樂 + 高貼圖。氣氛擔當。</li>
+                            <li>📢 <strong>熱家里長伯：</strong>高分享 + 高快樂。熱衷資訊。</li>
+                            <li>🤝 <strong>忠實盟友：</strong>高快樂 + 高自我。自信互挺。</li>
+                        </ul>
+                    </div>
+                    <!-- Family B -->
+                    <div class="modal-item border-purple-400">
+                        <strong class="text-purple-700 block mb-1">🟣 內耗焦慮家族 (Self & Anxiety)</strong>
+                        <ul class="list-disc pl-4 space-y-1">
+                            <li>🐨 <strong>焦慮無尾熊：</strong>高自我 + 高猶豫。患得患失。</li>
+                            <li>🎭 <strong>討拍演員：</strong>高自我 + 低快樂。索求安慰。</li>
+                            <li>🦁 <strong>自信獅子：</strong>高自我 + 低猶豫。自我中心。</li>
+                            <li>🌀 <strong>混亂漩渦：</strong>高自我 + 高認知 + 高猶豫。</li>
+                            <li>🥀 <strong>悲情主角：</strong>高自我 + 低快樂 + 低認知。</li>
+                        </ul>
+                    </div>
+                    <!-- Family C -->
+                    <div class="modal-item border-orange-400">
+                        <strong class="text-orange-700 block mb-1">🟠 防衛邏輯家族 (Logic & Defense)</strong>
+                        <ul class="list-disc pl-4 space-y-1">
+                            <li>🌵 <strong>受傷刺蝟：</strong>高認知 + 低自我。武裝防衛。</li>
+                            <li>👨‍🏫 <strong>嚴肅教授：</strong>高認知 + 低猶豫。說教權威。</li>
+                            <li>🦉 <strong>慎重貓頭鷹：</strong>高認知 + 高猶豫。過度分析。</li>
+                            <li>♟️ <strong>精算師：</strong>高認知 + 低分享。冷靜佈局。</li>
+                            <li>⚖️ <strong>辯護律師：</strong>高認知 + 高自我。捍衛觀點。</li>
+                        </ul>
+                    </div>
+                    <!-- Family D -->
+                    <div class="modal-item border-slate-400">
+                        <strong class="text-slate-700 block mb-1">🔵 低度投入家族 (Low Engagement)</strong>
+                        <ul class="list-disc pl-4 space-y-1">
+                            <li>🧘 <strong>靜謐觀察者：</strong>全低。情緒平穩，話少。</li>
+                            <li>💧 <strong>隨和水豚：</strong>低自我 + 低認知。隨波逐流。</li>
+                            <li>👻 <strong>隱形人：</strong>極低字數。互動趨零。</li>
+                            <li>🧊 <strong>冷面笑匠：</strong>低猶豫 + 低認知。話少精闢。</li>
+                            <li>🐢 <strong>縮頭烏龜：</strong>高猶豫 + 低分享。逃避閃躲。</li>
+                        </ul>
+                    </div>
+                    <!-- Family E -->
+                    <div class="modal-item border-red-400">
+                        <strong class="text-red-700 block mb-1">🟡 特殊狀態家族 (Special)</strong>
+                        <ul class="list-disc pl-4 space-y-1">
+                            <li>🌋 <strong>宣洩火山：</strong>高連擊 + 低快樂。情緒爆發。</li>
+                            <li>🚀 <strong>興奮火箭：</strong>高連擊 + 高快樂。狂熱連發。</li>
+                            <li>🗞️ <strong>資訊轉運站：</strong>高分享 + 低自我。純轉發。</li>
+                            <li>🧩 <strong>複雜混合體：</strong>數值極端且矛盾。</li>
+                            <li>☕️ <strong>歲月靜好：</strong>數值平穩。日常安穩。</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- References -->
+            <section>
+                <h3>📚 理論基礎與參考文獻 (References)</h3>
+                <ul class="list-decimal pl-5 space-y-2 text-xs text-slate-500">
+                    <li><strong>Pennebaker, J. W. (2011).</strong> <i>The Secret Life of Pronouns: What Our Words Say About Us.</i> (LIWC 理論基礎：代名詞與心理狀態的關聯)。</li>
+                    <li><strong>Bowlby, J. (1969).</strong> <i>Attachment and Loss.</i> (依附理論：焦慮與迴避型依附在語言上的表現)。</li>
+                    <li><strong>Altman, I., & Taylor, D. A. (1973).</strong> <i>Social Penetration: The Development of Interpersonal Relationships.</i> (社會滲透理論：自我揭露與親密度的關係)。</li>
+                    <li><strong>Berger, C. R., & Calabrese, R. J. (1975).</strong> <i>Some Explorations in Initial Interaction and Beyond.</i> (不確定性降低理論：語氣猶豫與認知過載的關係)。</li>
+                </ul>
+            </section>
+
         </div>
         <div class="p-4 bg-slate-50 rounded-b-2xl border-t border-slate-100 text-right">
             <button onclick="toggleModal('infoModal')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium transition text-sm">關閉</button>
@@ -455,17 +537,31 @@
         });
 
     const PERSONAS = [
-        { id: 'hedgehog', name: '受傷刺蝟', icon: '🌵', desc: '防衛心強且敏感', color: '#f97316', bg: '#fff7ed' },
+        { id: 'soulmate', name: '靈魂伴侶', icon: '💖', desc: '默契共鳴', color: '#ec4899', bg: '#fdf2f8' },
+        { id: 'sunflower', name: '溫暖向日葵', icon: '🌻', desc: '支持利他', color: '#eab308', bg: '#fefce8' },
+        { id: 'party', name: '派對嗨咖', icon: '🎉', desc: '氣氛帶動', color: '#22c55e', bg: '#f0fdf4' },
+        { id: 'connector', name: '熱家里長伯', icon: '📢', desc: '熱衷分享', color: '#06b6d4', bg: '#ecfeff' },
+        { id: 'ally', name: '忠實盟友', icon: '🤝', desc: '自信互挺', color: '#3b82f6', bg: '#eff6ff' },
         { id: 'koala', name: '焦慮無尾熊', icon: '🐨', desc: '患得患失', color: '#a855f7', bg: '#faf5ff' },
-        { id: 'actor', name: '討拍演員', icon: '🎭', desc: '渴望被看見與安慰', color: '#06b6d4', bg: '#ecfeff' },
-        { id: 'prof', name: '嚴肅教授', icon: '👨‍🏫', desc: '語氣強硬，傾向講道理', color: '#475569', bg: '#f1f5f9' },
-        { id: 'soulmate', name: '靈魂伴侶', icon: '💖', desc: '互動直覺流暢', color: '#ec4899', bg: '#fdf2f8' },
-        { id: 'peacock', name: '自信獅子', icon: '🦁', desc: '自信爆棚，自我中心', color: '#eab308', bg: '#fefce8' },
-        { id: 'volcano', name: '宣洩火山', icon: '🌋', desc: '情緒起伏較大', color: '#ef4444', bg: '#fef2f2' },
-        { id: 'owl', name: '慎重貓頭鷹', icon: '🦉', desc: '過度謹慎，客觀分析', color: '#3b82f6', bg: '#eff6ff' },
-        { id: 'sunflower', name: '溫暖向日葵', icon: '🌻', desc: '樂於分享，關心他人', color: '#f59e0b', bg: '#fffbeb' },
-        { id: 'robot', name: '靜謐觀察者', icon: '🧘', desc: '情緒平穩，話語簡潔', color: '#94a3b8', bg: '#f8fafc' },
-        { id: 'coffee', name: '歲月靜好', icon: '☕️', desc: '情緒平穩，日常安穩', color: '#6366f1', bg: '#eef2ff' }
+        { id: 'actor', name: '討拍演員', icon: '🎭', desc: '索求安慰', color: '#6366f1', bg: '#eef2ff' },
+        { id: 'peacock', name: '自信獅子', icon: '🦁', desc: '自我中心', color: '#f59e0b', bg: '#fffbeb' },
+        { id: 'spiral', name: '混亂漩渦', icon: '🌀', desc: '邏輯迴圈', color: '#8b5cf6', bg: '#f5f3ff' },
+        { id: 'victim', name: '悲情主角', icon: '🥀', desc: '委屈宣洩', color: '#be185d', bg: '#fdf2f8' },
+        { id: 'hedgehog', name: '受傷刺蝟', icon: '🌵', desc: '防衛合理化', color: '#f97316', bg: '#fff7ed' },
+        { id: 'prof', name: '嚴肅教授', icon: '👨‍🏫', desc: '權威說教', color: '#475569', bg: '#f8fafc' },
+        { id: 'owl', name: '慎重貓頭鷹', icon: '🦉', desc: '過度分析', color: '#1e293b', bg: '#f1f5f9' },
+        { id: 'strategist', name: '精算師', icon: '♟️', desc: '冷靜佈局', color: '#334155', bg: '#f8fafc' },
+        { id: 'debater', name: '辯護律師', icon: '⚖️', desc: '捍衛觀點', color: '#0f172a', bg: '#f1f5f9' },
+        { id: 'robot', name: '靜謐觀察者', icon: '🧘', desc: '冷淡旁觀', color: '#94a3b8', bg: '#f8fafc' },
+        { id: 'capybara', name: '隨和水豚', icon: '💧', desc: '隨波逐流', color: '#60a5fa', bg: '#eff6ff' },
+        { id: 'ghost', name: '隱形人', icon: '👻', desc: '極低互動', color: '#cbd5e1', bg: '#f8fafc' },
+        { id: 'cool', name: '冷面笑匠', icon: '🧊', desc: '話少精闢', color: '#38bdf8', bg: '#f0f9ff' },
+        { id: 'turtle', name: '縮頭烏龜', icon: '🐢', desc: '逃避閃躲', color: '#10b981', bg: '#ecfdf5' },
+        { id: 'volcano', name: '宣洩火山', icon: '🌋', desc: '情緒爆發', color: '#ef4444', bg: '#fef2f2' },
+        { id: 'rocket', name: '興奮火箭', icon: '🚀', desc: '狂熱連發', color: '#f43f5e', bg: '#fff1f2' },
+        { id: 'reporter', name: '資訊轉運站', icon: '🗞️', desc: '純轉發', color: '#64748b', bg: '#f1f5f9' },
+        { id: 'mix', name: '複雜混合體', icon: '🧩', desc: '難以捉摸', color: '#8b5cf6', bg: '#f5f3ff' },
+        { id: 'coffee', name: '歲月靜好', icon: '☕️', desc: '平穩日常', color: '#6366f1', bg: '#eef2ff' }
     ];
 
     let rawChatData = [];
@@ -484,7 +580,6 @@
         const reader = new FileReader();
         reader.onload = function(e) { 
             try {
-                // Strip BOM
                 const text = e.target.result.replace(/^\uFEFF/, '');
                 parseLineText(text); 
             } catch (err) {
@@ -500,10 +595,8 @@
         rawChatData = [];
         let currentDate = '';
         
-        // Robust Date Regex: 2025.10.06 or 2025/10/06 or 2025-10-06
         const dateRegex = /^\s*(\d{4})[./-](\d{1,2})[./-](\d{1,2})/;
-        // Robust Msg Regex: Time Space Name Space Content
-        const timeRegex = /^((?:上午|下午|AM|PM|am|pm)?\s?\d{1,2}:\d{2})/;
+        const timeRegex = /^(\d{1,2}:\d{2})/;
         const linkRegex = /(https?:\/\/[^\s]+)/g;
 
         lines.forEach(line => {
@@ -520,36 +613,21 @@
             }
 
             if (timeRegex.test(line) && currentDate) {
-                // Find first whitespace -> time end
                 const firstSpace = line.search(/\s/);
                 if (firstSpace === -1) return;
                 
-                // For Tab Separated files (iOS), parts[0] might contain time.
-                // But using spaces/tabs regex is safer.
+                const time = line.substring(0, firstSpace);
+                const rest = line.substring(firstSpace).trim();
+                const secondSpace = rest.search(/\s/);
+                if (secondSpace === -1) return;
                 
-                // Let's try splitting by tab first
-                let parts = line.split('\t');
-                let time, name, content;
-
-                if (parts.length >= 3) {
-                    time = parts[0].trim();
-                    name = parts[1].trim();
-                    content = parts.slice(2).join('\t').trim();
-                } else {
-                    // Fallback to space splitting
-                    const t = line.substring(0, firstSpace);
-                    const r = line.substring(firstSpace).trim();
-                    const s2 = r.search(/\s/);
-                    if (s2 === -1) return;
-                    time = t;
-                    name = r.substring(0, s2);
-                    content = r.substring(s2).trim();
-                }
+                const name = rest.substring(0, secondSpace);
+                const content = rest.substring(secondSpace).trim();
                 
                 if (content.includes('已收回訊息') || content.includes('通話時間') || content.includes('邀請') || content.includes('加入聊天')) return;
                 
-                const isSticker = content.includes('貼圖') || content.includes('(sticker)') || content.includes('[貼圖]');
-                const isImage = content.includes('圖片') || content.includes('照片') || content.includes('[照片]');
+                const isSticker = content.includes('貼圖') || content.includes('(sticker)');
+                const isImage = content.includes('圖片') || content.includes('照片');
                 const isVideo = content.includes('影片');
                 const links = (content.match(linkRegex) || []).length;
                 const exclamations = (content.match(/！|!/g) || []).length;
@@ -754,7 +832,7 @@
                     overallPid = pid;
                 }
             }
-            const overallPersona = PERSONAS.find(p => p.id === overallPid) || PERSONAS[10];
+            const overallPersona = PERSONAS.find(p => p.id === overallPid) || PERSONAS[24];
 
             processedData[speaker] = {
                 daily: dailyStats,
@@ -989,16 +1067,35 @@
         let scores = PERSONAS.map(p => {
             let score = 5; 
             switch(p.id) {
-                case 'hedgehog': score += (-dSelf * 0.1) + (dCog * 0.1); break;
-                case 'koala': score += (dSelf * 0.1) + (dCog * 0.1) + (dHedge * 0.1); break;
-                case 'actor': score += (dShare * 0.1) + (dSelf * 0.1) + (-dHappy * 0.1); break;
-                case 'prof': score += (dCog * 0.1) + (-dHedge * 0.1) + (-dSelf * 0.1); break;
-                case 'peacock': score += (dSelf * 0.1) + (-dHedge * 0.1) + (-dCog * 0.1); break;
-                case 'volcano': score += (dSelf * 0.1) + (-dHappy * 0.1) + (-dCog * 0.1); break;
-                case 'owl': score += (-dSelf * 0.1) + (dCog * 0.1) + (dHedge * 0.1); break;
-                case 'sunflower': score += (-dSelf * 0.1) + (dHappy * 0.1) + (dShare * 0.1); break;
-                case 'robot': score += (-dSelf * 0.1) + (-dShare * 0.1) + (-dCog * 0.1); break;
-                case 'soulmate': score += (dHappy * 0.1) + (-dCog * 0.1) + (-dHedge * 0.1); break;
+                // Group A
+                case 'soulmate': score += dHappy + (-dCog) + (-dHedge); break;
+                case 'sunflower': score += (-dSelf) + dHappy + dShare; break;
+                case 'party': score += dHappy + (dayMetrics.sticker > 5 ? 10 : 0); break;
+                case 'connector': score += dShare + dHappy; break;
+                case 'ally': score += dHappy + dSelf; break;
+                // Group B
+                case 'koala': score += dSelf + dCog + dHedge; break;
+                case 'actor': score += dShare + dSelf + (-dHappy); break;
+                case 'peacock': score += dSelf + (-dHedge) + (-dCog); break;
+                case 'spiral': score += dSelf + dCog + dHedge; break;
+                case 'victim': score += dSelf + (-dHappy) + (-dCog); break;
+                // Group C
+                case 'hedgehog': score += (-dSelf) + dCog; break;
+                case 'prof': score += dCog + (-dHedge) + (-dSelf); break;
+                case 'owl': score += (-dSelf) + dCog + dHedge; break;
+                case 'strategist': score += dCog + (-dShare); break;
+                case 'debater': score += dCog + dSelf; break;
+                // Group D
+                case 'robot': score += (-dSelf) + (-dShare) + (-dCog); break;
+                case 'capybara': score += (-dSelf) + (-dCog); break; 
+                case 'ghost': score += (dayMetrics.wordCount < 10 ? 20 : -10); break;
+                case 'cool': score += (-dHedge) + (-dCog) + dHappy; break;
+                case 'turtle': score += dHedge + (-dShare); break;
+                // Group E
+                case 'volcano': score += dSelf + (-dHappy) + (-dCog); break;
+                case 'rocket': score += dHappy + (burstFactor > 1 ? 10 : 0); break;
+                case 'reporter': score += dShare + (-dSelf) + (-dCog); break;
+                case 'mix': score += Math.abs(dHappy) > 15 && Math.abs(dCog) > 15 ? 10 : 0; break;
                 case 'coffee': 
                     const stability = 50 - (Math.abs(dSelf) + Math.abs(dCog) + Math.abs(dHedge) + Math.abs(dHappy) + Math.abs(dShare))/5;
                     score += Math.max(0, stability);
@@ -1090,16 +1187,35 @@
         let scores = PERSONAS.map(p => {
             let score = 5; 
             switch(p.id) {
-                case 'hedgehog': score += (-dSelf * 0.1) + (dCog * 0.1); break;
-                case 'koala': score += (dSelf * 0.1) + (dCog * 0.1) + (dHedge * 0.1); break;
-                case 'actor': score += (dShare * 0.1) + (dSelf * 0.1) + (-dHappy * 0.1); break;
-                case 'prof': score += (dCog * 0.1) + (-dHedge * 0.1) + (-dSelf * 0.1); break;
-                case 'peacock': score += (dSelf * 0.1) + (-dHedge * 0.1) + (-dCog * 0.1); break;
-                case 'volcano': score += (dSelf * 0.1) + (-dHappy * 0.1) + (-dCog * 0.1); break;
-                case 'owl': score += (-dSelf * 0.1) + (dCog * 0.1) + (dHedge * 0.1); break;
-                case 'sunflower': score += (-dSelf * 0.1) + (dHappy * 0.1) + (dShare * 0.1); break;
-                case 'robot': score += (-dSelf * 0.1) + (-dShare * 0.1) + (-dCog * 0.1); break;
-                case 'soulmate': score += (dHappy * 0.1) + (-dCog * 0.1) + (-dHedge * 0.1); break;
+                // Group A
+                case 'soulmate': score += dHappy + (-dCog) + (-dHedge); break;
+                case 'sunflower': score += (-dSelf) + dHappy + dShare; break;
+                case 'party': score += dHappy + (cur.happyScore > 8 ? 5 : 0); break;
+                case 'connector': score += dShare + dHappy; break;
+                case 'ally': score += dHappy + dSelf; break;
+                // Group B
+                case 'koala': score += dSelf + dCog + dHedge; break;
+                case 'actor': score += dShare + dSelf + (-dHappy); break;
+                case 'peacock': score += dSelf + (-dHedge) + (-dCog); break;
+                case 'spiral': score += dSelf + dCog + dHedge; break;
+                case 'victim': score += dSelf + (-dHappy) + (-dCog); break;
+                // Group C
+                case 'hedgehog': score += (-dSelf) + dCog; break;
+                case 'prof': score += dCog + (-dHedge) + (-dSelf); break;
+                case 'owl': score += (-dSelf) + dCog + dHedge; break;
+                case 'strategist': score += dCog + (-dShare); break;
+                case 'debater': score += dCog + dSelf; break;
+                // Group D
+                case 'robot': score += (-dSelf) + (-dShare) + (-dCog); break;
+                case 'capybara': score += (-dSelf) + (-dCog); break; 
+                case 'ghost': score += (cur.shareScore < 0.5 ? 10 : -5); break;
+                case 'cool': score += (-dHedge) + (-dCog) + dHappy; break;
+                case 'turtle': score += dHedge + (-dShare); break;
+                // Group E
+                case 'volcano': score += dSelf + (-dHappy) + (-dCog); break;
+                case 'rocket': score += dHappy + (cur.happyScore > 10 ? 10 : 0); break;
+                case 'reporter': score += dShare + (-dSelf) + (-dCog); break;
+                case 'mix': score += Math.abs(dHappy) > 15 && Math.abs(dCog) > 15 ? 10 : 0; break;
                 case 'coffee': 
                     const stability = 50 - (Math.abs(dSelf) + Math.abs(dCog) + Math.abs(dHedge) + Math.abs(dHappy) + Math.abs(dShare))/5;
                     score += Math.max(0, stability);
@@ -1126,7 +1242,7 @@
              iconContainer.appendChild(span);
         });
 
-        // Updated: Natural Language "他這個月比較..."
+        // Natural Language Generation
         let descText = `他這個月比較 <span class="font-bold">${main.desc}</span>。`;
         if (top3[1].percent > 15) descText += `同時也顯得有點 <span class="font-bold">${top3[1].desc}</span>，`;
         if (top3[2].percent > 10) descText += `偶爾會 <span class="font-bold">${top3[2].desc}</span>。`;
@@ -1158,7 +1274,7 @@
         else { elTrend.innerText = "-"; elTrend.className = "stat-trend bg-slate-100 text-slate-500"; }
     }
 
-    // Natural Language Insight Generation (v5.0 Update: "他這個月比較...")
+    // Natural Language Insight Generation
     function generateInsight(cur, base, validDays, totalDays) { 
         const sentences = [];
         
@@ -1196,7 +1312,9 @@
         const dShare = days.map(d => (d.metrics.links * 2) + (d.metrics.media * 1.5) + (d.metrics.sharePhrase * 1));
         const dHappy = days.map(d => {
             if (d.isLowData) return null;
-            return d.finalHappyScore || 0;
+            const stickerScore = Math.log2(d.metrics.sticker + 1) * 1.5; 
+            const exclScore = Math.log2(d.metrics.exclamations + 1) * 0.5;
+            return (d.metrics.pos_strong * 2) + (d.metrics.pos_normal * 1) - (d.metrics.neg * 1.5) - (d.metrics.dirty_pure * 2.0) + stickerScore + exclScore;
         });
 
         const dSelf = days.map(d => d.isLowData ? null : (d.metrics.self / (d.metrics.wordCount||1) * 100));
@@ -1240,8 +1358,10 @@
             document.getElementById('detailMood').innerText = "💤 見面/低數據";
             document.getElementById('detailMood').className = "text-[10px] px-2 py-1 rounded-full bg-slate-300 text-slate-700";
         } else {
-            const hScore = day.finalHappyScore ? day.finalHappyScore.toFixed(1) : "0.0";
-            document.getElementById('detailStats').innerText = `快樂分: ${hScore}`;
+            const stickerScore = Math.log2(day.metrics.sticker + 1) * 1.5; 
+            const exclScore = Math.log2(day.metrics.exclamations + 1) * 0.5;
+            const hScore = (day.metrics.pos_strong * 2) + (day.metrics.pos_normal * 1) - (day.metrics.neg * 1.5) - (day.metrics.dirty_pure * 2.0) + stickerScore + exclScore;
+            document.getElementById('detailStats').innerText = `快樂分: ${hScore.toFixed(1)}`;
             let mood = "日常"; let mClass = "bg-slate-200 text-slate-500";
             if (hScore > 8) { mood = "🤩 情緒高昂"; mClass = "bg-green-100 text-green-700"; }
             else if (hScore < -2) { mood = "🌧️ 疲累/低能量"; mClass = "bg-red-100 text-red-700"; }
@@ -1282,3 +1402,5 @@
 </script>
 </body>
 </html>
+
+
