@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VeriText Pro - LINE 對話心理分析</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Microsoft JhengHei', 'Segoe UI', sans-serif; background-color: #f8fafc; color: #334155; }
+        
+        /* Message Styles */
+        .message-row { border-bottom: 1px solid #f1f5f9; padding: 6px 0; display: flex; align-items: flex-start; font-size: 0.85rem; }
+        .message-time { color: #94a3b8; font-size: 0.8em; min-width: 40px; margin-top: 2px; }
+        .message-content { flex-grow: 1; margin-left: 8px; line-height: 1.5; word-break: break-all; }
+        
+        /* Highlight Styles */
+        .highlight-self { background-color: #dbeafe; color: #1e40af; border-radius: 2px; padding: 0 2px; }
+        .highlight-cog { background-color: #ffedd5; color: #9a3412; border-radius: 2px; padding: 0 2px; }
+        .highlight-hedge { background-color: #f3e8ff; color: #6b21a8; border-radius: 2px; padding: 0 2px; }
+        .highlight-pos { background-color: #dcfce7; color: #166534; border-radius: 2px; padding: 0 2px; font-weight: bold;}
+        .highlight-neg { background-color: #fee2e2; color: #991b1b; border-radius: 2px; padding: 0 2px; font-weight: bold;}
+        .highlight-dirty { background-color: #e2e8f0; color: #ef4444; border-radius: 2px; padding: 0 2px; font-weight: bold; border: 1px solid #cbd5e1; } 
+        .highlight-sticker { color: #15803d; font-weight: bold; font-size: 0.85em; background: #f0fdf4; padding: 1px 4px; border-radius: 4px; border: 1px solid #bbf7d0;}
+        .highlight-share { color: #0284c7; text-decoration: underline; background-color: #e0f2fe; padding: 0 2px; border-radius: 2px; font-weight: bold; }
+
+        /* Compact Stat Card */
+        .stat-card { background: white; border-radius: 12px; padding: 8px 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; display: flex; flex-direction: column; justify-content: center; height: 75px; transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-2px); border-color: #cbd5e1; }
+        .stat-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .stat-value { font-size: 1.4rem; font-weight: 800; color: #1e293b; line-height: 1.1; }
+        .stat-trend { font-size: 0.7rem; font-weight: 600; margin-left: 6px; padding: 1px 5px; border-radius: 9999px; }
+
+        /* Persona Card */
+        .persona-card { background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); color: white; transition: background 0.5s ease; }
+        .persona-icons-container { display: flex; gap: 8px; justify-content: center; align-items: center; margin-bottom: 0.5rem; height: 60px; }
+        .persona-icon-main { font-size: 3.5rem; text-shadow: 0 4px 6px rgba(0,0,0,0.2); animation: float 3s ease-in-out infinite; z-index: 10; }
+        .persona-icon-sub { font-size: 2rem; text-shadow: 0 4px 6px rgba(0,0,0,0.1); opacity: 0.7; filter: grayscale(30%); animation: floatDelayed 4s ease-in-out infinite; }
+        
+        /* Spectrum Bar */
+        .spectrum-container { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 12px; scroll-behavior: smooth; }
+        .spectrum-container::-webkit-scrollbar { height: 6px; }
+        .spectrum-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .spectrum-item { 
+            flex: 0 0 auto; 
+            width: 110px; 
+            background: white; 
+            border-radius: 12px; 
+            padding: 10px; 
+            border: 1px solid #e2e8f0; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .spectrum-item:hover { transform: translateY(-3px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-color: #6366f1; }
+        .spec-icon { font-size: 1.8rem; margin-bottom: 4px; }
+        .spec-name { font-size: 0.75rem; font-weight: 700; color: #475569; margin-bottom: 6px; line-height: 1.2; height: 2.4em; display: flex; align-items: center; justify-content: center; }
+        .spec-bar-bg { width: 100%; height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
+        .spec-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease-out; }
+        .spec-val { font-size: 0.7rem; color: #94a3b8; margin-top: 4px; font-weight: 600; }
+
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-5px); } 100% { transform: translateY(0px); } }
+        @keyframes floatDelayed { 0% { transform: translateY(-3px); } 50% { transform: translateY(2px); } 100% { transform: translateY(-3px); } }
+        
+        .modal { transition: opacity 0.3s ease-in-out; }
+        .modal-content { max-height: 80vh; overflow-y: auto; }
+        .low-data-day { opacity: 0.6; background-color: #f8fafc; border-left: 3px solid #cbd5e1; padding-left: 8px; }
+        
+        /* New Tab Styles - High Contrast */
+        .tab-btn { 
+            flex: 1; 
+            padding: 16px; 
+            border-radius: 12px; 
+            font-weight: 800; 
+            font-size: 1.1rem; 
+            text-align: center; 
+            cursor: pointer; 
+            transition: all 0.2s; 
+            border: 2px solid #e2e8f0; 
+            color: #94a3b8;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .tab-btn:hover { background: #f8fafc; border-color: #cbd5e1; color: #475569; }
+        .tab-btn.active { 
+            background: linear-gradient(to right, #4f46e5, #4338ca); 
+            border-color: transparent; 
+            color: white; 
+            box-shadow: 0 4px 6px -1px rgba(67, 56, 202, 0.3);
+            transform: translateY(-1px);
+        }
+        .chart-container { position: relative; height: 450px; width: 100%; }
+        
+        .tendency-badge { 
+            background: rgba(255,255,255,0.25); 
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.4);
+            border-radius: 9999px;
+            padding: 4px 14px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-6 min-h-screen flex flex-col bg-slate-50">
+
+<div class="max-w-7xl mx-auto w-full space-y-5 flex-grow">
+    <!-- Header -->
+    <header class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
+                VeriText Pro 
+                <span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold uppercase">v4.3 Ultimate</span>
+            </h1>
+            <p class="text-slate-500 text-sm mt-1">全方位心理語言分析：高容錯匯入 + 自然語言診斷。</p>
+        </div>
+        <div class="flex gap-3">
+             <label for="fileInput" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl cursor-pointer transition shadow-md shadow-indigo-200 text-sm font-bold flex items-center gap-2 hover:scale-105 active:scale-95">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                匯入聊天紀錄 (.txt)
+            </label>
+            <input type="file" id="fileInput" accept=".txt" class="hidden">
+        </div>
+    </header>
+
+    <!-- Controls Row (Hidden initially) -->
+    <div id="controls" class="hidden bg-white p-4 rounded-2xl shadow-sm border border-slate-200 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">分析對象</label>
+            <select id="speakerSelect" class="w-full bg-slate-50 border-slate-200 rounded-lg border p-2 text-sm outline-none text-slate-700 font-medium cursor-pointer hover:bg-white transition"></select>
+        </div>
+        <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">選擇區間</label>
+            <select id="monthSelect" class="w-full bg-slate-50 border-slate-200 rounded-lg border p-2 text-sm outline-none text-slate-700 font-medium cursor-pointer hover:bg-white transition"></select>
+        </div>
+        <div class="flex items-end pb-1 md:col-span-2">
+             <div id="monthStatus" class="hidden text-xs text-amber-700 font-bold flex items-center gap-1.5 bg-amber-100 px-3 py-2 rounded-lg border border-amber-200 w-full md:w-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                當前月份資料未完結，運算不具統計意義
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div id="navTabs" class="hidden flex gap-4">
+        <button onclick="switchTab('persona')" id="tabPersona" class="tab-btn active">
+            <span class="text-2xl">🎭</span> 
+            <div class="flex flex-col items-start">
+                <span>角色診斷</span>
+                <span class="text-[10px] font-normal opacity-80">心理側寫與光譜</span>
+            </div>
+        </button>
+        <button onclick="switchTab('chart')" id="tabChart" class="tab-btn">
+            <span class="text-2xl">📈</span> 
+            <div class="flex flex-col items-start">
+                <span>圖表統計</span>
+                <span class="text-[10px] font-normal opacity-80">每日趨勢與詳情</span>
+            </div>
+        </button>
+    </div>
+
+    <!-- View 1: Persona Diagnosis -->
+    <div id="viewPersona" class="hidden space-y-5">
+        
+        <!-- Compact Metrics Row -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div class="stat-card border-l-4 border-l-blue-400">
+                <div class="stat-title text-blue-500">自我擁抱度</div>
+                <div class="flex items-baseline">
+                    <div id="statSelf" class="stat-value">-</div>
+                    <div class="text-[10px] text-slate-400 ml-1">%</div>
+                    <div id="trendSelf" class="stat-trend bg-slate-100 text-slate-500">-</div>
+                </div>
+            </div>
+            <div class="stat-card border-l-4 border-l-orange-400">
+                <div class="stat-title text-orange-500">認知過載</div>
+                <div class="flex items-baseline">
+                    <div id="statCog" class="stat-value">-</div>
+                    <div class="text-[10px] text-slate-400 ml-1">%</div>
+                    <div id="trendCog" class="stat-trend bg-slate-100 text-slate-500">-</div>
+                </div>
+            </div>
+            <div class="stat-card border-l-4 border-l-purple-400">
+                <div class="stat-title text-purple-500">語氣猶豫度</div>
+                <div class="flex items-baseline">
+                    <div id="statHedge" class="stat-value">-</div>
+                    <div class="text-[10px] text-slate-400 ml-1">%</div>
+                    <div id="trendHedge" class="stat-trend bg-slate-100 text-slate-500">-</div>
+                </div>
+            </div>
+            <div class="stat-card border-l-4 border-l-green-500 bg-green-50/30">
+                <div class="stat-title text-green-600">快樂三角</div>
+                <div class="flex items-baseline">
+                    <div id="statHappy" class="stat-value">-</div>
+                    <div id="trendHappy" class="stat-trend bg-slate-100 text-slate-500">-</div>
+                </div>
+            </div>
+            <div class="stat-card border-l-4 border-l-cyan-500 bg-cyan-50/30">
+                <div class="stat-title text-cyan-600">綜合分享慾</div>
+                <div class="flex items-baseline">
+                    <div id="statShare" class="stat-value">-</div>
+                    <div id="trendShare" class="stat-trend bg-slate-100 text-slate-500">-</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-5">
+            <!-- Main Persona Card (Composite) -->
+            <div class="md:col-span-5 persona-card p-6 rounded-2xl shadow-xl flex flex-col justify-center items-center text-center relative overflow-hidden group min-h-[320px]">
+                <div class="absolute top-0 left-0 w-full h-full bg-white/5 group-hover:bg-white/10 transition-colors"></div>
+                <div class="relative z-10 flex flex-col items-center w-full">
+                    <div class="text-[10px] uppercase font-bold tracking-[0.2em] text-white/70 mb-4 border-b border-white/20 pb-1">MONTHLY COMPOSITE</div>
+                    
+                    <!-- Composite Icons -->
+                    <div id="personaIcons" class="persona-icons-container">
+                        <span id="pIcon2" class="persona-icon-sub hidden">🐨</span>
+                        <span id="pIcon1" class="persona-icon-main">👻</span>
+                        <span id="pIcon3" class="persona-icon-sub hidden">☕️</span>
+                    </div>
+
+                    <h2 id="personaTitle" class="text-3xl font-bold tracking-tight text-white mb-2">等待分析</h2>
+                    
+                    <div id="personaTag" class="text-xs text-white/90 font-medium mb-4 opacity-90 bg-white/20 px-3 py-1 rounded-full"></div>
+                    
+                    <div id="personaScore" class="tendency-badge hidden mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd" /></svg>
+                        佔比：<span id="scoreVal">0</span>%
+                    </div>
+
+                    <p id="personaDesc" class="text-sm text-white/90 leading-relaxed px-4 opacity-90 font-medium">
+                        請匯入 LINE 聊天紀錄
+                    </p>
+                </div>
+            </div>
+
+            <div class="md:col-span-7 flex flex-col gap-5">
+                <!-- Insight Text Box -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <h3 class="text-xs font-bold text-slate-800 mb-3 uppercase tracking-wide flex items-center gap-2 border-b border-slate-100 pb-2">
+                        <span class="bg-indigo-100 text-indigo-600 p-1.5 rounded-md">📊</span> 交叉分析側寫
+                    </h3>
+                    <div id="monthSummary" class="text-sm text-slate-600 leading-relaxed space-y-2">
+                        等待資料匯入...
+                    </div>
+                </div>
+
+                <!-- Spectrum List -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex-grow flex flex-col">
+                    <h3 class="text-xs font-bold text-slate-800 mb-3 uppercase tracking-wide flex items-center gap-2">
+                        <span class="bg-pink-100 text-pink-600 p-1.5 rounded-md">🌈</span> 心理角色佔比光譜 (全權重分佈)
+                    </h3>
+                    <div id="spectrumList" class="spectrum-container flex-grow items-center px-1">
+                        <div class="text-xs text-slate-400 italic w-full text-center py-4">等待數據...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View 2: Chart Statistics -->
+    <div id="viewChart" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="lg:col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-sm font-bold text-slate-700">每日心理與行為趨勢圖</h3>
+                <div class="text-[10px] text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full font-medium">💡 點擊圖例可開關曲線</div>
+            </div>
+            <div class="chart-container flex-grow">
+                <canvas id="mainChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Detail List -->
+        <div class="bg-white p-0 rounded-2xl shadow-sm border border-slate-200 flex flex-col h-[500px] overflow-hidden">
+            <div class="p-4 border-b border-slate-100 bg-slate-50">
+                <h3 class="font-bold text-slate-700 flex justify-between items-center text-sm">
+                    <span id="detailDate">請選擇日期</span>
+                    <span id="detailMood" class="text-[10px] px-2 py-1 rounded-full bg-slate-200 text-slate-500">-</span>
+                </h3>
+                <div id="detailStats" class="text-[10px] text-slate-400 mt-1"></div>
+            </div>
+            <div id="detailList" class="flex-1 overflow-y-auto p-4 space-y-3 bg-white scroll-smooth">
+                <div class="text-slate-400 text-center mt-20 text-xs flex flex-col items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" /></svg>
+                    點擊左側圖表檢視詳細對話
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-6 py-6 text-center text-slate-400 text-xs border-t border-slate-200">
+        <button onclick="toggleModal('infoModal')" class="text-indigo-500 hover:text-indigo-600 font-medium underline decoration-indigo-200 hover:decoration-indigo-500 transition-all">
+            了解 10 種角色卡與佔比計算公式
+        </button>
+    </footer>
+</div>
+
+<!-- Info Modal -->
+<div id="infoModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onclick="if(event.target === this) toggleModal('infoModal')">
+    <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl modal-content transform transition-all">
+        <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
+            <h2 class="text-lg font-bold text-slate-800">📊 10 大心理角色與計算公式</h2>
+            <button onclick="toggleModal('infoModal')" class="text-slate-400 hover:text-slate-600">✕</button>
+        </div>
+        <div class="p-6 space-y-6 text-slate-600 text-sm leading-relaxed overflow-y-auto max-h-[60vh]">
+            
+            <div class="bg-slate-50 p-4 rounded-lg border border-slate-100 text-xs mb-4 space-y-2">
+                <h3 class="font-bold text-slate-700 text-base mb-2">🧮 專有名詞計算公式</h3>
+                <p><strong>1. 自我擁抱度 (Self-References Density):</strong><br> `(第一人稱代名詞數 / 總字數) * 100`。反映自我關注程度。</p>
+                <p><strong>2. 認知過載 (Cognitive Load Density):</strong><br> `(因果邏輯連接詞數 / 總字數) * 100`。反映大腦處理複雜資訊或合理化的程度。</p>
+                <p><strong>3. 語氣猶豫度 (Hedge Density):</strong><br> `(模糊語詞數 / 總字數) * 100`。反映自信心與不確定感。</p>
+                <p><strong>4. 快樂三角指數 (Happiness Triad):</strong><br> 綜合 `強烈正面詞(x2) + 一般正面詞(x1) - 負面詞(x1.5) + log(貼圖/驚嘆號)`。反映情緒效價與喚起度。</p>
+                <p><strong>5. 綜合分享慾 (Sharing Desire):</strong><br> `連結 + 圖片 + 影片 + 分享語句` 的總頻次。反映主動互動意願。</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="border-l-4 border-orange-500 pl-3 py-1"><h3 class="font-bold text-orange-700">1. 🌵 受傷刺蝟 (防衛)</h3><p class="text-xs">特徵：低自我 + 高認知。感到被誤解，用邏輯保護自己。</p></div>
+                <div class="border-l-4 border-purple-500 pl-3 py-1"><h3 class="font-bold text-purple-700">2. 🐨 焦慮無尾熊 (焦慮)</h3><p class="text-xs">特徵：高自我 + 高認知 + 高猶豫。患得患失，內心戲多。</p></div>
+                <div class="border-l-4 border-cyan-500 pl-3 py-1"><h3 class="font-bold text-cyan-700">3. 🎭 討拍演員 (求關注)</h3><p class="text-xs">特徵：高分享 + 高自我 + 低快樂。負能量強，渴望被安慰。</p></div>
+                <div class="border-l-4 border-slate-500 pl-3 py-1"><h3 class="font-bold text-slate-700">4. 👨‍🏫 嚴肅教授 (說教)</h3><p class="text-xs">特徵：高認知 + 低猶豫。語氣強硬講道理，情感連結弱。</p></div>
+                <div class="border-l-4 border-green-500 pl-3 py-1"><h3 class="font-bold text-green-700">5. 💖 靈魂伴侶 (共鳴)</h3><p class="text-xs">特徵：高快樂 + 低認知。對話直覺流暢，最舒服的狀態。</p></div>
+                <div class="border-l-4 border-yellow-500 pl-3 py-1"><h3 class="font-bold text-yellow-700">6. 🦁 自信獅子 (自信)</h3><p class="text-xs">特徵：高自我 + 低猶豫。自信爆棚，自我中心，說話直接。</p></div>
+                <div class="border-l-4 border-red-500 pl-3 py-1"><h3 class="font-bold text-red-700">7. 🌋 宣洩火山 (情緒化)</h3><p class="text-xs">特徵：高自我 + 低快樂。非理性抱怨，單純發洩情緒。</p></div>
+                <div class="border-l-4 border-blue-500 pl-3 py-1"><h3 class="font-bold text-blue-700">8. 🦉 慎重貓頭鷹 (客觀)</h3><p class="text-xs">特徵：低自我 + 高認知 + 高猶豫。過度謹慎，客觀分析。</p></div>
+                <div class="border-l-4 border-amber-500 pl-3 py-1"><h3 class="font-bold text-amber-600">9. 🌻 溫暖向日葵 (支持)</h3><p class="text-xs">特徵：低自我 + 高快樂 + 高分享。焦點在他人，樂於分享。</p></div>
+                <div class="border-l-4 border-gray-400 pl-3 py-1"><h3 class="font-bold text-gray-600">10. 🧘 靜謐觀察者 (冷淡)</h3><p class="text-xs">特徵：三項皆低。敷衍回應，不想投入對話。</p></div>
+            </div>
+        </div>
+        <div class="p-4 bg-slate-50 rounded-b-2xl border-t border-slate-100 text-right">
+            <button onclick="toggleModal('infoModal')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium transition text-sm">關閉</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const DICT = {
+        self: ['我', '我們', '自己', '本身', '在下', '本人', '老子', '本宮', '本座', '咱', '俺', '偶', '我自己', '拎北', '哇', 'me', '人家', '本小姐', '本少爺', '勞資', '窩', '挖', '哇奔郎', '視角', '這邊', '小弟', '小妹', '老娘', '本山人', '哥', '姐', '林北', '恁爸', '我個人', '對我來說', '以我', '在我看來', '我們家', '咱們', '吾', '余', '孤', '寡人', '妾身', '奴家', '敝人', '鄙人', '末學', '筆者', '版主', '原PO', '樓主'],
+        cognitive: ['因為', '所以', '但是', '但', '不過', '其實', '除了', '如果', '導致', '為了', '原本', '接著', '然後', '結果', '雖然', '反而', '究竟', '意味著', '除非', '反正', '畢竟', '難道', '總之', '基本上', '鑑於', '於是', '只要', '因此', '然而', '否則', '以便', '以致', '加上', '只有', '由於', '以此', '或是', '或者', '並且', '而且', '固然', '縱使', '即使', '假如', '假使', '倘若', '要是', '萬一', '比如', '例如', '像是', '也就是說', '換句話說', '反之', '甚至', '顯然', '基於', '認為', '覺得', '發現', '理解', '明白', '推測', '估計', '分析', '考慮', '計畫', '打算'],
+        hedge: ['可能', '大概', '應該', '或許', '感覺', '好像', '似乎', '不確定', '那個', '嗯', '算是', '勉強', '稍微', '大約', '沒準', '看情況', '聽說', '據說', '不知', '有點', '差不多', '可能會', '應該是', '或者是', '看樣子', '搞不好', '說不定', '恐怕', '依稀', '彷彿', '大致上', '原則上', '理論上', '某種程度', '相對', '比較', '有點兒', '略微', '多少', '或是說', '話說', '呃', '痾', '那個...', '嗯...', '應該吧', '好像是', '貌似', '疑似', '或許吧'],
+        pos_strong: ['哈哈哈', '笑死', '笑爛', '太棒', '爽', '愛死', '超好', '完美', '神', '優秀', '嘻嘻', '嘿嘿', 'XD', 'XDD', '讚', '牛逼', '太神', '好笑', '笑瘋', 'www', 'XDDD', '笑噴', '笑翻', '笑慘', '好爽', '超爽', '太爽', '爽啦', '爽死', '愛了', '超愛', '太愛', '絕了', '厲害', '太強', '超強', '好強', '猛', '超猛', '太猛', '屌', '超屌', '太屌', '棒呆', '讚爆', '推爆', '神作', '優質', '崇拜', '水啦', '水喔', '666', '笑鼠', '笑到肚子痛', '哈囉', '開心死', '快樂死', '興奮', '狂', '超狂'],
+        pos_normal: ['開心', '快樂', '喜歡', '不錯', '好', '感謝', '謝謝', '舒服', '安心', '期待', '希望', '幸運', '歐耶', 'good', 'nice', 'ok', 'OK', '棒', '幸福', '滿足', '順利', '輕鬆', '放鬆', '療癒', '溫暖', '感動', '可以', '沒問題', '沒事', '不賴', '好喔', '好滴', '好噠', '辛苦了', '甘溫', '多謝', '阿里嘎多', '感恩', '欣慰', '樂意', '享受', '美滿', '甜蜜', '溫馨', '好康', '幸運', '好運', '祝福', '恭喜'],
+        neg: ['討厭', '煩', '恨', '不爽', '難過', '傷心', '累', '痛', '氣', '滾', '糟', '爛', '哭', '甚至', '無言', '傻眼', '煩躁', '擔心', '害怕', '焦慮', '生氣', '幹嘛', '問號', '...', '痛苦', '悲傷', '憂鬱', '鬱卒', '無奈', '無力', '疲憊', '心累', '心碎', '絕望', '失望', '灰心', '受傷', '委屈', '倒霉', '衰', '雖小', '賭爛', '北宋', '不開心', '不快樂', '不舒服', '不安', '緊張', '壓力', '沈重', '沈悶', '尷尬', '丟臉', '羞恥', '後悔', '遺憾', '可惜', '完蛋', '死定', '慘', '慘了', '糟糕', '崩潰', '眼神死'],
+        dirty: ['幹', '靠', '媽的', '三小', '白痴', '智障', '北七', '靠杯', '靠北', '乾', '操', '機掰', '雞掰', '他媽', '去死', '垃圾', '廢物', '白目', '腦殘', '神經', 'X的', 'TMD', 'WTF', 'shit', 'fucking', 'fuck', '機車', 'GY', '雞歪', '靠邀', '靠腰', '哭爸', '哭夭', '林老師', '你娘', '老木', '草枝擺', '趕羚羊', '媽咧', '北爛', '78', '87', '破麻', '婊子', '智缺', '低能', '啟智', '腦波弱', '有病', '神經病', '蕭婆', '瘋子'],
+        share_phrases: ['你看', '快看', '推薦', '這家', '這個好', '分享', '連結', '網址', '去吃', '去玩', '聽說這', '這間', '這首', '這部', '這裡', '那裡', '連結', 'link', 'URL', 'http', 'IG', 'instagram', 'youtube', 'yt', '開箱', '食記', '遊記', '攻略', '情報', '優惠', '特價', '團購', '必吃', '必去', '必買', '好物', '安利', '推坑', '傳給', '轉發']
+    };
+
+    const PERSONAS = [
+        { id: 'hedgehog', name: '受傷刺蝟', icon: '🌵', desc: '防衛心強且敏感', color: '#f97316' },
+        { id: 'koala', name: '焦慮無尾熊', icon: '🐨', desc: '患得患失', color: '#a855f7' },
+        { id: 'actor', name: '討拍演員', icon: '🎭', desc: '渴望被看見與安慰', color: '#06b6d4' },
+        { id: 'prof', name: '嚴肅教授', icon: '👨‍🏫', desc: '語氣強硬，傾向講道理', color: '#475569' },
+        { id: 'soulmate', name: '靈魂伴侶', icon: '💖', desc: '互動直覺流暢', color: '#ec4899' },
+        { id: 'peacock', name: '自信獅子', icon: '🦁', desc: '自信爆棚，自我中心', color: '#eab308' },
+        { id: 'volcano', name: '宣洩火山', icon: '🌋', desc: '情緒起伏較大', color: '#ef4444' },
+        { id: 'owl', name: '慎重貓頭鷹', icon: '🦉', desc: '過度謹慎，客觀分析', color: '#3b82f6' },
+        { id: 'sunflower', name: '溫暖向日葵', icon: '🌻', desc: '樂於分享，關心他人', color: '#f59e0b' },
+        { id: 'robot', name: '靜謐觀察者', icon: '🧘', desc: '情緒平穩，話語簡潔', color: '#94a3b8' },
+        { id: 'coffee', name: '歲月靜好', icon: '☕️', desc: '情緒平穩，日常安穩', color: '#6366f1' }
+    ];
+
+    let rawChatData = [];
+    let processedData = {}; 
+    let currentSpeaker = '';
+    let currentMonth = '';
+    let latestMonthInFile = ''; 
+    let mainChartInstance = null;
+    let activeTab = 'persona';
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect, false);
+
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) { 
+            try {
+                // Remove BOM and parse
+                const text = e.target.result.replace(/^\uFEFF/, '');
+                parseLineText(text); 
+            } catch (err) {
+                console.error(err);
+                alert("檔案讀取發生未知錯誤，請嘗試重新匯入。");
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function parseLineText(text) {
+        const lines = text.split(/\r?\n/);
+        rawChatData = [];
+        let currentDate = '';
+        
+        // Robust Regex: Support 2025.10.06, 2025/10/06, 2025-10-06, with optional BOM/spaces
+        const dateRegex = /^\s*(\d{4})[./-](\d{1,2})[./-](\d{1,2})/;
+        // Robust Msg Regex: Time Space Name Space Content
+        const timeRegex = /^(\d{1,2}:\d{2})/;
+        
+        const linkRegex = /(https?:\/\/[^\s]+)/g;
+
+        lines.forEach(line => {
+            line = line.trim();
+            if (!line) return;
+
+            const dateMatch = line.match(dateRegex);
+            if (dateMatch) {
+                const y = dateMatch[1];
+                const m = dateMatch[2].padStart(2, '0');
+                const d = dateMatch[3].padStart(2, '0');
+                currentDate = `${y}/${m}/${d}`;
+                return;
+            }
+
+            if (timeRegex.test(line) && currentDate) {
+                // Split logic: Time <space/tab> Name <space/tab> Content
+                // We use first whitespace to separate time, then next whitespace for name.
+                const firstSpace = line.search(/\s/);
+                if (firstSpace === -1) return;
+                
+                const time = line.substring(0, firstSpace);
+                const rest = line.substring(firstSpace).trim();
+                
+                const secondSpace = rest.search(/\s/);
+                if (secondSpace === -1) return; // Ignore system messages like "Name left chat" if they don't match format
+                
+                const name = rest.substring(0, secondSpace);
+                const content = rest.substring(secondSpace).trim();
+                
+                // Filters
+                if (content.includes('已收回訊息') || content.includes('通話時間') || content.includes('邀請') || content.includes('加入聊天')) return;
+                
+                const isSticker = content.includes('貼圖') || content.includes('(sticker)');
+                const isImage = content.includes('圖片') || content.includes('照片');
+                const isVideo = content.includes('影片');
+                const links = (content.match(linkRegex) || []).length;
+                const exclamations = (content.match(/！|!/g) || []).length;
+
+                rawChatData.push({
+                    date: currentDate,
+                    month: currentDate.substring(0, 7), // YYYY/MM
+                    time: time,
+                    name: name,
+                    content: content,
+                    isSticker: isSticker,
+                    isImage: isImage || isVideo,
+                    linkCount: links,
+                    exclamations: exclamations
+                });
+            }
+        });
+
+        if (rawChatData.length === 0) {
+            alert("未偵測到有效對話紀錄。請確認您上傳的是 LINE 電腦版「儲存聊天」匯出的文字檔 (.txt)。");
+            return;
+        }
+        processData();
+    }
+
+    function processData() {
+        const speakers = [...new Set(rawChatData.map(d => d.name))];
+        if (speakers.length === 0) return;
+        
+        const speakerCounts = {};
+        rawChatData.forEach(d => { speakerCounts[d.name] = (speakerCounts[d.name] || 0) + 1; });
+        const sortedSpeakers = Object.keys(speakerCounts).sort((a,b) => speakerCounts[b] - speakerCounts[a]);
+        
+        const spkSelect = document.getElementById('speakerSelect');
+        spkSelect.innerHTML = '';
+        sortedSpeakers.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s; opt.text = s; spkSelect.appendChild(opt);
+        });
+        currentSpeaker = sortedSpeakers[0];
+
+        const allMonths = [...new Set(rawChatData.map(d => d.month))].sort();
+        latestMonthInFile = allMonths[allMonths.length - 1];
+        processedData = {};
+        
+        speakers.forEach(speaker => {
+            const msgs = rawChatData.filter(d => d.name === speaker);
+            const daysMap = {};
+            const monthSet = new Set();
+
+            msgs.forEach(m => {
+                monthSet.add(m.month);
+                if (!daysMap[m.date]) {
+                    daysMap[m.date] = {
+                        date: m.date,
+                        month: m.month,
+                        msgs: [],
+                        metrics: { wordCount: 0, self: 0, cog: 0, hedge: 0, sticker: 0, links: 0, media: 0, sharePhrase: 0, pos_strong: 0, pos_normal: 0, neg: 0, exclamations: 0, dirty_pure: 0 },
+                        isLowData: false 
+                    };
+                }
+                const day = daysMap[m.date];
+                day.msgs.push(m);
+                
+                if (m.isSticker) {
+                    day.metrics.sticker++;
+                } else {
+                    if (m.isImage) day.metrics.media++;
+                    day.metrics.wordCount += m.content.length;
+                    day.metrics.links += m.linkCount;
+                    day.metrics.exclamations += m.exclamations;
+                    
+                    DICT.self.forEach(k => { if(m.content.includes(k)) day.metrics.self++; });
+                    DICT.cognitive.forEach(k => { if(m.content.includes(k)) day.metrics.cog++; });
+                    DICT.hedge.forEach(k => { if(m.content.includes(k)) day.metrics.hedge++; });
+                    DICT.pos_normal.forEach(k => { if(m.content.includes(k)) day.metrics.pos_normal++; });
+                    DICT.neg.forEach(k => { if(m.content.includes(k)) day.metrics.neg++; });
+                    DICT.share_phrases.forEach(k => { if(m.content.includes(k)) day.metrics.sharePhrase++; });
+                    
+                    let isDirty = false;
+                    DICT.dirty.forEach(k => { if(m.content.includes(k)) isDirty = true; });
+                    let isFunny = false;
+                    DICT.pos_strong.forEach(k => { 
+                        if(m.content.toLowerCase().includes(k.toLowerCase())) {
+                            day.metrics.pos_strong++; 
+                            isFunny = true;
+                        }
+                    });
+                    if (isDirty && !isFunny) day.metrics.dirty_pure++;
+                }
+            });
+
+            const activeDaysCount = Object.keys(daysMap).length;
+            const totalMessages = msgs.length;
+            
+            // Only apply low data filter if we have enough data points
+            if (activeDaysCount > 3) {
+                 const dailyAvg = activeDaysCount > 0 ? totalMessages / activeDaysCount : 0;
+                 const lowDataThreshold = Math.max(3, dailyAvg * 0.2); 
+                 Object.values(daysMap).forEach(day => {
+                    if (day.msgs.length < lowDataThreshold) day.isLowData = true;
+                 });
+            }
+
+            const dailyStats = Object.values(daysMap).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            let totalWordsValid = 0;
+            let grandTotals = { self:0, cog:0, hedge:0, happyScoreSum:0, validHappyDays:0, shareScoreSum:0 };
+
+            dailyStats.forEach(curr => {
+                if (!curr.isLowData) {
+                    totalWordsValid += (curr.metrics.wordCount || 1);
+                    grandTotals.self += curr.metrics.self;
+                    grandTotals.cog += curr.metrics.cog;
+                    grandTotals.hedge += curr.metrics.hedge;
+                    
+                    const stickerScore = Math.log2(curr.metrics.sticker + 1) * 1.5; 
+                    const exclScore = Math.log2(curr.metrics.exclamations + 1) * 0.5;
+                    const hScore = (curr.metrics.pos_strong * 2) + (curr.metrics.pos_normal * 1) 
+                                 - (curr.metrics.neg * 1.5) - (curr.metrics.dirty_pure * 2.0)
+                                 + stickerScore + exclScore;
+                    
+                    grandTotals.happyScoreSum += hScore;
+                    grandTotals.validHappyDays++;
+                }
+                grandTotals.shareScoreSum += (curr.metrics.links * 2) + (curr.metrics.media * 1.5) + (curr.metrics.sharePhrase * 1);
+            });
+
+            const safeWords = totalWordsValid > 0 ? totalWordsValid : 1;
+            
+            const baseline = {
+                self: (grandTotals.self / safeWords) * 100,
+                cog: (grandTotals.cog / safeWords) * 100,
+                hedge: (grandTotals.hedge / safeWords) * 100,
+                happyScore: grandTotals.validHappyDays > 0 ? grandTotals.happyScoreSum / grandTotals.validHappyDays : 0,
+                shareScore: grandTotals.shareScoreSum / dailyStats.length
+            };
+
+            processedData[speaker] = {
+                daily: dailyStats,
+                months: [...monthSet].sort(),
+                baseline: baseline
+            };
+        });
+        
+        initUI();
+    }
+
+    function initUI() {
+        const spkSelect = document.getElementById('speakerSelect');
+        spkSelect.value = currentSpeaker; 
+        
+        spkSelect.addEventListener('change', (e) => {
+            currentSpeaker = e.target.value;
+            updateMonthSelect();
+        });
+        
+        document.getElementById('monthSelect').addEventListener('change', (e) => {
+            currentMonth = e.target.value;
+            updateDashboard();
+        });
+
+        document.getElementById('controls').classList.remove('hidden');
+        document.getElementById('navTabs').classList.remove('hidden');
+        
+        switchTab('persona'); 
+        updateMonthSelect();
+    }
+
+    function switchTab(tab) {
+        activeTab = tab;
+        document.getElementById('tabPersona').classList.remove('active');
+        document.getElementById('tabChart').classList.remove('active');
+        document.getElementById('viewPersona').classList.add('hidden');
+        document.getElementById('viewChart').classList.add('hidden');
+        
+        if(tab === 'persona') {
+            document.getElementById('tabPersona').classList.add('active');
+            document.getElementById('viewPersona').classList.remove('hidden');
+            updateMonthSelect(); 
+        } else {
+            document.getElementById('tabChart').classList.add('active');
+            document.getElementById('viewChart').classList.remove('hidden');
+            updateMonthSelect();
+            setTimeout(() => { if(mainChartInstance) mainChartInstance.resize(); }, 100);
+        }
+    }
+
+    function updateMonthSelect() {
+        if (!processedData[currentSpeaker]) return;
+        const months = processedData[currentSpeaker].months;
+        const mSelect = document.getElementById('monthSelect');
+        const prevSelected = mSelect.value;
+        mSelect.innerHTML = '';
+        
+        if(activeTab === 'chart') {
+            const allOpt = document.createElement('option');
+            allOpt.value = 'ALL';
+            allOpt.text = '📅 綜觀全部紀錄';
+            mSelect.appendChild(allOpt);
+        }
+
+        months.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.text = m;
+            mSelect.appendChild(opt);
+        });
+        
+        let targetMonth = prevSelected;
+        
+        if (targetMonth === 'ALL' && activeTab === 'persona') {
+            targetMonth = ''; 
+        }
+        
+        const options = Array.from(mSelect.options).map(o => o.value);
+        if (!options.includes(targetMonth)) {
+            if(months.length > 1) {
+                targetMonth = months[months.length - 2];
+            } else if (months.length > 0) {
+                targetMonth = months[months.length - 1];
+            } else {
+                if(activeTab === 'chart') targetMonth = 'ALL';
+            }
+        }
+        
+        currentMonth = targetMonth;
+        mSelect.value = currentMonth;
+        updateDashboard();
+    }
+
+    function updateDashboard() {
+        const warningEl = document.getElementById('monthStatus');
+        
+        if (currentMonth !== 'ALL' && currentMonth === latestMonthInFile) {
+            warningEl.classList.remove('hidden');
+        } else {
+            warningEl.classList.add('hidden');
+        }
+
+        const data = processedData[currentSpeaker];
+        if (!data) return;
+
+        const baseline = data.baseline;
+        let activeDays = [];
+
+        if (currentMonth === 'ALL') {
+            if (data.daily.length > 0) {
+                const first = new Date(data.daily[0].date);
+                const last = new Date(data.daily[data.daily.length - 1].date);
+                activeDays = fillMissingDays(data.daily, first, last);
+            }
+        } else {
+            if (!currentMonth) return;
+            const parts = currentMonth.split('/');
+            const year = parseInt(parts[0]);
+            const month = parseInt(parts[1]);
+            const firstDay = new Date(year, month - 1, 1);
+            const lastDay = new Date(year, month, 0);
+            activeDays = fillMissingDays(data.daily.filter(d => d.month === currentMonth), firstDay, lastDay);
+        }
+        
+        if (activeDays.length === 0) return;
+
+        let totalWordsInterval = 0;
+        let intTotals = { self:0, cog:0, hedge:0, happyScoreSum:0, validHappyDays:0, shareScoreSum:0 };
+
+        activeDays.forEach(curr => {
+            if (!curr.isLowData) {
+                totalWordsInterval += (curr.metrics.wordCount || 1);
+                intTotals.self += curr.metrics.self;
+                intTotals.cog += curr.metrics.cog;
+                intTotals.hedge += curr.metrics.hedge;
+                
+                const stickerScore = Math.log2(curr.metrics.sticker + 1) * 1.5; 
+                const exclScore = Math.log2(curr.metrics.exclamations + 1) * 0.5;
+                const hScore = (curr.metrics.pos_strong * 2) + (curr.metrics.pos_normal * 1) 
+                                - (curr.metrics.neg * 1.5) - (curr.metrics.dirty_pure * 2.0)
+                                + stickerScore + exclScore;
+                
+                intTotals.happyScoreSum += hScore;
+                intTotals.validHappyDays++;
+            }
+            intTotals.shareScoreSum += (curr.metrics.links * 2) + (curr.metrics.media * 1.5) + (curr.metrics.sharePhrase * 1);
+        });
+
+        const safeIntWords = totalWordsInterval > 0 ? totalWordsInterval : 1;
+        const totalDivisor = activeDays.length > 0 ? activeDays.length : 1;
+        const validHappyDivisor = intTotals.validHappyDays > 0 ? intTotals.validHappyDays : 1;
+
+        const avg = {
+            self: (intTotals.self / safeIntWords) * 100,
+            cog: (intTotals.cog / safeIntWords) * 100,
+            hedge: (intTotals.hedge / safeIntWords) * 100,
+            happyScore: intTotals.happyScoreSum / validHappyDivisor,
+            shareScore: intTotals.shareScoreSum / totalDivisor
+        };
+
+        renderCard('statSelf', 'trendSelf', avg.self, baseline.self, 1);
+        renderCard('statCog', 'trendCog', avg.cog, baseline.cog, 1);
+        renderCard('statHedge', 'trendHedge', avg.hedge, baseline.hedge, 1);
+        renderCard('statHappy', 'trendHappy', avg.happyScore, baseline.happyScore, 1);
+        renderCard('statShare', 'trendShare', avg.shareScore, baseline.shareScore, 1);
+
+        calculateAllPersonas(avg, baseline);
+        generateInsight(avg, baseline, intTotals.validHappyDays, activeDays.length);
+        renderChart(activeDays, baseline);
+    }
+
+    function fillMissingDays(existingDays, startDate, endDate) {
+        const filled = [];
+        const existingMap = {};
+        existingDays.forEach(d => existingMap[d.date] = d);
+
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const dateStr = `${y}/${m}/${day}`;
+            
+            if (existingMap[dateStr]) {
+                filled.push(existingMap[dateStr]);
+            } else {
+                filled.push({
+                    date: dateStr,
+                    month: `${y}/${m}`,
+                    msgs: [],
+                    metrics: { 
+                        wordCount: 0, self: 0, cog: 0, hedge: 0, 
+                        sticker: 0, links: 0, media: 0, sharePhrase: 0,
+                        pos_strong: 0, pos_normal: 0, neg: 0, exclamations: 0,
+                        dirty_pure: 0 
+                    },
+                    isLowData: true
+                });
+            }
+        }
+        return filled;
+    }
+
+    function getDev(cur, base) {
+        if(base === 0) return 0;
+        return ((cur - base) / base) * 100;
+    }
+
+    function calculateAllPersonas(cur, base) {
+        const dSelf = getDev(cur.self, base.self);
+        const dCog = getDev(cur.cog, base.cog);
+        const dHedge = getDev(cur.hedge, base.hedge);
+        const dHappy = getDev(cur.happyScore, base.happyScore);
+        const dShare = getDev(cur.shareScore, base.shareScore);
+
+        let scores = PERSONAS.map(p => {
+            let score = 5; 
+            switch(p.id) {
+                case 'hedgehog': score += (-dSelf * 0.1) + (dCog * 0.1); break;
+                case 'koala': score += (dSelf * 0.1) + (dCog * 0.1) + (dHedge * 0.1); break;
+                case 'actor': score += (dShare * 0.1) + (dSelf * 0.1) + (-dHappy * 0.1); break;
+                case 'prof': score += (dCog * 0.1) + (-dHedge * 0.1) + (-dSelf * 0.1); break;
+                case 'peacock': score += (dSelf * 0.1) + (-dHedge * 0.1) + (-dCog * 0.1); break;
+                case 'volcano': score += (dSelf * 0.1) + (-dHappy * 0.1) + (-dCog * 0.1); break;
+                case 'owl': score += (-dSelf * 0.1) + (dCog * 0.1) + (dHedge * 0.1); break;
+                case 'sunflower': score += (-dSelf * 0.1) + (dHappy * 0.1) + (dShare * 0.1); break;
+                case 'robot': score += (-dSelf * 0.1) + (-dShare * 0.1) + (-dCog * 0.1); break;
+                case 'soulmate': score += (dHappy * 0.1) + (-dCog * 0.1) + (-dHedge * 0.1); break;
+                case 'coffee': 
+                    const stability = 50 - (Math.abs(dSelf) + Math.abs(dCog) + Math.abs(dHedge) + Math.abs(dHappy) + Math.abs(dShare))/5;
+                    score += Math.max(0, stability);
+                    break;
+            }
+            return { ...p, score: Math.max(0, score) }; 
+        });
+
+        const totalScore = scores.reduce((sum, item) => sum + item.score, 0);
+        scores = scores.map(p => ({ ...p, percent: totalScore > 0 ? (p.score / totalScore) * 100 : 0 }));
+        scores = scores.sort((a, b) => b.percent - a.percent);
+
+        const top3 = scores.slice(0, 3);
+        const main = top3[0];
+        
+        document.getElementById('personaTitle').innerText = `${main.name} (${main.percent.toFixed(0)}%)`;
+        
+        const iconContainer = document.getElementById('personaIcons');
+        iconContainer.innerHTML = '';
+        top3.forEach((p, idx) => {
+             const span = document.createElement('span');
+             span.innerText = p.icon;
+             span.className = idx === 0 ? "persona-icon-main" : "persona-icon-sub";
+             iconContainer.appendChild(span);
+        });
+
+        // Updated: Natural Language
+        let descText = `他這個月比較 <span class="font-bold">${main.desc}</span>。`;
+        if (top3[1].percent > 15) descText += `同時也顯得有點 <span class="font-bold">${top3[1].desc}</span>，`;
+        if (top3[2].percent > 10) descText += `偶爾會 <span class="font-bold">${top3[2].desc}</span>。`;
+        
+        document.getElementById('personaDesc').innerHTML = descText;
+        document.getElementById('personaTag').innerText = `主導角色佔比 ${main.percent.toFixed(1)}%`;
+        document.querySelector('.persona-card').style.background = main.color;
+        
+        document.getElementById('personaScore').classList.remove('hidden');
+        document.getElementById('scoreVal').innerText = main.percent.toFixed(0);
+
+        const specContainer = document.getElementById('spectrumList');
+        specContainer.innerHTML = '';
+        scores.forEach(s => {
+            const div = document.createElement('div');
+            div.className = 'spectrum-item';
+            div.innerHTML = `<div class="spec-icon">${s.icon}</div><div class="spec-name">${s.name}</div><div class="spec-bar-bg"><div class="spec-bar-fill" style="width:${s.percent}%; background:${s.color}"></div></div><div class="spec-val">${s.percent.toFixed(1)}%</div>`;
+            specContainer.appendChild(div);
+        });
+    }
+
+    function renderCard(valId, trendId, current, base, decimals) {
+        document.getElementById(valId).innerText = current.toFixed(decimals);
+        const elTrend = document.getElementById(trendId);
+        const diff = current - base;
+        const pct = base > 0 ? (diff / base) * 100 : 0;
+        if (diff > 0.01) { elTrend.innerText = `↑${Math.abs(pct).toFixed(0)}%`; elTrend.className = "stat-trend bg-red-100 text-red-600"; }
+        else if (diff < -0.01) { elTrend.innerText = `↓${Math.abs(pct).toFixed(0)}%`; elTrend.className = "stat-trend bg-green-100 text-green-600"; }
+        else { elTrend.innerText = "-"; elTrend.className = "stat-trend bg-slate-100 text-slate-500"; }
+    }
+
+    // Natural Language Insight Generation (v4.1 Update)
+    function generateInsight(cur, base, validDays, totalDays) { 
+        const sentences = [];
+        
+        if (cur.happyScore < base.happyScore * 0.6) {
+            sentences.push(`他這個月比較 <span class="font-bold text-slate-600">疲累或忙碌</span>，整體快樂指數偏低。`);
+        } else if (cur.happyScore > base.happyScore * 1.2) {
+            sentences.push(`他這個月比較 <span class="font-bold text-pink-600">正向積極</span>，充滿能量！`);
+        }
+
+        if (cur.self < base.self * 0.8 && cur.cog > base.cog * 1.2) {
+            sentences.push(`他這個月比較 <span class="font-bold text-orange-600">敏感防衛</span>，可能會用邏輯來保護自己。`);
+        } else if (cur.self > base.self * 1.2) {
+            sentences.push(`他這個月比較 <span class="font-bold text-blue-600">自我中心</span>，熱衷分享自己的想法。`);
+        }
+
+        if (cur.cog > base.cog * 1.2 && cur.hedge > base.hedge * 1.2) {
+            sentences.push(`他這個月比較 <span class="font-bold text-purple-600">猶豫不決</span>，語氣充滿不確定性。`);
+        }
+
+        // Fallback
+        if(sentences.length === 0) {
+             sentences.push(`他這個月比較 <span class="font-bold text-indigo-600">平穩安定</span>，沒有太大的情緒起伏，相處起來應該蠻舒服的。`);
+        }
+
+        const displayTitle = currentMonth === 'ALL' ? '全期綜觀' : currentMonth;
+        document.getElementById('monthSummary').innerHTML = `<strong>${displayTitle}：</strong> ` + sentences.join("<br>");
+    }
+
+    function renderChart(days, baseline) {
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        const labels = days.map(d => d.date.split('/').slice(1).join('/')); 
+        const dShare = days.map(d => (d.metrics.links * 2) + (d.metrics.media * 1.5) + (d.metrics.sharePhrase * 1));
+        const dHappy = days.map(d => {
+            if (d.isLowData) return null;
+            const stickerScore = Math.log2(d.metrics.sticker + 1) * 1.5; 
+            const exclScore = Math.log2(d.metrics.exclamations + 1) * 0.5;
+            return (d.metrics.pos_strong * 2) + (d.metrics.pos_normal * 1) - (d.metrics.neg * 1.5) - (d.metrics.dirty_pure * 2.0) + stickerScore + exclScore;
+        });
+
+        const dSelf = days.map(d => d.isLowData ? null : (d.metrics.self / (d.metrics.wordCount||1) * 100));
+        const dCog = days.map(d => d.isLowData ? null : (d.metrics.cog / (d.metrics.wordCount||1) * 100));
+        const dHedge = days.map(d => d.isLowData ? null : (d.metrics.hedge / (d.metrics.wordCount||1) * 100));
+        const dOffline = days.map(d => d.isLowData ? 2 : 0);
+
+        if (mainChartInstance) mainChartInstance.destroy();
+
+        mainChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    { type: 'line', label: '綜合分享慾', data: dShare, borderColor: '#06b6d4', backgroundColor: 'rgba(6, 182, 212, 0.1)', borderWidth: 2, tension: 0.3, yAxisID: 'y' },
+                    { type: 'line', label: '自我擁抱度 (%)', data: dSelf, borderColor: '#3b82f6', borderDash: [5, 5], borderWidth: 1.5, tension: 0.3, hidden: true, yAxisID: 'y1' },
+                    { type: 'line', label: '認知過載 (%)', data: dCog, borderColor: '#f97316', borderDash: [5, 5], borderWidth: 1.5, tension: 0.3, hidden: true, yAxisID: 'y1' },
+                    { type: 'line', label: '語氣猶豫度 (%)', data: dHedge, borderColor: '#a855f7', borderDash: [5, 5], borderWidth: 1.5, tension: 0.3, hidden: true, yAxisID: 'y1' },
+                    { type: 'bar', label: '快樂指數', data: dHappy, backgroundColor: (ctx) => ctx.raw >= 0 ? 'rgba(34, 197, 94, 0.6)' : 'rgba(239, 68, 68, 0.6)', yAxisID: 'y' },
+                    { type: 'bar', label: '見面/低對話', data: dOffline, backgroundColor: '#cbd5e1', yAxisID: 'y', barPercentage: 0.8 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                scales: { 
+                    y: { type: 'linear', display: true, position: 'left', title: { display: true, text: '指數 / 次數' } }, 
+                    y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: '語言佔比 (%)' } }
+                },
+                plugins: { legend: { position: 'top', labels: { boxWidth: 12, usePointStyle: true } } },
+                onClick: (e, els) => { if(els.length > 0) showDetails(days[els[0].index]); }
+            }
+        });
+        if(days.length > 0) showDetails(days[days.length-1]);
+    }
+
+    function showDetails(day) {
+        const list = document.getElementById('detailList');
+        document.getElementById('detailDate').innerText = `${day.date}`;
+        if (day.isLowData) {
+            document.getElementById('detailStats').innerText = `訊息數: ${day.msgs.length}`;
+            document.getElementById('detailMood').innerText = "💤 見面/低數據";
+            document.getElementById('detailMood').className = "text-[10px] px-2 py-1 rounded-full bg-slate-300 text-slate-700";
+        } else {
+            const stickerScore = Math.log2(day.metrics.sticker + 1) * 1.5; 
+            const exclScore = Math.log2(day.metrics.exclamations + 1) * 0.5;
+            const hScore = (day.metrics.pos_strong * 2) + (day.metrics.pos_normal * 1) - (day.metrics.neg * 1.5) - (day.metrics.dirty_pure * 2.0) + stickerScore + exclScore;
+            document.getElementById('detailStats').innerText = `快樂分: ${hScore.toFixed(1)}`;
+            let mood = "日常"; let mClass = "bg-slate-200 text-slate-500";
+            if (hScore > 8) { mood = "🤩 情緒高昂"; mClass = "bg-green-100 text-green-700"; }
+            else if (hScore < -2) { mood = "🌧️ 疲累/低能量"; mClass = "bg-red-100 text-red-700"; }
+            else if ((day.metrics.links + day.metrics.media) > 3) { mood = "🔗 狂熱分享"; mClass = "bg-cyan-100 text-cyan-700"; }
+            const badge = document.getElementById('detailMood'); badge.innerText = mood; badge.className = `text-[10px] px-2 py-1 rounded-full ${mClass}`;
+        }
+        list.innerHTML = '';
+        if(day.msgs.length === 0) { list.innerHTML = '<div class="text-center text-slate-400 mt-10">（本日無對話紀錄，可能為見面日）</div>'; return; }
+        day.msgs.forEach(msg => {
+            const div = document.createElement('div'); div.className = 'message-row';
+            if (day.isLowData) div.classList.add('low-data-day');
+            let html = msg.content;
+            if (msg.isSticker) html = `<span class="highlight-sticker">LINE 貼圖</span>`;
+            else if (msg.isImage) html = `<span class="highlight-share font-bold">[圖片/影片]</span>`;
+            else {
+                const urlRegex = /(https?:\/\/[^\s]+)/g; html = html.replace(urlRegex, '<span class="highlight-share">連結</span>');
+                DICT.share_phrases.forEach(w => html = html.replaceAll(w, `<span class="highlight-share">${w}</span>`));
+                DICT.pos_strong.forEach(w => html = html.replaceAll(w, `<span class="highlight-pos">${w}</span>`));
+                DICT.neg.forEach(w => html = html.replaceAll(w, `<span class="highlight-neg">${w}</span>`));
+                let isDirty = false;
+                DICT.dirty.forEach(w => { if (html.includes(w)) isDirty = true; html = html.replaceAll(w, `<span class="highlight-dirty">${w}</span>`) });
+                html = html.replace(/！|!/g, '<span class="text-red-500 font-bold">!</span>');
+            }
+            div.innerHTML = `<div class="message-time">${msg.time}</div><div class="message-content text-slate-700">${html}</div>`; list.appendChild(div);
+        });
+    }
+
+    function toggleModal(id) {
+        const el = document.getElementById(id);
+        if(el.classList.contains('hidden')) { el.classList.remove('hidden'); setTimeout(() => el.querySelector('div').classList.remove('scale-95', 'opacity-0'), 10); } 
+        else { el.querySelector('div').classList.add('scale-95', 'opacity-0'); setTimeout(() => el.classList.add('hidden'), 200); }
+    }
+</script>
+</body>
+</html>
