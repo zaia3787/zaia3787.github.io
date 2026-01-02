@@ -50,6 +50,7 @@
         import { getFirestore, collection, addDoc, query, onSnapshot, deleteDoc, doc, updateDoc, setDoc, serverTimestamp, writeBatch, getDocs, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Init ---
+        // 使用真實金鑰
         const firebaseConfig = {
           apiKey: "AIzaSyBAhA7PnvzJYT_Lil1iX-TVIEgtd9rBVHg",
           authDomain: "wfjh-87c3c.firebaseapp.com",
@@ -62,7 +63,9 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        // 固定 ID
         const appId = 'wfjh-tablet-system';
+        const ADMIN_EMAIL = 'zaia3787@gmail.com'; 
 
         // --- Initial Data ---
         const INITIAL_CARTS = [
@@ -125,6 +128,22 @@
             }
             ranges.push(rangeStart === prev ? `No.${rangeStart}` : `No.${rangeStart}~${prev}`);
             return ranges.join('、');
+        };
+
+        const sendEmailNotification = async (data) => {
+            try {
+                const payload = {
+                    _subject: `[平板預約] ${data.user} - ${data.type === 'long-term' ? '長期' : '單次'}`,
+                    _template: "table",
+                    _captcha: "false",
+                    ...data
+                };
+                await fetch(`https://formsubmit.co/ajax/${ADMIN_EMAIL}`, {
+                    method: "POST",
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            } catch (error) { console.error("Email error:", error); }
         };
 
         // --- UI Components ---
@@ -228,12 +247,10 @@
                 if (!cart) return [];
                 let available = new Set(ALL_DEVICES);
                 
-                // 1. Maintenance
                 const maintenance = cartStatus[cartId];
                 if (maintenance && maintenance.brokenIds) maintenance.brokenIds.forEach(id => available.delete(id));
                 else if (maintenance && maintenance.brokenCount) for(let i=1; i<=maintenance.brokenCount; i++) available.delete(i);
 
-                // 2. Bookings
                 bookings.forEach(b => {
                     if (b.cartId !== cartId || b.status === 'cancelled') return;
 
@@ -274,9 +291,13 @@
                 });
             };
 
+            const openReportModal = () => {
+                setModalConfig({ type: 'custom', title: '今日出貨報表', render: ({ onClose }) => <DailyReportModal bookings={bookings} onClose={onClose} /> });
+            };
+
             return (
                 <div className="min-h-screen flex flex-col relative">
-                    {/* Welcome Popup (New) */}
+                    {/* Welcome Popup */}
                     {showWelcome && (
                         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
                             <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
@@ -334,7 +355,8 @@
                     </main>
                     <footer className="bg-gray-800 text-gray-400 text-center py-4 text-sm">
                         &copy; {new Date().getFullYear()} 學校資訊組 | 
-                        <button onClick={handleBackendAccess} className="ml-2 hover:text-white underline decoration-dotted transition">行政人員管理後台</button>
+                        <button onClick={handleBackendAccess} className="ml-2 hover:text-white underline decoration-dotted transition">行政人員管理後台</button> | 
+                        <button onClick={openReportModal} className="ml-2 hover:text-white underline decoration-dotted transition">今日出貨</button>
                     </footer>
                 </div>
             );
@@ -552,6 +574,21 @@
                 const assignedIds = availableIds.slice(0, needed);
                 try {
                     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'bookings'), { ...form, cartId: selectedSlot.cart.id, cartLoc: selectedSlot.cart.location, date: date, dayOfWeek: getDayOfWeek(date), period: selectedSlot.period, status: 'active', deviceIds: assignedIds, createdAt: serverTimestamp(), createdBy: user.uid });
+                    
+                    // Send Email Notification
+                    const emailData = {
+                        type: 'one-time',
+                        user: form.user,
+                        ext: form.ext,
+                        dateStr: date,
+                        periodStr: `第 ${selectedSlot.period} 節`,
+                        cartId: selectedSlot.cart.id,
+                        quantity: needed,
+                        deviceStr: formatDeviceList(assignedIds),
+                        note: form.note || "無"
+                    };
+                    sendEmailNotification(emailData);
+
                     showToast(`預約成功！分配編號: ${formatDeviceList(assignedIds)}`); setSelectedSlot(null); setForm({ ...form, note: '', quantity: 30 });
                 } catch (err) { showToast("預約失敗", "error"); }
             };
@@ -693,6 +730,21 @@
                     });
                     if(fail) { showToast("部分時段無法分配連續相同的編號", "error"); return; }
                     await batch.commit(); 
+                    
+                    // Send Email Notification (Batch)
+                    const emailData = {
+                        type: 'long-term',
+                        user: form.user,
+                        ext: form.ext,
+                        dateStr: `${form.startDate} ~ ${form.endDate}`,
+                        periodStr: `共 ${form.selectedSlots.length} 個時段`, 
+                        cartId: form.cartId,
+                        quantity: needed,
+                        deviceStr: useGlobal ? formatDeviceList(assignedIdsGlobal) + " (全期固定)" : "依時段分配 (詳見系統)",
+                        note: form.note || "無"
+                    };
+                    sendEmailNotification(emailData);
+
                     showToast(useGlobal ? "租借成功！全程鎖定相同編號。" : "租借成功！每週固定時段編號相同。"); 
                     setForm({ ...form, selectedSlots: [], user: '', ext: '', note: '' }); setCheckResult(null); setStep(1);
                 } catch (e) { showToast("建立失敗", "error"); }
@@ -732,7 +784,7 @@
             };
 
             const openMaintenanceModal = (cartId) => { const status = cartStatus[cartId] || {}; let ids = status.brokenIds || (status.brokenCount ? Array.from({length: status.brokenCount}, (_,i)=>i+1) : []); setEditingMaintenance({ cartId, brokenIds: new Set(ids) }); setModalConfig({ type: 'custom', title: `${cartId} 車 - 鎖定管理`, render: ({ onClose }) => <MaintenanceGrid cartId={cartId} initialIds={ids} onClose={onClose} db={db} appId={appId} showToast={showToast} /> }); };
-            const openReportModal = () => { setModalConfig({ type: 'custom', title: '今日出貨報表', render: ({ onClose }) => <DailyReportModal bookings={bookings} onClose={onClose} /> }); };
+            
             const handleAddCart = async () => { if (!newCart.id || !newCart.location) return showToast("請填寫完整資訊", "error"); try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'carts', newCart.id.toUpperCase()), { ...newCart, id: newCart.id.toUpperCase() }); setIsAddingCart(false); setNewCart({ id: '', location: '', total: 36, enableOneTime: true, enableLongTerm: true }); showToast("新增成功"); } catch(e) { showToast("新增失敗", "error"); } };
             const handleUpdateCart = async (cart, field, val) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'carts', cart.id), { [field]: val });
             const handleDeleteCart = (id) => { setModalConfig({ type: 'confirm', title: '確認刪除車輛', message: `確定要刪除 ${id} 車嗎？`, onConfirm: async () => { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'carts', id)); showToast("已刪除"); } }); };
@@ -746,7 +798,7 @@
 
             return (
                 <div className="space-y-8 animate-fade-in">
-                    <button onClick={openReportModal} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition transform hover:-translate-y-1 flex items-center justify-center gap-3"><i data-lucide="clipboard-list" className="w-8 h-8"></i><span className="text-2xl font-bold">查看今日出貨報表</span><span className="text-purple-200 text-sm font-normal">(點擊開啟)</span></button>
+                    
                     <div className="bg-white p-5 rounded-lg card-shadow border-t-4 border-gray-600">
                         <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg flex items-center gap-2 text-gray-800"><i data-lucide="truck" className="w-5 h-5"></i> 車輛管理設定</h3><button onClick={() => setIsAddingCart(true)} className="bg-gray-800 text-white px-3 py-1 rounded text-sm hover:bg-black transition flex items-center gap-1"><i data-lucide="plus" className="w-4 h-4"></i> 新增車輛</button></div>
                         {isAddingCart && ( <div className="bg-gray-100 p-4 rounded mb-4 animate-fade-in"><h4 className="font-bold text-sm mb-2">新增車輛</h4><div className="flex flex-wrap gap-2 items-end"><div className="w-20"><label className="text-xs">代號</label><input type="text" className="w-full border p-1 rounded uppercase" placeholder="Z" value={newCart.id} onChange={e => setNewCart({...newCart, id: e.target.value})} /></div><div className="flex-1"><label className="text-xs">位置</label><input type="text" className="w-full border p-1 rounded" placeholder="教務處" value={newCart.location} onChange={e => setNewCart({...newCart, location: e.target.value})} /></div><div className="w-20"><label className="text-xs">總量</label><input type="number" className="w-full border p-1 rounded" value={newCart.total} onChange={e => setNewCart({...newCart, total: parseInt(e.target.value)})} /></div><button onClick={handleAddCart} className="bg-green-600 text-white px-3 py-1 rounded text-sm">儲存</button><button onClick={() => setIsAddingCart(false)} className="text-gray-500 text-sm px-2">取消</button></div></div> )}
@@ -755,7 +807,13 @@
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                         <div className="lg:col-span-1 bg-white p-5 rounded-lg card-shadow h-fit"><h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-gray-700"><i data-lucide="tool" className="w-5 h-5"></i> 鎖定控制管理</h3><div className="space-y-2 max-h-[600px] overflow-y-auto pr-1 custom-scrollbar">{carts.map(cart => { const status = cartStatus[cart.id] || {}; const brokenCount = status.brokenIds ? status.brokenIds.length : (status.brokenCount || 0); return (<div key={cart.id} className="border rounded p-3 bg-gray-50 flex justify-between items-center"><div><div className="font-bold text-gray-700">{cart.id} 車</div><div className="text-xs text-gray-500">{cart.location}</div></div><div className="flex items-center gap-2"><span className={`text-sm font-bold ${brokenCount > 0 ? 'text-red-600' : 'text-green-600'}`}>{brokenCount > 0 ? `鎖定 ${brokenCount}` : '正常'}</span><button onClick={() => openMaintenanceModal(cart.id)} className="text-gray-400 hover:text-blue-600"><i data-lucide="settings-2" className="w-4 h-4"></i></button></div></div>) })}</div></div>
                         <div className="lg:col-span-3 bg-white p-5 rounded-lg card-shadow">
-                            <div className="flex flex-wrap justify-between items-center mb-6 gap-4"><h3 className="font-bold text-lg flex items-center gap-2 text-gray-700"><i data-lucide="list" className="w-5 h-5"></i> 預約紀錄</h3><div className="flex gap-2"><button onClick={exportCSV} className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition"><i data-lucide="download" className="w-4 h-4"></i> CSV</button><div className="bg-gray-100 rounded p-1 flex">{['all','active','long-term'].map(f => <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1 rounded text-sm ${filter === f ? 'bg-white shadow text-blue-600 font-bold' : 'text-gray-500 hover:text-gray-700'}`}>{f==='all'?'全部':f==='active'?'有效':'長期'}</button>)}</div></div></div>
+                            <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
+                                <h3 className="font-bold text-lg flex items-center gap-2 text-gray-700"><i data-lucide="list" className="w-5 h-5"></i> 預約紀錄</h3>
+                                <div className="flex gap-2">
+                                    <button onClick={exportCSV} className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition"><i data-lucide="download" className="w-4 h-4"></i> CSV</button>
+                                    <div className="bg-gray-100 rounded p-1 flex">{['all','active','long-term'].map(f => <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1 rounded text-sm ${filter === f ? 'bg-white shadow text-blue-600 font-bold' : 'text-gray-500 hover:text-gray-700'}`}>{f==='all'?'全部':f==='active'?'有效':'長期'}</button>)}</div>
+                                </div>
+                            </div>
                             <div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-gray-50 text-gray-600 uppercase"><tr><th className="p-3">類型/時間</th><th className="p-3">車號</th><th className="p-3">借用人</th><th className="p-3">數量</th><th className="p-3">分配編號</th><th className="p-3">操作</th></tr></thead><tbody className="divide-y">{displayList.map(b => (<tr key={b.id || b.batchId} className="hover:bg-gray-50"><td className="p-3">{b.type === 'long-term' ? (<div><span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-bold mr-2">長期</span><br/>{b.startDate}~{b.endDate}<div className="text-purple-600 text-xs mt-1 font-bold">{b.isGroup ? b.scheduleText : `週${DAY_LABELS[b.dayOfWeek]} / 第 ${b.period} 節`}</div></div>) : (<div><span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-bold mr-2">單次</span><br/>{b.date}<div className="text-gray-500 text-xs mt-1">第 {b.period} 節</div></div>)}</td><td className="p-3 font-bold text-gray-700">{b.cartId} 車</td><td className="p-3"><div>{b.user}</div><div className="text-xs text-gray-400">分機 {b.ext}</div></td><td className="p-3">{b.quantity} 生 {b.needTeacherPad && '+ 1 師'}</td><td className="p-3 text-xs text-gray-600 max-w-[150px] truncate" title={formatDeviceList(b.deviceIds)}>{formatDeviceList(b.deviceIds)}</td><td className="p-3 flex gap-2"><button onClick={() => handleDelete(b)} className="text-red-500 hover:bg-red-50 p-2 rounded"><i data-lucide="trash-2" className="w-4 h-4"></i></button><button onClick={() => handleEdit(b)} className="text-blue-500 hover:bg-blue-50 p-2 rounded"><i data-lucide="edit" className="w-4 h-4"></i></button></td></tr>))}{displayList.length === 0 && <tr><td colSpan="6" className="p-8 text-center text-gray-400">無資料</td></tr>}</tbody></table></div>
                         </div>
                     </div>
