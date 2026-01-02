@@ -11,7 +11,7 @@
         
         /* Message Styles */
         .message-row { border-bottom: 1px solid #f1f5f9; padding: 6px 0; display: flex; align-items: flex-start; font-size: 0.85rem; }
-        .message-time { color: #94a3b8; font-size: 0.8em; min-width: 60px; margin-top: 2px; } /* Widened for "上午 12:00" */
+        .message-time { color: #94a3b8; font-size: 0.8em; min-width: 55px; margin-top: 2px; }
         .message-content { flex-grow: 1; margin-left: 8px; line-height: 1.5; word-break: break-all; }
         
         /* Highlight Styles */
@@ -163,9 +163,9 @@
         <div>
             <h1 class="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
                 LINE 對話分析儀 
-                <span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold uppercase">v5.1 iOS Fix</span>
+                <span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold uppercase">v5.2 iOS Fixed</span>
             </h1>
-            <p class="text-slate-500 text-sm mt-1">全方位心理語言分析：信效度檢核 + 歷史總體角色。支援 iOS/Android/PC 匯出格式。</p>
+            <p class="text-slate-500 text-sm mt-1">全方位心理語言分析：支援 iOS/PC 匯出格式 + 信效度檢核。</p>
         </div>
         <div class="flex gap-3">
              <label for="fileInput" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl cursor-pointer transition shadow-md shadow-indigo-200 text-sm font-bold flex items-center gap-2 hover:scale-105 active:scale-95">
@@ -176,7 +176,7 @@
         </div>
     </header>
 
-    <!-- Validity Banner -->
+    <!-- Validity Banner (Placed below Title) -->
     <div id="validityBanner" class="validity-banner hidden">
         <!-- JS will populate this -->
     </div>
@@ -291,7 +291,21 @@
                 </div>
             </div>
 
-            <div class="md:col-span-7 flex flex-col gap-5">
+            <!-- Overall Persona Card (Historical) -->
+            <div class="md:col-span-4 overall-card p-6 rounded-2xl shadow-xl flex flex-col justify-center items-center text-center relative overflow-hidden group min-h-[320px]">
+                <div class="absolute top-0 left-0 w-full h-full bg-white/5 group-hover:bg-white/10 transition-colors"></div>
+                <div class="relative z-10 flex flex-col items-center w-full">
+                    <div class="text-[10px] uppercase font-bold tracking-[0.2em] text-white/60 mb-4 border-b border-white/10 pb-1">HISTORICAL DOMINANT</div>
+                    <div id="histIcon" class="persona-icon mb-3" style="font-size: 2.5rem;">♾️</div>
+                    <h2 id="histTitle" class="text-2xl font-bold tracking-tight text-white mb-2">歷史總定調</h2>
+                    <div class="text-[10px] bg-white/10 px-2 py-0.5 rounded text-white/80 mb-4">累積大數據分析</div>
+                    <p id="histDesc" class="text-sm text-white/80 leading-relaxed px-4 font-medium">
+                        根據所有歷史紀錄，分析整體的心理傾向。
+                    </p>
+                </div>
+            </div>
+
+            <div class="md:col-span-3 flex flex-col gap-5">
                 <!-- Insight Text Box -->
                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                     <h3 class="text-xs font-bold text-slate-800 mb-3 uppercase tracking-wide flex items-center gap-2 border-b border-slate-100 pb-2">
@@ -305,37 +319,25 @@
                 <!-- Spectrum List -->
                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex-grow flex flex-col">
                     <h3 class="text-xs font-bold text-slate-800 mb-3 uppercase tracking-wide flex items-center gap-2">
-                        <span class="bg-pink-100 text-pink-600 p-1.5 rounded-md">🌈</span> 心理角色佔比光譜 (全權重分佈)
+                        <span class="bg-pink-100 text-pink-600 p-1.5 rounded-md">🌈</span> 當月角色光譜
                     </h3>
                     <div id="spectrumList" class="spectrum-container flex-grow items-center px-1">
                         <div class="text-xs text-slate-400 italic w-full text-center py-4">等待數據...</div>
                     </div>
                 </div>
             </div>
-            
-            <!-- Overall Persona Card (Historical) -->
-            <div class="md:col-span-5 md:col-start-1 overall-card p-6 rounded-2xl shadow-xl flex flex-col justify-center items-center text-center relative overflow-hidden group">
-                <div class="absolute top-0 left-0 w-full h-full bg-white/5 group-hover:bg-white/10 transition-colors"></div>
-                <div class="relative z-10 flex flex-col items-center w-full">
-                    <div class="text-[10px] uppercase font-bold tracking-[0.2em] text-white/60 mb-3 border-b border-white/10 pb-1">HISTORICAL DOMINANT</div>
-                    <div id="histIcon" class="persona-icon mb-2" style="font-size: 2.5rem;">♾️</div>
-                    <h2 id="histTitle" class="text-xl font-bold tracking-tight text-white mb-2">歷史總定調</h2>
-                    <p id="histDesc" class="text-xs text-white/80 leading-relaxed px-4 font-medium">
-                        根據所有歷史紀錄，分析整體的心理傾向。
-                    </p>
-                </div>
-            </div>
+        </div>
 
-            <!-- NEW: Daily Persona Landscape -->
-            <div class="md:col-span-7 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
-                <h3 class="text-xs font-bold text-slate-800 mb-4 uppercase tracking-wide flex items-center gap-2 border-b border-slate-100 pb-2">
-                    <span class="bg-amber-100 text-amber-600 p-1.5 rounded-md">📅</span> 每日心理氣象 (Daily Mood Landscape)
-                </h3>
-                <div id="dailyPersonaContainer" class="daily-grid w-full flex-grow">
-                    <div class="text-xs text-slate-400 italic w-full text-center py-4">等待數據生成日曆...</div>
-                </div>
+        <!-- NEW: Daily Persona Landscape -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+            <h3 class="text-xs font-bold text-slate-800 mb-4 uppercase tracking-wide flex items-center gap-2 border-b border-slate-100 pb-2">
+                <span class="bg-amber-100 text-amber-600 p-1.5 rounded-md">📅</span> 每日心理氣象 (Daily Mood Landscape)
+            </h3>
+            <div id="dailyPersonaContainer" class="daily-grid w-full">
+                <div class="text-xs text-slate-400 italic w-full text-center py-4">等待數據生成日曆...</div>
             </div>
         </div>
+
     </div>
 
     <!-- View 2: Chart Statistics -->
@@ -498,10 +500,10 @@
         rawChatData = [];
         let currentDate = '';
         
-        // Robust Date Regex
+        // Robust Date Regex: 2025.10.06 or 2025/10/06 or 2025-10-06
         const dateRegex = /^\s*(\d{4})[./-](\d{1,2})[./-](\d{1,2})/;
         // Robust Msg Regex: Time Space Name Space Content
-        const timeRegex = /^(\d{1,2}:\d{2})/;
+        const timeRegex = /^((?:上午|下午|AM|PM|am|pm)?\s?\d{1,2}:\d{2})/;
         const linkRegex = /(https?:\/\/[^\s]+)/g;
 
         lines.forEach(line => {
@@ -518,21 +520,36 @@
             }
 
             if (timeRegex.test(line) && currentDate) {
+                // Find first whitespace -> time end
                 const firstSpace = line.search(/\s/);
                 if (firstSpace === -1) return;
                 
-                const time = line.substring(0, firstSpace);
-                const rest = line.substring(firstSpace).trim();
-                const secondSpace = rest.search(/\s/);
-                if (secondSpace === -1) return;
+                // For Tab Separated files (iOS), parts[0] might contain time.
+                // But using spaces/tabs regex is safer.
                 
-                const name = rest.substring(0, secondSpace);
-                const content = rest.substring(secondSpace).trim();
+                // Let's try splitting by tab first
+                let parts = line.split('\t');
+                let time, name, content;
+
+                if (parts.length >= 3) {
+                    time = parts[0].trim();
+                    name = parts[1].trim();
+                    content = parts.slice(2).join('\t').trim();
+                } else {
+                    // Fallback to space splitting
+                    const t = line.substring(0, firstSpace);
+                    const r = line.substring(firstSpace).trim();
+                    const s2 = r.search(/\s/);
+                    if (s2 === -1) return;
+                    time = t;
+                    name = r.substring(0, s2);
+                    content = r.substring(s2).trim();
+                }
                 
                 if (content.includes('已收回訊息') || content.includes('通話時間') || content.includes('邀請') || content.includes('加入聊天')) return;
                 
-                const isSticker = content.includes('貼圖') || content.includes('(sticker)');
-                const isImage = content.includes('圖片') || content.includes('照片');
+                const isSticker = content.includes('貼圖') || content.includes('(sticker)') || content.includes('[貼圖]');
+                const isImage = content.includes('圖片') || content.includes('照片') || content.includes('[照片]');
                 const isVideo = content.includes('影片');
                 const links = (content.match(linkRegex) || []).length;
                 const exclamations = (content.match(/！|!/g) || []).length;
@@ -1109,7 +1126,7 @@
              iconContainer.appendChild(span);
         });
 
-        // Updated: Natural Language
+        // Updated: Natural Language "他這個月比較..."
         let descText = `他這個月比較 <span class="font-bold">${main.desc}</span>。`;
         if (top3[1].percent > 15) descText += `同時也顯得有點 <span class="font-bold">${top3[1].desc}</span>，`;
         if (top3[2].percent > 10) descText += `偶爾會 <span class="font-bold">${top3[2].desc}</span>。`;
@@ -1141,7 +1158,7 @@
         else { elTrend.innerText = "-"; elTrend.className = "stat-trend bg-slate-100 text-slate-500"; }
     }
 
-    // Natural Language Insight Generation (v4.3 Update: "他這個月比較...")
+    // Natural Language Insight Generation (v5.0 Update: "他這個月比較...")
     function generateInsight(cur, base, validDays, totalDays) { 
         const sentences = [];
         
@@ -1179,9 +1196,7 @@
         const dShare = days.map(d => (d.metrics.links * 2) + (d.metrics.media * 1.5) + (d.metrics.sharePhrase * 1));
         const dHappy = days.map(d => {
             if (d.isLowData) return null;
-            const stickerScore = Math.log2(d.metrics.sticker + 1) * 1.5; 
-            const exclScore = Math.log2(d.metrics.exclamations + 1) * 0.5;
-            return (d.metrics.pos_strong * 2) + (d.metrics.pos_normal * 1) - (d.metrics.neg * 1.5) - (d.metrics.dirty_pure * 2.0) + stickerScore + exclScore;
+            return d.finalHappyScore || 0;
         });
 
         const dSelf = days.map(d => d.isLowData ? null : (d.metrics.self / (d.metrics.wordCount||1) * 100));
@@ -1225,10 +1240,8 @@
             document.getElementById('detailMood').innerText = "💤 見面/低數據";
             document.getElementById('detailMood').className = "text-[10px] px-2 py-1 rounded-full bg-slate-300 text-slate-700";
         } else {
-            const stickerScore = Math.log2(day.metrics.sticker + 1) * 1.5; 
-            const exclScore = Math.log2(day.metrics.exclamations + 1) * 0.5;
-            const hScore = (day.metrics.pos_strong * 2) + (day.metrics.pos_normal * 1) - (day.metrics.neg * 1.5) - (day.metrics.dirty_pure * 2.0) + stickerScore + exclScore;
-            document.getElementById('detailStats').innerText = `快樂分: ${hScore.toFixed(1)}`;
+            const hScore = day.finalHappyScore ? day.finalHappyScore.toFixed(1) : "0.0";
+            document.getElementById('detailStats').innerText = `快樂分: ${hScore}`;
             let mood = "日常"; let mClass = "bg-slate-200 text-slate-500";
             if (hScore > 8) { mood = "🤩 情緒高昂"; mClass = "bg-green-100 text-green-700"; }
             else if (hScore < -2) { mood = "🌧️ 疲累/低能量"; mClass = "bg-red-100 text-red-700"; }
