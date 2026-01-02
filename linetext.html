@@ -11,7 +11,7 @@
         
         /* Message Styles */
         .message-row { border-bottom: 1px solid #f1f5f9; padding: 6px 0; display: flex; align-items: flex-start; font-size: 0.85rem; }
-        .message-time { color: #94a3b8; font-size: 0.8em; min-width: 40px; margin-top: 2px; }
+        .message-time { color: #94a3b8; font-size: 0.8em; min-width: 60px; margin-top: 2px; } /* Widened for "上午 12:00" */
         .message-content { flex-grow: 1; margin-left: 8px; line-height: 1.5; word-break: break-all; }
         
         /* Highlight Styles */
@@ -163,9 +163,9 @@
         <div>
             <h1 class="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
                 LINE 對話分析儀 
-                <span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold uppercase">v5.0 Final</span>
+                <span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold uppercase">v5.1 iOS Fix</span>
             </h1>
-            <p class="text-slate-500 text-sm mt-1">全方位心理語言分析：信效度檢核 + 歷史總體角色。透過大數據演算法，解析對話中的潛在心理動機與互動模式。</p>
+            <p class="text-slate-500 text-sm mt-1">全方位心理語言分析：信效度檢核 + 歷史總體角色。支援 iOS/Android/PC 匯出格式。</p>
         </div>
         <div class="flex gap-3">
              <label for="fileInput" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl cursor-pointer transition shadow-md shadow-indigo-200 text-sm font-bold flex items-center gap-2 hover:scale-105 active:scale-95">
@@ -176,7 +176,7 @@
         </div>
     </header>
 
-    <!-- Validity Banner (Placed below Title) -->
+    <!-- Validity Banner -->
     <div id="validityBanner" class="validity-banner hidden">
         <!-- JS will populate this -->
     </div>
@@ -264,7 +264,7 @@
 
         <div class="grid grid-cols-1 md:grid-cols-12 gap-5">
             <!-- Main Persona Card (Composite) -->
-            <div class="md:col-span-4 persona-card p-6 rounded-2xl shadow-xl flex flex-col justify-center items-center text-center relative overflow-hidden group min-h-[320px]">
+            <div class="md:col-span-5 persona-card p-6 rounded-2xl shadow-xl flex flex-col justify-center items-center text-center relative overflow-hidden group min-h-[320px]">
                 <div class="absolute top-0 left-0 w-full h-full bg-white/5 group-hover:bg-white/10 transition-colors"></div>
                 <div class="relative z-10 flex flex-col items-center w-full">
                     <div class="text-[10px] uppercase font-bold tracking-[0.2em] text-white/70 mb-4 border-b border-white/20 pb-1">MONTHLY COMPOSITE</div>
@@ -291,21 +291,7 @@
                 </div>
             </div>
 
-            <!-- Overall Persona Card (Historical) -->
-            <div class="md:col-span-4 overall-card p-6 rounded-2xl shadow-xl flex flex-col justify-center items-center text-center relative overflow-hidden group min-h-[320px]">
-                <div class="absolute top-0 left-0 w-full h-full bg-white/5 group-hover:bg-white/10 transition-colors"></div>
-                <div class="relative z-10 flex flex-col items-center w-full">
-                    <div class="text-[10px] uppercase font-bold tracking-[0.2em] text-white/60 mb-4 border-b border-white/10 pb-1">HISTORICAL DOMINANT</div>
-                    <div id="histIcon" class="persona-icon mb-3">♾️</div>
-                    <h2 id="histTitle" class="text-2xl font-bold tracking-tight text-white mb-2">歷史總定調</h2>
-                    <div class="text-[10px] bg-white/10 px-2 py-0.5 rounded text-white/80 mb-4">累積大數據分析</div>
-                    <p id="histDesc" class="text-sm text-white/80 leading-relaxed px-4 font-medium">
-                        根據所有歷史紀錄，分析整體的心理傾向。
-                    </p>
-                </div>
-            </div>
-
-            <div class="md:col-span-4 flex flex-col gap-5">
+            <div class="md:col-span-7 flex flex-col gap-5">
                 <!-- Insight Text Box -->
                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                     <h3 class="text-xs font-bold text-slate-800 mb-3 uppercase tracking-wide flex items-center gap-2 border-b border-slate-100 pb-2">
@@ -319,25 +305,37 @@
                 <!-- Spectrum List -->
                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex-grow flex flex-col">
                     <h3 class="text-xs font-bold text-slate-800 mb-3 uppercase tracking-wide flex items-center gap-2">
-                        <span class="bg-pink-100 text-pink-600 p-1.5 rounded-md">🌈</span> 當月角色光譜
+                        <span class="bg-pink-100 text-pink-600 p-1.5 rounded-md">🌈</span> 心理角色佔比光譜 (全權重分佈)
                     </h3>
                     <div id="spectrumList" class="spectrum-container flex-grow items-center px-1">
                         <div class="text-xs text-slate-400 italic w-full text-center py-4">等待數據...</div>
                     </div>
                 </div>
             </div>
-        </div>
+            
+            <!-- Overall Persona Card (Historical) -->
+            <div class="md:col-span-5 md:col-start-1 overall-card p-6 rounded-2xl shadow-xl flex flex-col justify-center items-center text-center relative overflow-hidden group">
+                <div class="absolute top-0 left-0 w-full h-full bg-white/5 group-hover:bg-white/10 transition-colors"></div>
+                <div class="relative z-10 flex flex-col items-center w-full">
+                    <div class="text-[10px] uppercase font-bold tracking-[0.2em] text-white/60 mb-3 border-b border-white/10 pb-1">HISTORICAL DOMINANT</div>
+                    <div id="histIcon" class="persona-icon mb-2" style="font-size: 2.5rem;">♾️</div>
+                    <h2 id="histTitle" class="text-xl font-bold tracking-tight text-white mb-2">歷史總定調</h2>
+                    <p id="histDesc" class="text-xs text-white/80 leading-relaxed px-4 font-medium">
+                        根據所有歷史紀錄，分析整體的心理傾向。
+                    </p>
+                </div>
+            </div>
 
-        <!-- NEW: Daily Persona Landscape -->
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-            <h3 class="text-xs font-bold text-slate-800 mb-4 uppercase tracking-wide flex items-center gap-2 border-b border-slate-100 pb-2">
-                <span class="bg-amber-100 text-amber-600 p-1.5 rounded-md">📅</span> 每日心理氣象 (Daily Mood Landscape)
-            </h3>
-            <div id="dailyPersonaContainer" class="daily-grid w-full">
-                <div class="text-xs text-slate-400 italic w-full text-center py-4">等待數據生成日曆...</div>
+            <!-- NEW: Daily Persona Landscape -->
+            <div class="md:col-span-7 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+                <h3 class="text-xs font-bold text-slate-800 mb-4 uppercase tracking-wide flex items-center gap-2 border-b border-slate-100 pb-2">
+                    <span class="bg-amber-100 text-amber-600 p-1.5 rounded-md">📅</span> 每日心理氣象 (Daily Mood Landscape)
+                </h3>
+                <div id="dailyPersonaContainer" class="daily-grid w-full flex-grow">
+                    <div class="text-xs text-slate-400 italic w-full text-center py-4">等待數據生成日曆...</div>
+                </div>
             </div>
         </div>
-
     </div>
 
     <!-- View 2: Chart Statistics -->
@@ -383,67 +381,33 @@
 
 <!-- Info Modal -->
 <div id="infoModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onclick="if(event.target === this) toggleModal('infoModal')">
-    <div class="bg-white w-full max-w-4xl rounded-2xl shadow-2xl modal-content transform transition-all">
+    <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl modal-content transform transition-all">
         <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
-            <h2 class="text-lg font-bold text-slate-800">📊 心理分析詳解與公式</h2>
+            <h2 class="text-lg font-bold text-slate-800">📊 10 大心理角色與計算公式</h2>
             <button onclick="toggleModal('infoModal')" class="text-slate-400 hover:text-slate-600">✕</button>
         </div>
-        <div class="p-6 space-y-8 text-slate-600 text-sm leading-relaxed overflow-y-auto max-h-[70vh]">
+        <div class="p-6 space-y-6 text-slate-600 text-sm leading-relaxed overflow-y-auto max-h-[60vh]">
             
-            <!-- Personas Section -->
-            <div class="space-y-4">
-                <h3 class="text-base font-bold text-indigo-700 border-b pb-2">🎭 10 種心理角色解析 (10 Psychological Personas)</h3>
-                <p class="text-xs text-slate-500 mb-2">系統根據各構面的強度交叉比對，找出最符合的心理狀態原型。</p>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
-                    <div class="border-l-4 border-orange-500 pl-3 py-1"><h4 class="font-bold text-orange-700">🌵 受傷刺蝟 (防衛機制)</h4><p class="text-xs"><strong>特徵：</strong>低自我 + 高認知。感到被誤解或不安全，潛意識中減少「我」的使用以抽離情感，並大量使用邏輯詞來合理化行為。</p></div>
-                    <div class="border-l-4 border-purple-500 pl-3 py-1"><h4 class="font-bold text-purple-700">🐨 焦慮無尾熊 (焦慮依附)</h4><p class="text-xs"><strong>特徵：</strong>高自我 + 高認知 + 高猶豫。患得患失，焦點全在自己身上，腦袋高速運轉試圖解釋，但語氣充滿不確定。</p></div>
-                    <div class="border-l-4 border-cyan-500 pl-3 py-1"><h4 class="font-bold text-cyan-700">🎭 討拍演員 (尋求關注)</h4><p class="text-xs"><strong>特徵：</strong>高分享 + 高自我 + 低快樂。頻繁開啟話題，但內容缺乏正向情緒且圍繞自身，渴望被看見與安慰。</p></div>
-                    <div class="border-l-4 border-slate-500 pl-3 py-1"><h4 class="font-bold text-slate-700">👨‍🏫 嚴肅教授 (說教/權威)</h4><p class="text-xs"><strong>特徵：</strong>高認知 + 低猶豫。語氣肯定，邏輯強勢，但缺乏個人情感投入。常見於爭辯或講道理。</p></div>
-                    <div class="border-l-4 border-green-500 pl-3 py-1"><h4 class="font-bold text-green-700">💖 靈魂伴侶 (舒適共鳴)</h4><p class="text-xs"><strong>特徵：</strong>高快樂 + 低認知。對話直覺、放鬆，充滿笑聲，無需費力解釋。這是關係最理想的狀態。</p></div>
-                    <div class="border-l-4 border-yellow-500 pl-3 py-1"><h4 class="font-bold text-yellow-700">🦁 自信獅子 (自戀/自信)</h4><p class="text-xs"><strong>特徵：</strong>高自我 + 低猶豫。自信爆棚，自我中心，說話直接不拖泥帶水。</p></div>
-                    <div class="border-l-4 border-red-500 pl-3 py-1"><h4 class="font-bold text-red-700">🌋 宣洩火山 (情緒化)</h4><p class="text-xs"><strong>特徵：</strong>高自我 + 低快樂。非理性的抱怨，單純的情緒發洩，不需要邏輯。</p></div>
-                    <div class="border-l-4 border-blue-500 pl-3 py-1"><h4 class="font-bold text-blue-700">🦉 慎重貓頭鷹 (客觀分析)</h4><p class="text-xs"><strong>特徵：</strong>低自我 + 高認知 + 高猶豫。過度謹慎，客觀分析事物，情感抽離。</p></div>
-                    <div class="border-l-4 border-amber-500 pl-3 py-1"><h4 class="font-bold text-amber-600">🌻 溫暖向日葵 (支持利他)</h4><p class="text-xs"><strong>特徵：</strong>低自我 + 高快樂 + 高分享。焦點在他人，樂於分享美好事物，給予支持。</p></div>
-                    <div class="border-l-4 border-gray-400 pl-3 py-1"><h4 class="font-bold text-gray-600">🧘 靜謐觀察者 (冷淡/平穩)</h4><p class="text-xs"><strong>特徵：</strong>三項指標皆低。情緒平穩，話語簡潔，或者敷衍回應不想投入。</p></div>
-                </div>
+            <div class="bg-slate-50 p-4 rounded-lg border border-slate-100 text-xs mb-4 space-y-2">
+                <h3 class="font-bold text-slate-700 text-base mb-2">🧮 專有名詞計算公式</h3>
+                <p><strong>1. 自我擁抱度 (Self-References Density):</strong><br> `(第一人稱代名詞數 / 總字數) * 100`。反映自我關注程度。</p>
+                <p><strong>2. 認知過載 (Cognitive Load Density):</strong><br> `(因果邏輯連接詞數 / 總字數) * 100`。反映大腦處理複雜資訊或合理化的程度。</p>
+                <p><strong>3. 語氣猶豫度 (Hedge Density):</strong><br> `(模糊語詞數 / 總字數) * 100`。反映自信心與不確定感。</p>
+                <p><strong>4. 快樂三角指數 (Happiness Triad):</strong><br> 綜合 `強烈正面詞(x2) + 一般正面詞(x1) - 負面詞(x1.5) + log(貼圖/驚嘆號)`。反映情緒效價與喚起度。</p>
+                <p><strong>5. 綜合分享慾 (Sharing Desire):</strong><br> `連結 + 圖片 + 影片 + 分享語句` 的總頻次。反映主動互動意願。</p>
             </div>
 
-            <!-- Formulas Section -->
-            <div class="space-y-4">
-                <h3 class="text-base font-bold text-slate-700 border-b pb-2">🧮 5 大心理構面計算公式</h3>
-                <div class="bg-slate-50 p-4 rounded-lg border border-slate-100 text-xs space-y-3">
-                    <div>
-                        <p class="font-bold text-blue-600 mb-1">1. 自我擁抱度 (Self-References Density)</p>
-                        <p>公式：`(第一人稱代名詞數 / 總字數) * 100`</p>
-                        <p class="text-slate-400">意義：反映自我關注程度。高=真誠/自戀，低=疏離/防衛。</p>
-                    </div>
-                    <div>
-                        <p class="font-bold text-orange-600 mb-1">2. 認知過載 (Cognitive Load Density)</p>
-                        <p>公式：`(因果邏輯連接詞數 / 總字數) * 100`</p>
-                        <p class="text-slate-400">意義：反映大腦處理複雜資訊或合理化的程度。高=找藉口/解釋，低=直覺。</p>
-                    </div>
-                    <div>
-                        <p class="font-bold text-purple-600 mb-1">3. 語氣猶豫度 (Hedge Density)</p>
-                        <p>公式：`(模糊語詞數 / 總字數) * 100`</p>
-                        <p class="text-slate-400">意義：反映自信心與不確定感。高=焦慮/保留，低=篤定。</p>
-                    </div>
-                    <div>
-                        <p class="font-bold text-green-600 mb-1">4. 快樂三角指數 (Happiness Triad)</p>
-                        <p>公式：`(強烈正面x2 + 一般正面x1 - 負面x1.5 - 純髒話x2) + log2(貼圖+1)*1.5`</p>
-                        <p class="text-slate-400">意義：綜合情緒效價與喚起度。含髒話脈絡偵測（髒話+笑聲不扣分）。</p>
-                    </div>
-                    <div>
-                        <p class="font-bold text-cyan-600 mb-1">5. 綜合分享慾 (Sharing Desire)</p>
-                        <p>公式：`連結x2 + 媒體x1.5 + 分享詞x1` (次數累加)</p>
-                        <p class="text-slate-400">意義：反映主動互動與分享生活的意願。</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Calculation Method -->
-            <div class="space-y-4">
-                 <h3 class="text-base font-bold text-slate-700 border-b pb-2">⚖️ 角色佔比計算 (Weighted Spectrum)</h3>
-                 <p class="text-xs">每個角色擁有特定的「權重向量」。系統計算您當月的數據與該角色的<strong>相似度</strong>，而非單純的門檻判定。即使特徵不明顯，也會累積基礎分數，最終依比例分配成 100% 的光譜。</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="border-l-4 border-orange-500 pl-3 py-1"><h3 class="font-bold text-orange-700">1. 🌵 受傷刺蝟 (防衛)</h3><p class="text-xs">特徵：低自我 + 高認知。感到被誤解，用邏輯保護自己。</p></div>
+                <div class="border-l-4 border-purple-500 pl-3 py-1"><h3 class="font-bold text-purple-700">2. 🐨 焦慮無尾熊 (焦慮)</h3><p class="text-xs">特徵：高自我 + 高認知 + 高猶豫。患得患失，內心戲多。</p></div>
+                <div class="border-l-4 border-cyan-500 pl-3 py-1"><h3 class="font-bold text-cyan-700">3. 🎭 討拍演員 (求關注)</h3><p class="text-xs">特徵：高分享 + 高自我 + 低快樂。負能量強，渴望被安慰。</p></div>
+                <div class="border-l-4 border-slate-500 pl-3 py-1"><h3 class="font-bold text-slate-700">4. 👨‍🏫 嚴肅教授 (說教)</h3><p class="text-xs">特徵：高認知 + 低猶豫。語氣強硬講道理，情感連結弱。</p></div>
+                <div class="border-l-4 border-green-500 pl-3 py-1"><h3 class="font-bold text-green-700">5. 💖 靈魂伴侶 (共鳴)</h3><p class="text-xs">特徵：高快樂 + 低認知。對話直覺流暢，最舒服的狀態。</p></div>
+                <div class="border-l-4 border-yellow-500 pl-3 py-1"><h3 class="font-bold text-yellow-700">6. 🦁 自信獅子 (自信)</h3><p class="text-xs">特徵：高自我 + 低猶豫。自信爆棚，自我中心，說話直接。</p></div>
+                <div class="border-l-4 border-red-500 pl-3 py-1"><h3 class="font-bold text-red-700">7. 🌋 宣洩火山 (情緒化)</h3><p class="text-xs">特徵：高自我 + 低快樂。非理性抱怨，單純發洩情緒。</p></div>
+                <div class="border-l-4 border-blue-500 pl-3 py-1"><h3 class="font-bold text-blue-700">8. 🦉 慎重貓頭鷹 (客觀)</h3><p class="text-xs">特徵：低自我 + 高認知 + 高猶豫。過度謹慎，客觀分析。</p></div>
+                <div class="border-l-4 border-amber-500 pl-3 py-1"><h3 class="font-bold text-amber-600">9. 🌻 溫暖向日葵 (支持)</h3><p class="text-xs">特徵：低自我 + 高快樂 + 高分享。焦點在他人，樂於分享。</p></div>
+                <div class="border-l-4 border-gray-400 pl-3 py-1"><h3 class="font-bold text-gray-600">10. 🧘 靜謐觀察者 (冷淡)</h3><p class="text-xs">特徵：三項皆低。敷衍回應，不想投入對話。</p></div>
             </div>
         </div>
         <div class="p-4 bg-slate-50 rounded-b-2xl border-t border-slate-100 text-right">
@@ -789,7 +753,6 @@
         initUI();
     }
 
-    // Dummy helper not used, logic moved inside processData
     var grandTotalsRef = {}; 
     function calculateOverallPersonaMode(stats, base) { return null; }
 
