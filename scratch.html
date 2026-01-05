@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scratch 作業批改系統</title>
+    
+    <!-- Tailwind CSS (樣式庫) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM (核心框架) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel (讓瀏覽器看懂 JSX) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- JSZip (解壓縮 .sb3 檔案用) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <style>
+        /* 自定義動畫 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+        
+        // --- 內建圖示組件 (移除外部依賴以避免白屏) ---
+        const Icon = ({ children, size = 24, className = "" }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className}
+            >
+                {children}
+            </svg>
+        );
+
+        const Upload = (props) => <Icon {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Icon>;
+        const FileText = (props) => <Icon {...props}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></Icon>;
+        const AlertCircle = (props) => <Icon {...props}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></Icon>;
+        const CheckCircle = (props) => <Icon {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></Icon>;
+        const XCircle = (props) => <Icon {...props}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></Icon>;
+        const ChevronRight = (props) => <Icon {...props}><polyline points="9 18 15 12 9 6"/></Icon>;
+        const ChevronDown = (props) => <Icon {...props}><polyline points="6 9 12 15 18 9"/></Icon>;
+        const Activity = (props) => <Icon {...props}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></Icon>;
+        const Users = (props) => <Icon {...props}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Icon>;
+        const ArrowLeft = (props) => <Icon {...props}><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></Icon>;
+        const Search = (props) => <Icon {...props}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></Icon>;
+        const BarChart = (props) => <Icon {...props}><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></Icon>;
+
+        // --- 核心邏輯區 ---
+
+        const LoadJSZip = () => {
+            return new Promise((resolve, reject) => {
+                if (window.JSZip) {
+                    resolve(window.JSZip);
+                } else {
+                    reject("JSZip library not found");
+                }
+            });
+        };
+
+        const parseProjectData = (projectJson) => {
+            const targets = projectJson.targets;
+            const parsedTargets = {};
+
+            targets.forEach(target => {
+                const spriteName = target.name;
+                const blocks = target.blocks;
+                const parsedStacks = [];
+
+                const topLevelBlockIds = Object.keys(blocks).filter(id => blocks[id].topLevel);
+
+                topLevelBlockIds.forEach(startId => {
+                    const stack = [];
+                    let currentId = startId;
+                    
+                    while (currentId) {
+                        const block = blocks[currentId];
+                        if (!block) break;
+
+                        const simplifiedBlock = {
+                            opcode: block.opcode,
+                            inputs: extractInputs(block.inputs, blocks),
+                            fields: extractFields(block.fields)
+                        };
+                        
+                        stack.push(simplifiedBlock);
+                        currentId = block.next;
+                    }
+                    parsedStacks.push(stack);
+                });
+
+                parsedTargets[spriteName] = parsedStacks;
+            });
+
+            return parsedTargets;
+        };
+
+        const extractInputs = (inputs, allBlocks) => {
+            const result = {};
+            for (const key in inputs) {
+                const inputArr = inputs[key];
+                if (inputArr[1] && (typeof inputArr[1] === 'string' || typeof inputArr[1] === 'number')) {
+                    result[key] = inputArr[1];
+                } else if (inputArr[1] && typeof inputArr[1] === 'string' && allBlocks[inputArr[1]]) {
+                    result[key] = `BLOCK(${allBlocks[inputArr[1]].opcode})`;
+                }
+            }
+            return result;
+        };
+
+        const extractFields = (fields) => {
+            const result = {};
+            for (const key in fields) {
+                result[key] = fields[key][0];
+            }
+            return result;
+        };
+
+        const compareStacks = (teacherStack, studentStacks) => {
+            let bestMatchScore = 0;
+            let bestMatchDetails = [];
+            let bestStudentStackIndex = -1;
+
+            studentStacks.forEach((sStack, sIndex) => {
+                let tIdx = 0;
+                let sIdx = 0;
+                let matchCount = 0;
+                const details = [];
+
+                while (tIdx < teacherStack.length && sIdx < sStack.length) {
+                    const tBlock = teacherStack[tIdx];
+                    const sBlock = sStack[sIdx];
+
+                    const opcodeMatch = tBlock.opcode === sBlock.opcode;
+                    
+                    let paramMatch = true;
+                    if (opcodeMatch) {
+                        const tParams = {...tBlock.inputs, ...tBlock.fields};
+                        const sParams = {...sBlock.inputs, ...sBlock.fields};
+                        
+                        for (const key in tParams) {
+                            if (tParams[key] != sParams[key]) {
+                                paramMatch = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (opcodeMatch && paramMatch) {
+                        matchCount++;
+                        details.push({ status: 'ok', block: tBlock });
+                        tIdx++;
+                        sIdx++;
+                    } else if (opcodeMatch && !paramMatch) {
+                        matchCount += 0.5;
+                        details.push({ status: 'param_error', block: tBlock, studentBlock: sBlock });
+                        tIdx++;
+                        sIdx++;
+                    } else {
+                        sIdx++;
+                    }
+                }
+
+                while (tIdx < teacherStack.length) {
+                    details.push({ status: 'missing', block: teacherStack[tIdx] });
+                    tIdx++;
+                }
+
+                const score = (matchCount / teacherStack.length) * 100;
+
+                if (score > bestMatchScore) {
+                    bestMatchScore = score;
+                    bestMatchDetails = details;
+                    bestStudentStackIndex = sIndex;
+                }
+            });
+
+            if (bestMatchScore === 0 && teacherStack.length > 0) {
+                return {
+                    score: 0,
+                    details: teacherStack.map(b => ({ status: 'missing', block: b })),
+                    usedStackIndex: -1
+                };
+            }
+
+            return {
+                score: bestMatchScore,
+                details: bestMatchDetails,
+                usedStackIndex: bestStudentStackIndex
+            };
+        };
+
+        const analyzeSingleProject = (teacherData, studentData) => {
+            const report = [];
+            let totalScore = 0;
+            let stackCount = 0;
+
+            Object.keys(teacherData).forEach(spriteName => {
+                const tStacks = teacherData[spriteName];
+                const sStacks = studentData[spriteName] || [];
+
+                let availableStudentStacks = [...sStacks].map((s, i) => ({ stack: s, originalIndex: i }));
+
+                const spriteReport = {
+                    name: spriteName,
+                    stacks: []
+                };
+
+                tStacks.forEach((tStack, tIdx) => {
+                    let bestResult = { score: -1, details: [], usedStackIndex: -1 };
+                    
+                    for (let i = 0; i < availableStudentStacks.length; i++) {
+                        const sStackObj = availableStudentStacks[i];
+                        const result = compareStacks(tStack, [sStackObj.stack]); 
+                        
+                        if (result.score > bestResult.score) {
+                            bestResult = { ...result, usedStackIndex: i };
+                        }
+                    }
+
+                    if (bestResult.score === -1) {
+                        bestResult = { score: 0, details: tStack.map(b => ({ status: 'missing', block: b })) };
+                    } else if (bestResult.usedStackIndex !== -1) {
+                        availableStudentStacks.splice(bestResult.usedStackIndex, 1);
+                    }
+
+                    spriteReport.stacks.push({
+                        id: tIdx,
+                        score: bestResult.score,
+                        details: bestResult.details
+                    });
+
+                    totalScore += bestResult.score;
+                    stackCount++;
+                });
+
+                if (tStacks.length > 0) {
+                    report.push(spriteReport);
+                }
+            });
+
+            const finalScore = stackCount === 0 ? 0 : Math.round(totalScore / stackCount);
+            return { finalScore, report };
+        };
+
+        const analyzeBatch = (teacherData, studentsList) => {
+            return studentsList.map(student => {
+                const result = analyzeSingleProject(teacherData, student.data);
+                return {
+                    fileName: student.fileName,
+                    ...result
+                };
+            });
+        };
+
+        // --- UI 組件區 ---
+
+        const FileUploader = ({ label, onFileLoad, fileCount, colorClass, multiple = false }) => {
+            const [loading, setLoading] = useState(false);
+
+            const handleChange = async (e) => {
+                const files = Array.from(e.target.files);
+                if (files.length === 0) return;
+
+                setLoading(true);
+                try {
+                    const JSZip = await LoadJSZip();
+                    
+                    const loadedFiles = await Promise.all(files.map(async (file) => {
+                        try {
+                            const zip = await JSZip.loadAsync(file);
+                            const projectJson = await zip.file('project.json').async('string');
+                            const parsedData = JSON.parse(projectJson);
+                            const simplifiedData = parseProjectData(parsedData);
+                            return { fileName: file.name, data: simplifiedData, error: null };
+                        } catch (err) {
+                            return { fileName: file.name, data: null, error: "解析失敗" };
+                        }
+                    }));
+
+                    const validFiles = loadedFiles.filter(f => !f.error);
+
+                    if (multiple) {
+                        onFileLoad(validFiles); 
+                    } else {
+                        if (validFiles.length > 0) {
+                            onFileLoad(validFiles[0].data, validFiles[0].fileName);
+                        }
+                    }
+
+                } catch (err) {
+                    console.error(err);
+                    alert("檔案讀取發生錯誤。");
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className={`border-2 border-dashed rounded-lg p-6 text-center transition-all ${fileCount > 0 ? 'border-green-500 bg-green-50' : 'border-gray-300 hover:border-blue-400'}`}>
+                    <label className="cursor-pointer block">
+                        <div className={`mb-2 font-bold text-lg ${colorClass} flex items-center justify-center gap-2`}>
+                            {multiple ? <Users size={24}/> : <FileText size={24}/>}
+                            {label}
+                        </div>
+                        {loading ? (
+                            <div className="text-gray-500 animate-pulse">正在讀取 {multiple ? "多個檔案" : "檔案"}...</div>
+                        ) : fileCount > 0 ? (
+                            <div className="flex items-center justify-center gap-2 text-green-700">
+                                <CheckCircle size={20} />
+                                <span className="font-medium">
+                                    {multiple ? `已載入 ${fileCount} 個學生作業` : "標準答案已載入"}
+                                </span>
+                            </div>
+                        ) : (
+                            <div className="text-gray-500 flex flex-col items-center">
+                                <Upload className="mb-2" size={24} />
+                                <span>{multiple ? "選取或拖曳多個 .sb3 檔案" : "點擊上傳 .sb3 檔案"}</span>
+                            </div>
+                        )}
+                        <input type="file" accept=".sb3" multiple={multiple} onChange={handleChange} className="hidden" />
+                    </label>
+                </div>
+            );
+        };
+
+        const BlockRow = ({ item }) => {
+            let bgColor = "bg-gray-100";
+            let icon = null;
+            let statusText = "";
+
+            if (item.status === 'ok') {
+                bgColor = "bg-green-100 border-l-4 border-green-500";
+                icon = <CheckCircle size={16} className="text-green-600" />;
+                statusText = "符合";
+            } else if (item.status === 'missing') {
+                bgColor = "bg-red-100 border-l-4 border-red-500";
+                icon = <XCircle size={16} className="text-red-600" />;
+                statusText = "缺失";
+            } else if (item.status === 'param_error') {
+                bgColor = "bg-yellow-100 border-l-4 border-yellow-500";
+                icon = <AlertCircle size={16} className="text-yellow-600" />;
+                statusText = "參數錯誤";
+            }
+
+            const formatOpcode = (opcode) => {
+                const map = {
+                    'event_whenflagclicked': '當綠旗被點擊',
+                    'motion_movesteps': '移動(步數)',
+                    'motion_turnright': '右轉(度)',
+                    'motion_turnleft': '左轉(度)',
+                    'looks_sayforsecs': '說...幾秒',
+                    'looks_thinkforsecs': '思考...幾秒',
+                    'control_wait': '等待(秒)',
+                    'control_forever': '重複無限次',
+                    'control_if': '如果...那麼',
+                    'control_repeat': '重複(次數)',
+                    'operator_add': '加法',
+                    'operator_subtract': '減法',
+                    'control_stop': '停止',
+                    'event_whenkeypressed': '當按下按鍵',
+                };
+                return map[opcode] || opcode;
+            };
+
+            const formatParams = (inputs, fields) => {
+                const all = {...inputs, ...fields};
+                const str = Object.values(all).join(', ');
+                return str ? `[參數: ${str}]` : '';
+            };
+
+            return (
+                <div className={`p-2 mb-1 rounded flex items-center justify-between text-sm ${bgColor}`}>
+                    <div className="flex items-center gap-2">
+                        {icon}
+                        <span className="font-mono font-bold text-gray-700">{formatOpcode(item.block.opcode)}</span>
+                        <span className="text-gray-500 text-xs">{formatParams(item.block.inputs, item.block.fields)}</span>
+                    </div>
+                    <span className="text-xs font-semibold opacity-70">{statusText}</span>
+                </div>
+            );
+        };
+
+        const ReportCard = ({ spriteName, stacks }) => {
+            const [expanded, setExpanded] = useState(false);
+            const spriteScore = Math.round(stacks.reduce((acc, curr) => acc + curr.score, 0) / (stacks.length || 1));
+
+            return (
+                <div className="border rounded-lg mb-4 bg-white shadow-sm overflow-hidden">
+                    <div 
+                        className="p-4 flex items-center justify-between cursor-pointer bg-gray-50 hover:bg-gray-100"
+                        onClick={() => setExpanded(!expanded)}
+                    >
+                        <div className="flex items-center gap-3">
+                            {expanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                            <span className="font-bold text-lg text-gray-800">{spriteName}</span>
+                            <span className="text-sm text-gray-500">({stacks.length} 組程式積木)</span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <div className="flex flex-col items-end">
+                                <span className="text-xs text-gray-500 uppercase">相似度</span>
+                                <span className={`font-bold text-xl ${spriteScore === 100 ? 'text-green-600' : spriteScore < 60 ? 'text-red-500' : 'text-yellow-600'}`}>
+                                    {spriteScore}%
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {expanded && (
+                        <div className="p-4 border-t">
+                            {stacks.map((stack, idx) => (
+                                <div key={idx} className="mb-6 last:mb-0">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h4 className="text-sm font-bold text-gray-600">程式片段 #{idx + 1}</h4>
+                                        <span className="text-xs font-mono bg-gray-200 px-2 py-1 rounded">得分: {Math.round(stack.score)}%</span>
+                                    </div>
+                                    <div className="pl-4 border-l-2 border-gray-200">
+                                        {stack.details.map((item, i) => (
+                                            <BlockRow key={i} item={item} />
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const SummaryTable = ({ results, onViewDetail }) => {
+            const [filter, setFilter] = useState("");
+            const [sortOrder, setSortOrder] = useState("scoreDesc");
+
+            const filtered = useMemo(() => {
+                let data = results.filter(r => r.fileName.toLowerCase().includes(filter.toLowerCase()));
+                
+                if (sortOrder === "scoreDesc") data.sort((a, b) => b.finalScore - a.finalScore);
+                else if (sortOrder === "scoreAsc") data.sort((a, b) => a.finalScore - b.finalScore);
+                else if (sortOrder === "name") data.sort((a, b) => a.fileName.localeCompare(b.fileName));
+                
+                return data;
+            }, [results, filter, sortOrder]);
+
+            return (
+                <div className="bg-white rounded-xl shadow-md p-6 border-t-4 border-blue-500">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-xl font-bold flex items-center gap-2">
+                            <BarChart className="text-blue-600"/> 班級成績總表
+                            <span className="text-sm font-normal text-gray-500">({results.length} 位學生)</span>
+                        </h2>
+                        <div className="flex gap-4">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-2.5 text-gray-400" size={18}/>
+                                <input 
+                                    type="text" 
+                                    placeholder="搜尋姓名/檔名..." 
+                                    className="pl-10 pr-4 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                    value={filter}
+                                    onChange={(e) => setFilter(e.target.value)}
+                                />
+                            </div>
+                            <select 
+                                className="border rounded px-2 py-1 text-sm bg-gray-50"
+                                value={sortOrder}
+                                onChange={(e) => setSortOrder(e.target.value)}
+                            >
+                                <option value="scoreDesc">分數: 高 → 低</option>
+                                <option value="scoreAsc">分數: 低 → 高</option>
+                                <option value="name">檔名: A → Z</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-gray-100 text-gray-600 text-sm uppercase tracking-wider">
+                                    <th className="p-4 rounded-tl-lg">學生檔名</th>
+                                    <th className="p-4">角色分析</th>
+                                    <th className="p-4 text-center">總分</th>
+                                    <th className="p-4 rounded-tr-lg text-right">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filtered.map((r, idx) => (
+                                    <tr key={idx} className="border-b hover:bg-blue-50 transition-colors">
+                                        <td className="p-4 font-medium text-gray-800">{r.fileName}</td>
+                                        <td className="p-4 text-sm text-gray-500">
+                                            {r.report.length} 個角色包含程式
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                                                r.finalScore === 100 ? 'bg-green-100 text-green-700' :
+                                                r.finalScore < 60 ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                                            }`}>
+                                                {r.finalScore}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-right">
+                                            <button 
+                                                onClick={() => onViewDetail(r)}
+                                                className="text-blue-600 hover:text-blue-800 text-sm font-bold hover:underline"
+                                            >
+                                                查看詳情
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {filtered.length === 0 && (
+                            <div className="text-center p-8 text-gray-400">沒有符合搜尋條件的學生</div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const DetailedView = ({ data, onBack }) => {
+            return (
+                <div className="animate-fade-in">
+                    <button 
+                        onClick={onBack}
+                        className="mb-4 flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors font-medium"
+                    >
+                        <ArrowLeft size={20}/> 返回總表
+                    </button>
+
+                    <div className="bg-white rounded-xl shadow-md p-6 mb-8 flex justify-between items-center border-l-8 border-purple-500">
+                        <div>
+                            <h2 className="text-xl font-bold mb-1">{data.fileName} - 分析報告</h2>
+                            <p className="text-gray-500 text-sm">與標準答案的積木邏輯比對結果</p>
+                        </div>
+                        <div className="text-5xl font-extrabold text-purple-600">
+                            {data.finalScore}<span className="text-2xl">%</span>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        {data.report.length === 0 ? (
+                            <div className="text-center p-8 bg-gray-100 rounded text-gray-500">
+                                無法找到任何可比對的角色或程式積木。
+                            </div>
+                        ) : (
+                            data.report.map((sprite, idx) => (
+                                <ReportCard key={idx} spriteName={sprite.name} stacks={sprite.stacks} />
+                            ))
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [teacherData, setTeacherData] = useState(null);
+            const [batchResults, setBatchResults] = useState(null);
+            const [selectedStudent, setSelectedStudent] = useState(null);
+            const [tFileName, setTFileName] = useState("");
+            const [sFileCount, setSFileCount] = useState(0);
+
+            const handleStudentUpload = (files) => {
+                if (!teacherData) {
+                    alert("請先上傳標準答案 (老師檔案)！");
+                    return;
+                }
+                
+                const results = analyzeBatch(teacherData, files);
+                setBatchResults(results);
+                setSFileCount(files.length);
+                setSelectedStudent(null);
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-50 text-gray-800 font-sans p-6">
+                    <div className="max-w-5xl mx-auto">
+                        <header className="mb-8 text-center">
+                            <h1 className="text-3xl font-bold text-blue-600 mb-2 flex items-center justify-center gap-3">
+                                <Activity /> Scratch 作業批改系統
+                            </h1>
+                            <p className="text-gray-600">支援批次上傳學生檔案，自動計算相似度與錯誤檢查。</p>
+                        </header>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                            <FileUploader 
+                                label="1. 上傳標準答案 (老師)" 
+                                colorClass="text-blue-600"
+                                fileCount={tFileName ? 1 : 0}
+                                onFileLoad={(data, name) => {
+                                    setTeacherData(data);
+                                    setTFileName(name);
+                                    if (batchResults) {
+                                        if(confirm("更換標準答案將清除目前的學生分析結果，是否繼續？")) {
+                                            setBatchResults(null);
+                                            setSFileCount(0);
+                                        }
+                                    }
+                                }} 
+                            />
+                            <FileUploader 
+                                label="2. 批次上傳學生作業" 
+                                colorClass="text-purple-600"
+                                multiple={true}
+                                fileCount={sFileCount}
+                                onFileLoad={handleStudentUpload} 
+                            />
+                        </div>
+
+                        {batchResults && (
+                            <div>
+                                {selectedStudent ? (
+                                    <DetailedView 
+                                        data={selectedStudent} 
+                                        onBack={() => setSelectedStudent(null)} 
+                                    />
+                                ) : (
+                                    <SummaryTable 
+                                        results={batchResults} 
+                                        onViewDetail={(student) => setSelectedStudent(student)} 
+                                    />
+                                )}
+                            </div>
+                        )}
+                        
+                        {!batchResults && (tFileName || sFileCount > 0) && (
+                            <div className="text-center p-12 text-gray-400 bg-white rounded-lg border border-dashed">
+                                {tFileName && sFileCount === 0 ? "請上傳學生檔案以開始分析..." : "準備中..."}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
