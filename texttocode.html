@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scratch 積木自動繁中翻譯器</title>
+    <meta name="description" content="輸入 Scratch 代碼，自動轉換為繁體中文積木圖片">
+    
+    <!-- 載入字型 -->
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC:400,700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f2f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background-color: #4c97ff;
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 60px); /* 減去 header 高度 */
+            overflow: hidden;
+        }
+
+        .pane {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .pane-left {
+            background-color: white;
+            border-right: 1px solid #ddd;
+        }
+
+        .pane-right {
+            background-color: #f9f9f9;
+            /* 讓積木預覽區可以捲動 */
+            overflow-y: auto; 
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start; /* 讓積木靠左對齊 */
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #575e75;
+            font-size: 1rem;
+            margin-bottom: 10px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100%;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            resize: none;
+            outline: none;
+            box-sizing: border-box; /* 確保 padding 不會撐爆寬度 */
+        }
+
+        textarea:focus {
+            border-color: #4c97ff;
+            box-shadow: 0 0 0 2px rgba(76, 151, 255, 0.2);
+        }
+
+        #preview-area {
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            min-height: 200px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* 針對 SVG 的樣式調整 */
+        svg.scratchblocks-style-scratch3 {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .tips {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        /* 手機版響應式調整 */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                height: auto;
+            }
+            .pane {
+                height: 50vh;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Scratch 積木翻譯器 (自動繁中)</h1>
+</header>
+
+<div class="container">
+    <!-- 左側：輸入區 -->
+    <div class="pane pane-left">
+        <h2>輸入代碼 (英文/虛擬碼)</h2>
+        <textarea id="input-code" placeholder="請輸入代碼，例如：&#10;when green flag clicked&#10;move (10) steps&#10;say [你好！] for (2) seconds" spellcheck="false">when green flag clicked
+move (10) steps
+turn cw (15) degrees
+say [轉換成功！] for (2) seconds
+if <touching [mouse-pointer v]?> then
+  change [color v] effect by (25)
+end</textarea>
+        <div class="tips">支援標準 Scratch 語法。輸入後即時轉換。</div>
+    </div>
+
+    <!-- 右側：預覽區 -->
+    <div class="pane pane-right">
+        <h2>繁體中文積木預覽</h2>
+        <div id="preview-area"></div>
+    </div>
+</div>
+
+<!-- 載入 scratchblocks 核心與翻譯檔 -->
+<!-- 使用 unpkg CDN 確保穩定性 -->
+<script src="https://unpkg.com/scratchblocks@latest/build/scratchblocks.min.js"></script>
+<script src="https://unpkg.com/scratchblocks@latest/build/translations-all.js"></script>
+
+<script>
+    const inputArea = document.getElementById('input-code');
+    const previewArea = document.getElementById('preview-area');
+    const targetLang = 'zh_TW'; // 設定目標語言為繁體中文 (台灣)
+
+    // 主渲染函數
+    function renderBlocks() {
+        const code = inputArea.value;
+
+        // 1. 清空預覽區
+        previewArea.innerHTML = '';
+
+        if (!code.trim()) return;
+
+        try {
+            // 2. 解析輸入的代碼 (預設英文)
+            const doc = scratchblocks.parse(code, {
+                // 自動偵測輸入語言，通常英文能準確識別
+            });
+
+            // 3. 翻譯成繁體中文
+            // 檢查是否載入了翻譯庫
+            if (scratchblocks.allLanguages && scratchblocks.allLanguages[targetLang]) {
+                doc.translate(scratchblocks.allLanguages[targetLang]);
+            } else {
+                console.warn('找不到繁體中文翻譯檔，將顯示原文');
+            }
+
+            // 4. 建立視圖 (使用 Scratch 3.0 風格)
+            const view = scratchblocks.newView(doc, {
+                style: 'scratch3',
+                scale: 0.8 // 稍微縮小一點，看起來比較精緻
+            });
+
+            // 5. 渲染 SVG 並放入 DOM
+            const svg = view.render();
+            previewArea.appendChild(svg);
+
+        } catch (e) {
+            console.error('渲染錯誤:', e);
+            // 可以在這裡顯示錯誤提示，但在打字過程中通常忽略暫時的語法錯誤
+        }
+    }
+
+    // 防抖動 (Debounce) 函數：避免每打一個字就重新渲染，提升效能
+    function debounce(func, wait) {
+        let timeout;
+        return function() {
+            const context = this, args = arguments;
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(context, args), wait);
+        };
+    }
+
+    // 監聽輸入事件 (延遲 300ms 執行)
+    inputArea.addEventListener('input', debounce(renderBlocks, 300));
+
+    // 頁面載入時執行一次渲染
+    window.addEventListener('load', renderBlocks);
+</script>
+
+</body>
+</html>
