@@ -48,6 +48,7 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            position: relative;
         }
 
         .pane-left {
@@ -57,8 +58,8 @@
 
         .pane-right {
             background-color: #f9f9f9;
-            /* 讓積木預覽區可以捲動 */
-            overflow-y: auto; 
+            /* 修改：允許雙向捲動，避免積木太長被切掉 */
+            overflow: auto; 
             display: flex;
             flex-direction: column;
             align-items: flex-start; /* 讓積木靠左對齊 */
@@ -95,7 +96,9 @@
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             min-height: 200px;
-            width: 100%;
+            /* 修改：寬度自動適應內容，但至少填滿容器 */
+            width: fit-content;
+            min-width: 100%;
             box-sizing: border-box;
         }
 
@@ -109,6 +112,18 @@
             font-size: 0.8rem;
             color: #888;
             margin-top: 5px;
+        }
+        
+        #status-bar {
+            position: fixed; /* 修改為 fixed 確保在捲動時仍在右下角，或視需求調整 */
+            bottom: 5px;
+            right: 10px;
+            font-size: 0.75rem;
+            color: #aaa;
+            pointer-events: none;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 2px 5px;
+            border-radius: 3px;
         }
 
         /* 手機版響應式調整 */
@@ -148,58 +163,75 @@ end</textarea>
         <h2>繁體中文積木預覽</h2>
         <div id="preview-area"></div>
     </div>
+    <div id="status-bar">準備中...</div>
 </div>
 
-<!-- 載入 scratchblocks 核心與翻譯檔 -->
-<!-- 使用 unpkg CDN 確保穩定性 -->
-<script src="https://unpkg.com/scratchblocks@latest/build/scratchblocks.min.js"></script>
-<script src="https://unpkg.com/scratchblocks@latest/build/translations-all.js"></script>
+<!-- 載入 scratchblocks 核心與翻譯檔 (使用穩定版 3.6.4) -->
+<script src="https://unpkg.com/scratchblocks@3.6.4/build/scratchblocks.min.js"></script>
+<script src="https://unpkg.com/scratchblocks@3.6.4/build/translations-all.js"></script>
 
 <script>
     const inputArea = document.getElementById('input-code');
     const previewArea = document.getElementById('preview-area');
-    const targetLang = 'zh_TW'; // 設定目標語言為繁體中文 (台灣)
+    const statusBar = document.getElementById('status-bar');
+
+    // 尋找繁體中文語言包的輔助函式
+    function findTraditionalChinese() {
+        if (!window.scratchblocks || !window.scratchblocks.allLanguages) return null;
+        
+        // 嘗試常見的鍵值
+        if (scratchblocks.allLanguages['zh_TW']) return scratchblocks.allLanguages['zh_TW'];
+        if (scratchblocks.allLanguages['zh-tw']) return scratchblocks.allLanguages['zh-tw'];
+        if (scratchblocks.allLanguages['zh_HANT']) return scratchblocks.allLanguages['zh_HANT'];
+
+        // 如果都沒找到，掃描所有鍵值
+        const keys = Object.keys(scratchblocks.allLanguages);
+        const foundKey = keys.find(k => k.toLowerCase().includes('zh') && k.toLowerCase().includes('tw'));
+        
+        if (foundKey) return scratchblocks.allLanguages[foundKey];
+        return null;
+    }
 
     // 主渲染函數
     function renderBlocks() {
         const code = inputArea.value;
-
-        // 1. 清空預覽區
-        previewArea.innerHTML = '';
+        previewArea.innerHTML = ''; // 清空
 
         if (!code.trim()) return;
 
         try {
-            // 2. 解析輸入的代碼 (預設英文)
-            const doc = scratchblocks.parse(code, {
-                // 自動偵測輸入語言，通常英文能準確識別
-            });
+            // 1. 解析
+            const doc = scratchblocks.parse(code);
 
-            // 3. 翻譯成繁體中文
-            // 檢查是否載入了翻譯庫
-            if (scratchblocks.allLanguages && scratchblocks.allLanguages[targetLang]) {
-                doc.translate(scratchblocks.allLanguages[targetLang]);
+            // 2. 嘗試翻譯
+            const langPack = findTraditionalChinese();
+            if (langPack) {
+                doc.translate(langPack);
+                statusBar.textContent = `已載入語言: ${langPack.name || '繁體中文'} (${Object.keys(langPack).length} 條目)`;
+                statusBar.style.color = '#4caf50'; // 綠色表示成功
             } else {
-                console.warn('找不到繁體中文翻譯檔，將顯示原文');
+                statusBar.textContent = '警告: 找不到繁體中文翻譯檔，顯示原文';
+                statusBar.style.color = '#ff9800'; // 橘色表示警告
             }
 
-            // 4. 建立視圖 (使用 Scratch 3.0 風格)
+            // 3. 建立視圖
             const view = scratchblocks.newView(doc, {
                 style: 'scratch3',
-                scale: 0.8 // 稍微縮小一點，看起來比較精緻
+                scale: 0.8
             });
 
-            // 5. 渲染 SVG 並放入 DOM
+            // 4. 渲染
             const svg = view.render();
             previewArea.appendChild(svg);
 
         } catch (e) {
             console.error('渲染錯誤:', e);
-            // 可以在這裡顯示錯誤提示，但在打字過程中通常忽略暫時的語法錯誤
+            statusBar.textContent = '渲染錯誤: 請檢查語法';
+            statusBar.style.color = '#f44336';
         }
     }
 
-    // 防抖動 (Debounce) 函數：避免每打一個字就重新渲染，提升效能
+    // 防抖動
     function debounce(func, wait) {
         let timeout;
         return function() {
@@ -209,11 +241,13 @@ end</textarea>
         };
     }
 
-    // 監聽輸入事件 (延遲 300ms 執行)
     inputArea.addEventListener('input', debounce(renderBlocks, 300));
 
-    // 頁面載入時執行一次渲染
-    window.addEventListener('load', renderBlocks);
+    // 確保資源載入後再執行
+    window.addEventListener('load', () => {
+        // 給一點緩衝時間確保 translations-all.js 解析完畢
+        setTimeout(renderBlocks, 100);
+    });
 </script>
 
 </body>
