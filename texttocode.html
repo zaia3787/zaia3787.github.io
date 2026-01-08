@@ -148,14 +148,20 @@
     <!-- 左側：輸入區 -->
     <div class="pane pane-left">
         <h2>輸入代碼 (英文/虛擬碼)</h2>
-        <textarea id="input-code" placeholder="請輸入代碼，例如：&#10;when green flag clicked&#10;move (10) steps&#10;say [你好！] for (2) seconds" spellcheck="false">when green flag clicked
+        <!-- 修改預設文字，展示註解清洗功能 -->
+        <textarea id="input-code" placeholder="請輸入代碼..." spellcheck="false"># 這裡是程式初始化
+when green flag clicked
+// 設定移動參數
 move (10) steps
 turn cw (15) degrees
 say [轉換成功！] for (2) seconds
+
+# 條件判斷區塊
 if <touching [mouse-pointer v]?> then
+  // 改變顏色特效
   change [color v] effect by (25)
 end</textarea>
-        <div class="tips">支援標準 Scratch 語法。輸入後即時轉換。</div>
+        <div class="tips">支援標準 Scratch 語法。會自動過濾 // 和 # 開頭的註解行。</div>
     </div>
 
     <!-- 右側：預覽區 -->
@@ -194,13 +200,25 @@ end</textarea>
 
     // 主渲染函數
     function renderBlocks() {
-        const code = inputArea.value;
+        const rawCode = inputArea.value;
         previewArea.innerHTML = ''; // 清空
 
-        if (!code.trim()) return;
+        if (!rawCode.trim()) return;
+
+        // --- 新增功能：清洗代碼 ---
+        // 將以 // 或 # 開頭的行濾除，避免解析器錯誤
+        const code = rawCode.split('\n').filter(line => {
+            const trimmed = line.trim();
+            // 如果該行去空白後是以 // 或 # 開頭，就排除
+            if (trimmed.startsWith('//') || trimmed.startsWith('#')) {
+                return false;
+            }
+            return true;
+        }).join('\n');
+        // ------------------------
 
         try {
-            // 1. 解析
+            // 1. 解析 (使用清洗後的 code)
             const doc = scratchblocks.parse(code);
 
             // 2. 嘗試翻譯
