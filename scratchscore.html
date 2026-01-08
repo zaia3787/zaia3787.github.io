@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scratch (sb3) 插入排序法：高鑑別度分析器 v4.0 (含創意加分)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --primary: #4C97FF;
+            --success: #4CAF50;
+            --warning: #FF9800;
+            --danger: #F44336;
+            --bg: #F0F4F8;
+            --text-main: #333;
+            --text-sub: #666;
+            --purple: #8e44ad; /* Creative color */
+        }
+
+        body {
+            font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px;
+            color: var(--text-main);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        h1 { color: var(--text-main); text-align: center; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: var(--text-sub); margin-bottom: 25px; font-size: 0.95em; }
+
+        .upload-area {
+            border: 3px dashed #cbd5e1;
+            padding: 30px;
+            text-align: center;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #fafafa;
+            margin-bottom: 20px;
+        }
+        .upload-area:hover { border-color: var(--primary); background: #eef7ff; }
+        .upload-icon { font-size: 40px; margin-bottom: 10px; display: block; }
+
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        
+        th, td { border-bottom: 1px solid #eee; padding: 12px 10px; text-align: left; vertical-align: middle; }
+        th { background-color: #f1f5f9; color: #475569; font-weight: 700; text-transform: uppercase; font-size: 12px; white-space: nowrap; }
+        tr:hover { background-color: #f8fafc; }
+
+        /* 分數系統 */
+        .score-badge {
+            display: inline-flex; justify-content: center; align-items: center;
+            width: 45px; height: 45px; border-radius: 50%;
+            font-weight: 800; font-size: 16px; color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+        }
+        .score-s { background: linear-gradient(135deg, #10B981, #059669); } /* 90-100 */
+        .score-a { background: linear-gradient(135deg, #3B82F6, #2563EB); } /* 80-89 */
+        .score-b { background: linear-gradient(135deg, #F59E0B, #D97706); } /* 60-79 */
+        .score-c { background: linear-gradient(135deg, #EF4444, #DC2626); } /* <60 */
+
+        /* 標籤系統 */
+        .tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin: 2px; border: 1px solid transparent; font-weight: 600; }
+        
+        .tag-algo { background-color: #e0f2fe; color: #0284c7; border-color: #bae6fd; }
+        .tag-dynamic { background-color: #dcfce7; color: #16a34a; border-color: #bbf7d0; }
+        .tag-creative { background-color: #f3e8ff; color: #7e22ce; border-color: #d8b4fe; } /* 創意標籤 */
+        .tag-warn { background-color: #fef9c3; color: #ca8a04; border-color: #fde047; }
+        .tag-error { background-color: #fee2e2; color: #dc2626; border-color: #fecaca; }
+
+        .detail-list { font-size: 12px; color: #64748b; margin: 0; padding-left: 18px; line-height: 1.4; }
+        .detail-list li { margin-bottom: 2px; }
+
+        #loading { display: none; text-align: center; padding: 20px; color: var(--primary); font-weight: bold; }
+        
+        .btn {
+            background-color: var(--primary); color: white; padding: 10px 20px; border-radius: 6px;
+            text-decoration: none; display: inline-block; margin-top: 10px; font-size: 14px; border: none; cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn:hover { background-color: #3a7bd5; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Scratch 插入排序法：高鑑別度分析器 v4.0</h1>
+    <p class="subtitle">評分標準：演算法邏輯(85%) + 動態設計(15%) + <span style="color:var(--purple);font-weight:bold">創意加分(動作/畫筆/音效)</span></p>
+    
+    <div class="upload-area" onclick="document.getElementById('fileInput').click()" id="dropZone">
+        <span class="upload-icon">🎨</span>
+        <h3>拖曳 .sb3 檔案至此 (支援批量分析)</h3>
+        <p style="color: #94a3b8;">自動偵測演算法結構與視覺化創意表現</p>
+        <input type="file" id="fileInput" multiple accept=".sb3" style="display:none" onchange="handleFiles(this.files)">
+    </div>
+
+    <div id="loading">正在分析演算法邏輯與創意元件... 🚀</div>
+
+    <div class="table-container">
+        <table id="resultTable">
+            <thead>
+                <tr>
+                    <th style="width: 15%;">檔案名稱</th>
+                    <th style="width: 5%;">評分</th>
+                    <th style="width: 20%;">演算法特徵</th>
+                    <th style="width: 20%;">創意加分 (Bonus)</th>
+                    <th style="width: 40%;">詳細診斷報告</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <!-- JS 動態生成 -->
+            </tbody>
+        </table>
+    </div>
+    
+    <div style="margin-top: 20px; text-align: right;">
+        <button class="btn" onclick="exportToCSV()">匯出詳細成績單 (CSV)</button>
+    </div>
+</div>
+
+<script>
+    const dropZone = document.getElementById('dropZone');
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#4C97FF'; dropZone.style.backgroundColor = '#eef7ff'; });
+    dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.style.borderColor = '#cbd5e1'; dropZone.style.backgroundColor = '#fafafa'; });
+    dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.style.borderColor = '#cbd5e1'; dropZone.style.backgroundColor = '#fafafa'; handleFiles(e.dataTransfer.files); });
+
+    async function handleFiles(files) {
+        const tableBody = document.getElementById('tableBody');
+        tableBody.innerHTML = ''; 
+        document.getElementById('loading').style.display = 'block';
+
+        const fileArray = Array.from(files);
+        const results = await Promise.all(fileArray.map(async (file) => {
+            if (!file.name.endsWith('.sb3')) return null;
+            try {
+                return await analyzeSb3(file);
+            } catch (e) {
+                console.error("Error parsing " + file.name, e);
+                return { name: file.name, error: true };
+            }
+        }));
+
+        document.getElementById('loading').style.display = 'none';
+        
+        // 排序：分數高 -> 低
+        results.sort((a, b) => (b.score || 0) - (a.score || 0));
+        results.forEach(res => { if(res) addRowToTable(res); });
+    }
+
+    // --- 輔助函式 ---
+    function isDynamicInput(input) {
+        if (!input || !input[1]) return false;
+        const valueArray = input[1];
+        if (typeof valueArray === 'string') return true; 
+        if (Array.isArray(valueArray)) {
+            const type = valueArray[0];
+            if (type === 12) return true; // Variable
+            if (type >= 4 && type <= 8) return false; // Number/Text
+        }
+        return false;
+    }
+
+    async function analyzeSb3(file) {
+        const zip = await JSZip.loadAsync(file);
+        const projectJson = await zip.file("project.json").async("string");
+        const project = JSON.parse(projectJson);
+
+        let s = {
+            name: file.name.replace('.sb3', ''),
+            totalBlocks: 0,
+            
+            // 基礎與結構
+            hasInit: false,
+            hasHat: false,
+            nestedLoop: false,
+            dynamicLoop: false,
+            varUpdate: false,
+            varIndexing: 0,
+            hardcodedIndexing: 0,
+            hasInsert: false,
+            insertInLoop: false,
+            compareListItems: false,
+
+            // 創意加分項
+            hasMotion: false, // 動作
+            hasPen: false,    // 畫筆
+            hasSound: false   // 音效
+        };
+
+        project.targets.forEach(target => {
+            if (!target.blocks) return;
+            const blocks = target.blocks;
+            
+            Object.keys(blocks).forEach(key => {
+                const b = blocks[key];
+                if (!b.opcode) return;
+                s.totalBlocks++;
+                const op = b.opcode;
+
+                // 基礎檢查
+                if (op === 'data_deletealloflist') s.hasInit = true;
+                if (op === 'event_whenflagclicked') s.hasHat = true;
+
+                // 迴圈檢查
+                if (op.startsWith('control_repeat') || op === 'control_forever') {
+                    if (b.parent && blocks[b.parent] && blocks[b.parent].opcode.startsWith('control_repeat')) {
+                        s.nestedLoop = true;
+                    }
+                    if (op === 'control_repeat' && b.inputs.TIMES && isDynamicInput(b.inputs.TIMES)) {
+                        s.dynamicLoop = true;
+                    }
+                }
+
+                // 變數與邏輯
+                if (op === 'data_changevariableby' && b.parent) s.varUpdate = true;
+                if (op === 'data_itemoflist' && b.inputs.INDEX) {
+                    if (isDynamicInput(b.inputs.INDEX)) s.varIndexing++; else s.hardcodedIndexing++;
+                }
+                if (op === 'data_insertatlist') {
+                    s.hasInsert = true;
+                    let p = b.parent;
+                    while(p && blocks[p]) {
+                        if (blocks[p].opcode.startsWith('control_repeat')) { s.insertInLoop = true; break; }
+                        p = blocks[p].parent;
+                    }
+                }
+                if ((op === 'operator_gt' || op === 'operator_lt')) {
+                    const op1 = b.inputs.OPERAND1, op2 = b.inputs.OPERAND2;
+                    if ((op1 && typeof op1[1] === 'string') || (op2 && typeof op2[1] === 'string')) s.compareListItems = true;
+                }
+
+                // --- 創意加分檢測 ---
+                if (op.startsWith('motion_')) s.hasMotion = true;
+                if (op.startsWith('pen_')) s.hasPen = true;
+                if (op.startsWith('sound_')) s.hasSound = true;
+            });
+        });
+
+        s.scoreData = calculateScore(s);
+        s.score = s.scoreData.total;
+        return s;
+    }
+
+    function calculateScore(s) {
+        if (s.error) return { total: 0, details: [] };
+
+        let score = 0;
+        let details = [];
+
+        // 1. 基礎與習慣 (15分)
+        if (s.hasHat && s.hasInit) score += 15;
+        else if (s.hasHat) { score += 10; details.push("⚠️ 缺少「刪除清單」初始化"); }
+        else details.push("❌ 沒有小綠旗");
+
+        // 2. 演算法結構 (30分)
+        if (s.nestedLoop) score += 30;
+        else if (s.insertInLoop) { score += 15; details.push("⚠️ 僅單層迴圈，插入排序通常需雙層"); }
+        else details.push("❌ 缺少巢狀迴圈");
+
+        // 3. 動態性 (25分)
+        if (s.varIndexing > 2) score += 15;
+        else if (s.varIndexing > 0) score += 10;
+        else if (s.hardcodedIndexing > 0) details.push("⚠️ 使用固定數字讀取清單 (非通用)");
+
+        if (s.dynamicLoop) score += 10;
+        else if (s.nestedLoop) details.push("⚠️ 迴圈次數固定，建議用清單長度");
+
+        // 4. 邏輯 (15分)
+        if (s.hasInsert && s.insertInLoop) score += 15;
+        else if (s.hasInsert) { score += 5; details.push("❌ 插入積木在迴圈外"); }
+        else details.push("❌ 缺插入積木");
+
+        // 邏輯細項補分
+        if (s.compareListItems) score += 5;
+        if (s.varUpdate) score += 5;
+
+        // --- 創意加分 (最高 15分) ---
+        let bonus = 0;
+        let bonusMsg = [];
+        if (s.hasMotion) { bonus += 5; bonusMsg.push("✨動作"); }
+        if (s.hasPen) { bonus += 5; bonusMsg.push("🎨畫筆"); }
+        if (s.hasSound) { bonus += 5; bonusMsg.push("🎵音效"); }
+
+        if (bonus > 0) {
+            details.push(`🎉 創意加分 +${bonus}: ${bonusMsg.join(', ')}`);
+        }
+
+        // 總分計算 (上限 100)
+        let total = Math.min(100, score + bonus);
+        return { total: total, details: details, bonus: bonus };
+    }
+
+    function addRowToTable(s) {
+        if (s.error) return;
+
+        let badgeClass = 'score-c';
+        if (s.score >= 90) badgeClass = 'score-s';
+        else if (s.score >= 80) badgeClass = 'score-a';
+        else if (s.score >= 60) badgeClass = 'score-b';
+
+        // 演算法標籤
+        let algoTags = '';
+        if (s.nestedLoop) algoTags += `<span class="tag tag-algo">雙層迴圈</span>`;
+        if (s.hasInsert) algoTags += `<span class="tag tag-algo">插入排序</span>`;
+        if (s.dynamicLoop) algoTags += `<span class="tag tag-dynamic">動態長度</span>`;
+        if (s.varIndexing > 2) algoTags += `<span class="tag tag-dynamic">變數索引</span>`;
+        if (!s.hasInsert) algoTags += `<span class="tag tag-error">缺插入</span>`;
+
+        // 創意標籤
+        let creativeTags = '';
+        if (s.hasMotion) creativeTags += `<span class="tag tag-creative">✨ 動作視覺</span>`;
+        if (s.hasPen) creativeTags += `<span class="tag tag-creative">🎨 畫筆軌跡</span>`;
+        if (s.hasSound) creativeTags += `<span class="tag tag-creative">🎵 音效回饋</span>`;
+        if (creativeTags === '') creativeTags = '<span style="color:#ccc">-</span>';
+
+        let detailHtml = `<ul class="detail-list">`;
+        if (s.scoreData.details.length === 0) detailHtml += `<li style="color:#059669">✅ 完美！</li>`;
+        s.scoreData.details.forEach(d => detailHtml += `<li>${d}</li>`);
+        detailHtml += `</ul>`;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${s.name}</strong><br><span style="color:#999;font-size:11px">${s.totalBlocks} blocks</span></td>
+            <td><div class="score-badge ${badgeClass}">${s.score}</div></td>
+            <td>${algoTags || '<span style="color:#ccc">-</span>'}</td>
+            <td>${creativeTags}</td>
+            <td>${detailHtml}</td>
+        `;
+        document.getElementById('tableBody').appendChild(tr);
+    }
+
+    function exportToCSV() {
+        let csv = ["檔案名稱,分數,演算法特徵,創意加分,診斷報告"];
+        const rows = document.querySelectorAll("table tbody tr");
+        rows.forEach(row => {
+            let cols = row.querySelectorAll("td");
+            let name = cols[0].innerText.split('\n')[0];
+            let score = cols[1].innerText;
+            let algo = cols[2].innerText.replace(/\n/g, " ");
+            let creative = cols[3].innerText.replace(/\n/g, " ");
+            let detail = cols[4].innerText.replace(/\n/g, "; ");
+            csv.push(`"${name}","${score}","${algo}","${creative}","${detail}"`);
+        });
+
+        const csvFile = new Blob(["\uFEFF" + csv.join("\n")], {type: "text/csv"});
+        const link = document.createElement("a");
+        link.href = window.URL.createObjectURL(csvFile);
+        link.download = "scratch_grades_v4.csv";
+        link.click();
+    }
+</script>
+
+</body>
+</html>
