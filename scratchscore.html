@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scratch (sb3) 插入排序法：高鑑別度分析器 v4.0 (含創意加分)</title>
+    <title>Scratch 插入排序法評分器 v8.0 (檔名規範版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root {
-            --primary: #4C97FF;
-            --success: #4CAF50;
-            --warning: #FF9800;
-            --danger: #F44336;
-            --bg: #F0F4F8;
-            --text-main: #333;
-            --text-sub: #666;
-            --purple: #8e44ad; /* Creative color */
+            --primary: #6366f1;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-sub: #6b7280;
         }
 
         body {
@@ -26,113 +26,133 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1100px;
             margin: 0 auto;
-            background: white;
+            background: var(--card-bg);
             padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border-radius: 16px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
         }
 
-        h1 { color: var(--text-main); text-align: center; margin-bottom: 5px; }
+        h1 { color: var(--text-main); text-align: center; margin-bottom: 5px; font-weight: 800; }
         .subtitle { text-align: center; color: var(--text-sub); margin-bottom: 25px; font-size: 0.95em; }
+        
+        .rules-box {
+            background: #eef2ff;
+            border: 1px solid #c7d2fe;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            color: #3730a3;
+        }
+        .rules-box ul { margin: 5px 0 0 20px; padding: 0; }
+        .rules-box li { margin-bottom: 4px; }
+        .rules-box span.neg { color: #dc2626; font-weight: bold; }
+        .rules-box span.pos { color: #059669; font-weight: bold; }
 
         .upload-area {
-            border: 3px dashed #cbd5e1;
-            padding: 30px;
+            border: 3px dashed #e5e7eb;
+            padding: 40px;
             text-align: center;
             border-radius: 12px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            background: #fafafa;
+            transition: all 0.2s ease;
+            background: #f9fafb;
             margin-bottom: 20px;
         }
-        .upload-area:hover { border-color: var(--primary); background: #eef7ff; }
-        .upload-icon { font-size: 40px; margin-bottom: 10px; display: block; }
+        .upload-area:hover { border-color: var(--primary); background: #eef2ff; }
+        .upload-icon { font-size: 48px; margin-bottom: 10px; display: block; }
 
-        .table-container { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid #e5e7eb; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
         
-        th, td { border-bottom: 1px solid #eee; padding: 12px 10px; text-align: left; vertical-align: middle; }
-        th { background-color: #f1f5f9; color: #475569; font-weight: 700; text-transform: uppercase; font-size: 12px; white-space: nowrap; }
-        tr:hover { background-color: #f8fafc; }
+        th { background-color: #f9fafb; color: var(--text-sub); font-weight: 700; text-transform: uppercase; font-size: 12px; padding: 12px 16px; text-align: left; }
+        td { border-top: 1px solid #e5e7eb; padding: 12px 16px; vertical-align: middle; }
+        tr:hover { background-color: #f3f4f6; }
 
-        /* 分數系統 */
+        /* 分數顯示 */
         .score-badge {
             display: inline-flex; justify-content: center; align-items: center;
-            width: 45px; height: 45px; border-radius: 50%;
-            font-weight: 800; font-size: 16px; color: white;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+            width: 50px; height: 50px; border-radius: 50%;
+            font-weight: 800; font-size: 20px; color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
-        .score-s { background: linear-gradient(135deg, #10B981, #059669); } /* 90-100 */
-        .score-a { background: linear-gradient(135deg, #3B82F6, #2563EB); } /* 80-89 */
-        .score-b { background: linear-gradient(135deg, #F59E0B, #D97706); } /* 60-79 */
-        .score-c { background: linear-gradient(135deg, #EF4444, #DC2626); } /* <60 */
+        .score-100 { background: linear-gradient(135deg, #10B981, #059669); }
+        .score-high { background: linear-gradient(135deg, #3B82F6, #2563EB); } 
+        .score-low { background: linear-gradient(135deg, #EF4444, #DC2626); } 
 
-        /* 標籤系統 */
-        .tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin: 2px; border: 1px solid transparent; font-weight: 600; }
-        
-        .tag-algo { background-color: #e0f2fe; color: #0284c7; border-color: #bae6fd; }
-        .tag-dynamic { background-color: #dcfce7; color: #16a34a; border-color: #bbf7d0; }
-        .tag-creative { background-color: #f3e8ff; color: #7e22ce; border-color: #d8b4fe; } /* 創意標籤 */
-        .tag-warn { background-color: #fef9c3; color: #ca8a04; border-color: #fde047; }
-        .tag-error { background-color: #fee2e2; color: #dc2626; border-color: #fecaca; }
-
-        .detail-list { font-size: 12px; color: #64748b; margin: 0; padding-left: 18px; line-height: 1.4; }
-        .detail-list li { margin-bottom: 2px; }
+        .tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-right: 4px; font-weight: 600; border: 1px solid transparent; }
+        .tag-bonus { background-color: #f3e8ff; color: #7e22ce; border-color: #d8b4fe; }
+        .tag-logic { background-color: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+        .tag-penalty { background-color: #fee2e2; color: #b91c1c; border-color: #fecaca; }
+        .tag-error { background-color: #f3f4f6; color: #6b7280; text-decoration: line-through; }
+        .original-name { font-size: 11px; color: #9ca3af; display: block; margin-top: 2px; }
 
         #loading { display: none; text-align: center; padding: 20px; color: var(--primary); font-weight: bold; }
         
         .btn {
-            background-color: var(--primary); color: white; padding: 10px 20px; border-radius: 6px;
-            text-decoration: none; display: inline-block; margin-top: 10px; font-size: 14px; border: none; cursor: pointer;
+            background-color: var(--primary); color: white; padding: 10px 24px; border-radius: 6px;
+            text-decoration: none; display: inline-block; margin-top: 20px; font-size: 14px; border: none; cursor: pointer;
             transition: background 0.2s;
+            font-weight: 500;
         }
-        .btn:hover { background-color: #3a7bd5; }
+        .btn:hover { background-color: #4338ca; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Scratch 插入排序法：高鑑別度分析器 v4.0</h1>
-    <p class="subtitle">評分標準：演算法邏輯(85%) + 動態設計(15%) + <span style="color:var(--purple);font-weight:bold">創意加分(動作/畫筆/音效)</span></p>
+    <h1>Scratch 插入排序法評分器 v8.0</h1>
+    <p class="subtitle">評分重點：檔名規範、演算法結構、創意表現、整潔度</p>
     
+    <div class="rules-box">
+        <strong>🚩 評分規則：</strong>
+        <ul>
+            <li><strong>100 分</strong>：具備「插入積木」且「雙層迴圈 (巢狀結構)」。</li>
+            <li><strong>85 分</strong>：具備「插入積木」但無雙層迴圈。</li>
+            <li><span class="pos">加分 (+5)</span>：創意加分 (動作/音效/外觀/畫筆)。</li>
+            <li><span class="neg">扣分 (-5)</span>：若有「未連接的廢棄積木」。</li>
+            <li><span class="neg">扣分 (-5)</span>：檔名未以 20 開頭 (如: 10804 或 一年八班...)。</li>
+            <li><strong>轉換</strong>：中文檔名 (如: 一年八班04) 將自動轉為標準格式 (20804)。</li>
+        </ul>
+    </div>
+
     <div class="upload-area" onclick="document.getElementById('fileInput').click()" id="dropZone">
-        <span class="upload-icon">🎨</span>
-        <h3>拖曳 .sb3 檔案至此 (支援批量分析)</h3>
-        <p style="color: #94a3b8;">自動偵測演算法結構與視覺化創意表現</p>
+        <span class="upload-icon">📂</span>
+        <h3>拖曳 .sb3 檔案至此</h3>
+        <p style="color: #9CA3AF;">支援批量分析</p>
         <input type="file" id="fileInput" multiple accept=".sb3" style="display:none" onchange="handleFiles(this.files)">
     </div>
 
-    <div id="loading">正在分析演算法邏輯與創意元件... 🚀</div>
+    <div id="loading">正在分析結構、檔名與分數... 🔍</div>
 
     <div class="table-container">
         <table id="resultTable">
             <thead>
                 <tr>
-                    <th style="width: 15%;">檔案名稱</th>
-                    <th style="width: 5%;">評分</th>
-                    <th style="width: 20%;">演算法特徵</th>
-                    <th style="width: 20%;">創意加分 (Bonus)</th>
-                    <th style="width: 40%;">詳細診斷報告</th>
+                    <th style="width: 25%;">學號 / 原始檔名</th>
+                    <th style="width: 15%;">最終分數</th>
+                    <th style="width: 30%;">評分細項</th>
+                    <th style="width: 30%;">評語</th>
                 </tr>
             </thead>
             <tbody id="tableBody">
-                <!-- JS 動態生成 -->
+                <!-- 結果將動態生成 -->
             </tbody>
         </table>
     </div>
     
-    <div style="margin-top: 20px; text-align: right;">
-        <button class="btn" onclick="exportToCSV()">匯出詳細成績單 (CSV)</button>
+    <div style="text-align: right;">
+        <button class="btn" onclick="exportToCSV()">匯出成績單 (CSV)</button>
     </div>
 </div>
 
 <script>
     const dropZone = document.getElementById('dropZone');
-    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#4C97FF'; dropZone.style.backgroundColor = '#eef7ff'; });
-    dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.style.borderColor = '#cbd5e1'; dropZone.style.backgroundColor = '#fafafa'; });
-    dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.style.borderColor = '#cbd5e1'; dropZone.style.backgroundColor = '#fafafa'; handleFiles(e.dataTransfer.files); });
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#4F46E5'; dropZone.style.backgroundColor = '#EEF2FF'; });
+    dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.style.borderColor = '#E5E7EB'; dropZone.style.backgroundColor = '#F9FAFB'; });
+    dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.style.borderColor = '#E5E7EB'; dropZone.style.backgroundColor = '#F9FAFB'; handleFiles(e.dataTransfer.files); });
 
     async function handleFiles(files) {
         const tableBody = document.getElementById('tableBody');
@@ -152,22 +172,65 @@
 
         document.getElementById('loading').style.display = 'none';
         
-        // 排序：分數高 -> 低
-        results.sort((a, b) => (b.score || 0) - (a.score || 0));
+        // 排序：總分高到低
+        results.sort((a, b) => (b.finalScore || 0) - (a.finalScore || 0));
         results.forEach(res => { if(res) addRowToTable(res); });
     }
 
-    // --- 輔助函式 ---
-    function isDynamicInput(input) {
-        if (!input || !input[1]) return false;
-        const valueArray = input[1];
-        if (typeof valueArray === 'string') return true; 
-        if (Array.isArray(valueArray)) {
-            const type = valueArray[0];
-            if (type === 12) return true; // Variable
-            if (type >= 4 && type <= 8) return false; // Number/Text
+    // 中文數字轉阿拉伯數字輔助函式
+    function chineseToInt(cnStr) {
+        const map = {
+            '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
+            '六': 6, '七': 7, '八': 8, '九': 9, '十': 10
+        };
+        
+        let val = 0;
+        if (cnStr.length === 1) return map[cnStr] || 0;
+        
+        // 簡單處理 "十一" 到 "二十"
+        if (cnStr.startsWith('十')) {
+            val = 10 + (map[cnStr[1]] || 0);
+        } else if (cnStr.endsWith('十')) {
+            val = (map[cnStr[0]] || 0) * 10;
+        } else if (cnStr.includes('十')) {
+            val = (map[cnStr[0]] || 0) * 10 + (map[cnStr[2]] || 0);
+        } else {
+            // "二八" 這種非標準寫法，雖然少見，但可視為 28
+             val = parseInt(cnStr.split('').map(c => map[c]).join(''));
         }
-        return false;
+        return val;
+    }
+
+    // 檔名正規化函式
+    function normalizeFilename(originalName) {
+        let name = originalName.replace('.sb3', '');
+        
+        // 檢查是否符合 "中文班級 + 數字座號" 模式
+        // Regex: 捕捉 (班級數字中文)班 (座號數字)號?
+        // 支援 "一年八班04" 或 "八班04"
+        const regex = /([一二三四五六七八九十]+)班(\d+)/;
+        const match = name.match(regex);
+
+        if (match) {
+            const classCn = match[1]; // 例如 "八" 或 "十"
+            const numStr = match[2];  // 例如 "04"
+            
+            const classInt = chineseToInt(classCn);
+            const numInt = parseInt(numStr);
+            
+            // 格式化: 20 + 班級(不補零? 依範例 "20804" 應為 20+8+04)
+            // 若班級是 10，則為 201004
+            
+            // 補零處理：座號一定是兩位
+            const numPad = numInt.toString().padStart(2, '0');
+            
+            // 班級處理：依範例 "20804"，班級似乎不補零直接接在20後面? 
+            // 但如果班級是 12? -> 201204。如果班級是 8 -> 20804。
+            const newName = `20${classInt}${numPad}`;
+            return newName;
+        }
+        
+        return name;
     }
 
     async function analyzeSb3(file) {
@@ -176,26 +239,31 @@
         const project = JSON.parse(projectJson);
 
         let s = {
-            name: file.name.replace('.sb3', ''),
+            originalName: file.name.replace('.sb3', ''),
+            name: '', // 顯示名稱 (可能被轉換)
             totalBlocks: 0,
-            
-            // 基礎與結構
-            hasInit: false,
-            hasHat: false,
-            nestedLoop: false,
-            dynamicLoop: false,
-            varUpdate: false,
-            varIndexing: 0,
-            hardcodedIndexing: 0,
             hasInsert: false,
-            insertInLoop: false,
-            compareListItems: false,
-
-            // 創意加分項
-            hasMotion: false, // 動作
-            hasPen: false,    // 畫筆
-            hasSound: false   // 音效
+            hasNestedLoop: false,
+            hasCreative: false,
+            creativeTypes: [],
+            floatingStacks: 0,
+            filenamePenalty: 0
         };
+
+        // 1. 檔名處理
+        s.name = normalizeFilename(s.originalName);
+        
+        // 檢查檔名是否以 20 開頭 (檢查的是原始檔名)
+        // 題目要求：檔名不是20開頭的-5分
+        // 這裡應該檢查 "原始上傳的檔名" 還是 "轉換後的"？
+        // 通常這類規則是為了處罰沒有按規定命名的學生。
+        // 所以如果學生檔名是 "一年八班..."，原始檔名不是20開頭 -> 扣分。
+        // 但我們幫他轉好了顯示名稱。
+        if (!s.originalName.startsWith('20')) {
+            s.filenamePenalty = 5;
+        }
+
+        let creativeFound = { motion: false, sound: false, looks: false, pen: false };
 
         project.targets.forEach(target => {
             if (!target.blocks) return;
@@ -204,158 +272,149 @@
             Object.keys(blocks).forEach(key => {
                 const b = blocks[key];
                 if (!b.opcode) return;
-                s.totalBlocks++;
+                
+                if (!b.shadow) s.totalBlocks++;
+                
                 const op = b.opcode;
 
-                // 基礎檢查
-                if (op === 'data_deletealloflist') s.hasInit = true;
-                if (op === 'event_whenflagclicked') s.hasHat = true;
-
-                // 迴圈檢查
+                // Logic
+                if (op === 'data_insertatlist') s.hasInsert = true;
                 if (op.startsWith('control_repeat') || op === 'control_forever') {
                     if (b.parent && blocks[b.parent] && blocks[b.parent].opcode.startsWith('control_repeat')) {
-                        s.nestedLoop = true;
-                    }
-                    if (op === 'control_repeat' && b.inputs.TIMES && isDynamicInput(b.inputs.TIMES)) {
-                        s.dynamicLoop = true;
+                        s.hasNestedLoop = true;
                     }
                 }
 
-                // 變數與邏輯
-                if (op === 'data_changevariableby' && b.parent) s.varUpdate = true;
-                if (op === 'data_itemoflist' && b.inputs.INDEX) {
-                    if (isDynamicInput(b.inputs.INDEX)) s.varIndexing++; else s.hardcodedIndexing++;
-                }
-                if (op === 'data_insertatlist') {
-                    s.hasInsert = true;
-                    let p = b.parent;
-                    while(p && blocks[p]) {
-                        if (blocks[p].opcode.startsWith('control_repeat')) { s.insertInLoop = true; break; }
-                        p = blocks[p].parent;
-                    }
-                }
-                if ((op === 'operator_gt' || op === 'operator_lt')) {
-                    const op1 = b.inputs.OPERAND1, op2 = b.inputs.OPERAND2;
-                    if ((op1 && typeof op1[1] === 'string') || (op2 && typeof op2[1] === 'string')) s.compareListItems = true;
-                }
+                // Creative
+                if (op.startsWith('motion_')) creativeFound.motion = true;
+                if (op.startsWith('sound_') || op === 'event_whenbroadcastreceived') creativeFound.sound = true;
+                if (op.startsWith('looks_') && op !== 'looks_say') creativeFound.looks = true;
+                if (op.startsWith('pen_')) creativeFound.pen = true;
 
-                // --- 創意加分檢測 ---
-                if (op.startsWith('motion_')) s.hasMotion = true;
-                if (op.startsWith('pen_')) s.hasPen = true;
-                if (op.startsWith('sound_')) s.hasSound = true;
+                // Cleanup Check (Floating stacks)
+                if (b.topLevel && !b.shadow) {
+                    const isHat = op.startsWith('event_') || 
+                                  op === 'procedures_definition' || 
+                                  op === 'control_start_as_clone';
+                    if (!isHat) s.floatingStacks++;
+                }
             });
         });
 
-        s.scoreData = calculateScore(s);
-        s.score = s.scoreData.total;
+        if (creativeFound.motion) s.creativeTypes.push("動作");
+        if (creativeFound.sound) s.creativeTypes.push("音效");
+        if (creativeFound.looks) s.creativeTypes.push("外觀");
+        if (creativeFound.pen) s.creativeTypes.push("畫筆");
+        s.hasCreative = s.creativeTypes.length > 0;
+
+        calculateFinalScore(s);
         return s;
     }
 
-    function calculateScore(s) {
-        if (s.error) return { total: 0, details: [] };
+    function calculateFinalScore(s) {
+        if (s.error) { s.finalScore = 0; return; }
 
         let score = 0;
-        let details = [];
+        let comment = "";
+        let logicTag = "";
+        
+        const BONUS_POINTS = 5;
+        const CLEANUP_PENALTY = 5;
+        // filenamePenalty 已經在 analyzeSb3 計算 (5分)
 
-        // 1. 基礎與習慣 (15分)
-        if (s.hasHat && s.hasInit) score += 15;
-        else if (s.hasHat) { score += 10; details.push("⚠️ 缺少「刪除清單」初始化"); }
-        else details.push("❌ 沒有小綠旗");
+        const bonus = s.hasCreative ? BONUS_POINTS : 0;
+        const cleanupPen = (s.floatingStacks > 0) ? CLEANUP_PENALTY : 0;
+        const namePen = s.filenamePenalty;
 
-        // 2. 演算法結構 (30分)
-        if (s.nestedLoop) score += 30;
-        else if (s.insertInLoop) { score += 15; details.push("⚠️ 僅單層迴圈，插入排序通常需雙層"); }
-        else details.push("❌ 缺少巢狀迴圈");
+        if (s.hasInsert) {
+            if (s.hasNestedLoop) {
+                score = 100;
+                logicTag = "雙層迴圈 (完美)";
+                comment = "✅ 結構標準。";
+            } else {
+                score = 85;
+                logicTag = "單層迴圈";
+                comment = "⚠️ 缺巢狀結構。";
+            }
+            
+            // 計算總分
+            score = score + bonus - cleanupPen - namePen;
+            // 確保不超過 100 (除非有加分? 規則沒說，通常上限100)
+            if (score > 100) score = 100;
 
-        // 3. 動態性 (25分)
-        if (s.varIndexing > 2) score += 15;
-        else if (s.varIndexing > 0) score += 10;
-        else if (s.hardcodedIndexing > 0) details.push("⚠️ 使用固定數字讀取清單 (非通用)");
-
-        if (s.dynamicLoop) score += 10;
-        else if (s.nestedLoop) details.push("⚠️ 迴圈次數固定，建議用清單長度");
-
-        // 4. 邏輯 (15分)
-        if (s.hasInsert && s.insertInLoop) score += 15;
-        else if (s.hasInsert) { score += 5; details.push("❌ 插入積木在迴圈外"); }
-        else details.push("❌ 缺插入積木");
-
-        // 邏輯細項補分
-        if (s.compareListItems) score += 5;
-        if (s.varUpdate) score += 5;
-
-        // --- 創意加分 (最高 15分) ---
-        let bonus = 0;
-        let bonusMsg = [];
-        if (s.hasMotion) { bonus += 5; bonusMsg.push("✨動作"); }
-        if (s.hasPen) { bonus += 5; bonusMsg.push("🎨畫筆"); }
-        if (s.hasSound) { bonus += 5; bonusMsg.push("🎵音效"); }
-
-        if (bonus > 0) {
-            details.push(`🎉 創意加分 +${bonus}: ${bonusMsg.join(', ')}`);
+        } else {
+            // 不及格
+            score = Math.min(60, s.totalBlocks * 2);
+            // 就算不及格，檔名錯還是要扣嗎？通常不及格就已經很低了，
+            // 這裡簡單處理：在不及格基礎上再扣檔名分
+            score = Math.max(0, score - namePen);
+            logicTag = "缺核心積木";
+            comment = "❌ 未使用插入積木。";
         }
 
-        // 總分計算 (上限 100)
-        let total = Math.min(100, score + bonus);
-        return { total: total, details: details, bonus: bonus };
+        s.finalScore = score;
+        s.comment = comment;
+        s.logicTag = logicTag;
+        s.bonusScore = bonus;
+        s.cleanupPen = cleanupPen;
     }
 
     function addRowToTable(s) {
         if (s.error) return;
 
-        let badgeClass = 'score-c';
-        if (s.score >= 90) badgeClass = 'score-s';
-        else if (s.score >= 80) badgeClass = 'score-a';
-        else if (s.score >= 60) badgeClass = 'score-b';
+        let badgeClass = 'score-low';
+        if (s.finalScore >= 95) badgeClass = 'score-100';
+        else if (s.finalScore >= 80) badgeClass = 'score-high';
 
-        // 演算法標籤
-        let algoTags = '';
-        if (s.nestedLoop) algoTags += `<span class="tag tag-algo">雙層迴圈</span>`;
-        if (s.hasInsert) algoTags += `<span class="tag tag-algo">插入排序</span>`;
-        if (s.dynamicLoop) algoTags += `<span class="tag tag-dynamic">動態長度</span>`;
-        if (s.varIndexing > 2) algoTags += `<span class="tag tag-dynamic">變數索引</span>`;
-        if (!s.hasInsert) algoTags += `<span class="tag tag-error">缺插入</span>`;
+        // 標籤 HTML
+        let tagsHtml = `<span class="tag ${s.hasInsert ? 'tag-logic' : 'tag-error'}">${s.logicTag}</span>`;
+        
+        if (s.bonusScore > 0) tagsHtml += `<span class="tag tag-bonus">+${s.bonusScore} 創意</span>`;
+        if (s.cleanupPen > 0) tagsHtml += `<span class="tag tag-penalty">-${s.cleanupPen} 廢棄積木</span>`;
+        if (s.filenamePenalty > 0) tagsHtml += `<span class="tag tag-penalty">-${s.filenamePenalty} 檔名錯誤</span>`;
 
-        // 創意標籤
-        let creativeTags = '';
-        if (s.hasMotion) creativeTags += `<span class="tag tag-creative">✨ 動作視覺</span>`;
-        if (s.hasPen) creativeTags += `<span class="tag tag-creative">🎨 畫筆軌跡</span>`;
-        if (s.hasSound) creativeTags += `<span class="tag tag-creative">🎵 音效回饋</span>`;
-        if (creativeTags === '') creativeTags = '<span style="color:#ccc">-</span>';
-
-        let detailHtml = `<ul class="detail-list">`;
-        if (s.scoreData.details.length === 0) detailHtml += `<li style="color:#059669">✅ 完美！</li>`;
-        s.scoreData.details.forEach(d => detailHtml += `<li>${d}</li>`);
-        detailHtml += `</ul>`;
+        // 檔名顯示
+        let nameHtml = `<strong>${s.name}</strong>`;
+        if (s.name !== s.originalName) {
+            nameHtml += `<span class="original-name">原: ${s.originalName}</span>`;
+        } else {
+            nameHtml += `<br><span style="color:#9ca3af; font-size:11px;">${s.totalBlocks} blocks</span>`;
+        }
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><strong>${s.name}</strong><br><span style="color:#999;font-size:11px">${s.totalBlocks} blocks</span></td>
-            <td><div class="score-badge ${badgeClass}">${s.score}</div></td>
-            <td>${algoTags || '<span style="color:#ccc">-</span>'}</td>
-            <td>${creativeTags}</td>
-            <td>${detailHtml}</td>
+            <td>${nameHtml}</td>
+            <td><div class="score-badge ${badgeClass}">${s.finalScore}</div></td>
+            <td>${tagsHtml}</td>
+            <td style="color:#4B5563; font-size:13px;">${s.comment}</td>
         `;
         document.getElementById('tableBody').appendChild(tr);
     }
 
     function exportToCSV() {
-        let csv = ["檔案名稱,分數,演算法特徵,創意加分,診斷報告"];
+        let csv = ["學號,原始檔名,總分,評語,檔名扣分"];
         const rows = document.querySelectorAll("table tbody tr");
+        // 重新遍歷需要存取原始資料，這裡簡單從 DOM 抓取
+        // 為了 CSV 準確，建議將 results 存為全域變數，但這裡做簡易版
+        // 這裡僅抓取顯示文字
         rows.forEach(row => {
             let cols = row.querySelectorAll("td");
-            let name = cols[0].innerText.split('\n')[0];
+            let nameBox = cols[0];
+            let newName = nameBox.querySelector("strong").innerText;
+            let oldNameSpan = nameBox.querySelector(".original-name");
+            let oldName = oldNameSpan ? oldNameSpan.innerText.replace("原: ", "") : newName;
+            
             let score = cols[1].innerText;
-            let algo = cols[2].innerText.replace(/\n/g, " ");
-            let creative = cols[3].innerText.replace(/\n/g, " ");
-            let detail = cols[4].innerText.replace(/\n/g, "; ");
-            csv.push(`"${name}","${score}","${algo}","${creative}","${detail}"`);
+            let comment = cols[3].innerText;
+            let penaltyCheck = cols[2].innerText.includes("檔名錯誤") ? "-5" : "0";
+
+            csv.push(`"${newName}","${oldName}",${score},"${comment}",${penaltyCheck}`);
         });
 
         const csvFile = new Blob(["\uFEFF" + csv.join("\n")], {type: "text/csv"});
         const link = document.createElement("a");
         link.href = window.URL.createObjectURL(csvFile);
-        link.download = "scratch_grades_v4.csv";
+        link.download = "scratch_grades_v8.csv";
         link.click();
     }
 </script>
