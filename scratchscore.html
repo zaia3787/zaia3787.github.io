@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scratch 插入排序法評分器 v8.0 (檔名規範版)</title>
+    <title>Scratch 插入排序法評分器 v9.0 (寬鬆標準版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root {
-            --primary: #6366f1;
+            --primary: #8b5cf6; /* Violet */
             --success: #10b981;
             --warning: #f59e0b;
             --danger: #ef4444;
@@ -38,13 +38,13 @@
         .subtitle { text-align: center; color: var(--text-sub); margin-bottom: 25px; font-size: 0.95em; }
         
         .rules-box {
-            background: #eef2ff;
-            border: 1px solid #c7d2fe;
+            background: #f5f3ff;
+            border: 1px solid #ddd6fe;
             border-radius: 8px;
             padding: 15px;
             margin-bottom: 20px;
             font-size: 0.9em;
-            color: #3730a3;
+            color: #5b21b6;
         }
         .rules-box ul { margin: 5px 0 0 20px; padding: 0; }
         .rules-box li { margin-bottom: 4px; }
@@ -61,7 +61,7 @@
             background: #f9fafb;
             margin-bottom: 20px;
         }
-        .upload-area:hover { border-color: var(--primary); background: #eef2ff; }
+        .upload-area:hover { border-color: var(--primary); background: #f5f3ff; }
         .upload-icon { font-size: 48px; margin-bottom: 10px; display: block; }
 
         .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid #e5e7eb; }
@@ -97,23 +97,23 @@
             transition: background 0.2s;
             font-weight: 500;
         }
-        .btn:hover { background-color: #4338ca; }
+        .btn:hover { background-color: #7c3aed; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Scratch 插入排序法評分器 v8.0</h1>
-    <p class="subtitle">評分重點：檔名規範、演算法結構、創意表現、整潔度</p>
+    <h1>Scratch 插入排序法評分器 v9.0</h1>
+    <p class="subtitle">評分重點：檔名(2開頭)、結構(90分)、創意/雙層(+5分)</p>
     
     <div class="rules-box">
         <strong>🚩 評分規則：</strong>
         <ul>
-            <li><strong>100 分</strong>：具備「插入積木」且「雙層迴圈 (巢狀結構)」。</li>
-            <li><strong>85 分</strong>：具備「插入積木」但無雙層迴圈。</li>
+            <li><strong>90 分</strong>：只要有使用「插入積木」即有 90 分基礎分。</li>
+            <li><span class="pos">加分 (+5)</span>：具備「雙層迴圈 (巢狀結構)」。</li>
             <li><span class="pos">加分 (+5)</span>：創意加分 (動作/音效/外觀/畫筆)。</li>
             <li><span class="neg">扣分 (-5)</span>：若有「未連接的廢棄積木」。</li>
-            <li><span class="neg">扣分 (-5)</span>：檔名未以 20 開頭 (如: 10804 或 一年八班...)。</li>
+            <li><span class="neg">扣分 (-5)</span>：原始檔名不是以 "2" 開頭。</li>
             <li><strong>轉換</strong>：中文檔名 (如: 一年八班04) 將自動轉為標準格式 (20804)。</li>
         </ul>
     </div>
@@ -133,8 +133,8 @@
                 <tr>
                     <th style="width: 25%;">學號 / 原始檔名</th>
                     <th style="width: 15%;">最終分數</th>
-                    <th style="width: 30%;">評分細項</th>
-                    <th style="width: 30%;">評語</th>
+                    <th style="width: 35%;">評分細項</th>
+                    <th style="width: 25%;">評語</th>
                 </tr>
             </thead>
             <tbody id="tableBody">
@@ -150,7 +150,7 @@
 
 <script>
     const dropZone = document.getElementById('dropZone');
-    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#4F46E5'; dropZone.style.backgroundColor = '#EEF2FF'; });
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#8b5cf6'; dropZone.style.backgroundColor = '#f5f3ff'; });
     dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.style.borderColor = '#E5E7EB'; dropZone.style.backgroundColor = '#F9FAFB'; });
     dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.style.borderColor = '#E5E7EB'; dropZone.style.backgroundColor = '#F9FAFB'; handleFiles(e.dataTransfer.files); });
 
@@ -187,7 +187,6 @@
         let val = 0;
         if (cnStr.length === 1) return map[cnStr] || 0;
         
-        // 簡單處理 "十一" 到 "二十"
         if (cnStr.startsWith('十')) {
             val = 10 + (map[cnStr[1]] || 0);
         } else if (cnStr.endsWith('十')) {
@@ -195,7 +194,6 @@
         } else if (cnStr.includes('十')) {
             val = (map[cnStr[0]] || 0) * 10 + (map[cnStr[2]] || 0);
         } else {
-            // "二八" 這種非標準寫法，雖然少見，但可視為 28
              val = parseInt(cnStr.split('').map(c => map[c]).join(''));
         }
         return val;
@@ -205,31 +203,21 @@
     function normalizeFilename(originalName) {
         let name = originalName.replace('.sb3', '');
         
-        // 檢查是否符合 "中文班級 + 數字座號" 模式
-        // Regex: 捕捉 (班級數字中文)班 (座號數字)號?
         // 支援 "一年八班04" 或 "八班04"
         const regex = /([一二三四五六七八九十]+)班(\d+)/;
         const match = name.match(regex);
 
         if (match) {
-            const classCn = match[1]; // 例如 "八" 或 "十"
-            const numStr = match[2];  // 例如 "04"
+            const classCn = match[1];
+            const numStr = match[2];
             
             const classInt = chineseToInt(classCn);
             const numInt = parseInt(numStr);
-            
-            // 格式化: 20 + 班級(不補零? 依範例 "20804" 應為 20+8+04)
-            // 若班級是 10，則為 201004
-            
-            // 補零處理：座號一定是兩位
             const numPad = numInt.toString().padStart(2, '0');
             
-            // 班級處理：依範例 "20804"，班級似乎不補零直接接在20後面? 
-            // 但如果班級是 12? -> 201204。如果班級是 8 -> 20804。
             const newName = `20${classInt}${numPad}`;
             return newName;
         }
-        
         return name;
     }
 
@@ -240,7 +228,7 @@
 
         let s = {
             originalName: file.name.replace('.sb3', ''),
-            name: '', // 顯示名稱 (可能被轉換)
+            name: '',
             totalBlocks: 0,
             hasInsert: false,
             hasNestedLoop: false,
@@ -253,13 +241,8 @@
         // 1. 檔名處理
         s.name = normalizeFilename(s.originalName);
         
-        // 檢查檔名是否以 20 開頭 (檢查的是原始檔名)
-        // 題目要求：檔名不是20開頭的-5分
-        // 這裡應該檢查 "原始上傳的檔名" 還是 "轉換後的"？
-        // 通常這類規則是為了處罰沒有按規定命名的學生。
-        // 所以如果學生檔名是 "一年八班..."，原始檔名不是20開頭 -> 扣分。
-        // 但我們幫他轉好了顯示名稱。
-        if (!s.originalName.startsWith('20')) {
+        // 檔名檢查規則：不是以 "2" 開頭扣分
+        if (!s.originalName.startsWith('2')) {
             s.filenamePenalty = 5;
         }
 
@@ -291,7 +274,7 @@
                 if (op.startsWith('looks_') && op !== 'looks_say') creativeFound.looks = true;
                 if (op.startsWith('pen_')) creativeFound.pen = true;
 
-                // Cleanup Check (Floating stacks)
+                // Cleanup Check
                 if (b.topLevel && !b.shadow) {
                     const isHat = op.startsWith('event_') || 
                                   op === 'procedures_definition' || 
@@ -318,36 +301,38 @@
         let comment = "";
         let logicTag = "";
         
-        const BONUS_POINTS = 5;
-        const CLEANUP_PENALTY = 5;
-        // filenamePenalty 已經在 analyzeSb3 計算 (5分)
+        const BONUS_CREATIVE = 5;
+        const BONUS_NESTED = 5;
+        const PENALTY_CLEANUP = 5;
+        const PENALTY_NAME = s.filenamePenalty; // 5
 
-        const bonus = s.hasCreative ? BONUS_POINTS : 0;
-        const cleanupPen = (s.floatingStacks > 0) ? CLEANUP_PENALTY : 0;
-        const namePen = s.filenamePenalty;
+        const bonusCreative = s.hasCreative ? BONUS_CREATIVE : 0;
+        const bonusNested = s.hasNestedLoop ? BONUS_NESTED : 0;
+        const penaltyCleanup = (s.floatingStacks > 0) ? PENALTY_CLEANUP : 0;
 
         if (s.hasInsert) {
+            // 基礎分 90
+            score = 90;
+            logicTag = "結構正確";
+            comment = "✅ 使用插入排序法。";
+
             if (s.hasNestedLoop) {
-                score = 100;
-                logicTag = "雙層迴圈 (完美)";
-                comment = "✅ 結構標準。";
+                // 巢狀結構改為加分
+                // logicTag = "雙層迴圈 (優秀)"; 可以在顯示時透過標籤呈現
             } else {
-                score = 85;
-                logicTag = "單層迴圈";
-                comment = "⚠️ 缺巢狀結構。";
+                comment = "⚠️ 具備核心，若有雙層迴圈更好。";
             }
             
-            // 計算總分
-            score = score + bonus - cleanupPen - namePen;
-            // 確保不超過 100 (除非有加分? 規則沒說，通常上限100)
+            // 計算總分：90 + 5(Nested?) + 5(Creative?) - 5(Cleanup?) - 5(Name?)
+            score = score + bonusNested + bonusCreative - penaltyCleanup - PENALTY_NAME;
+            
             if (score > 100) score = 100;
 
         } else {
             // 不及格
             score = Math.min(60, s.totalBlocks * 2);
-            // 就算不及格，檔名錯還是要扣嗎？通常不及格就已經很低了，
-            // 這裡簡單處理：在不及格基礎上再扣檔名分
-            score = Math.max(0, score - namePen);
+            // 不及格再扣檔名分
+            score = Math.max(0, score - PENALTY_NAME);
             logicTag = "缺核心積木";
             comment = "❌ 未使用插入積木。";
         }
@@ -355,23 +340,25 @@
         s.finalScore = score;
         s.comment = comment;
         s.logicTag = logicTag;
-        s.bonusScore = bonus;
-        s.cleanupPen = cleanupPen;
+        s.bonusScore = bonusCreative;
+        s.nestedScore = bonusNested;
+        s.penaltyScore = penaltyCleanup;
     }
 
     function addRowToTable(s) {
         if (s.error) return;
 
         let badgeClass = 'score-low';
-        if (s.finalScore >= 95) badgeClass = 'score-100';
+        if (s.finalScore === 100) badgeClass = 'score-100';
         else if (s.finalScore >= 80) badgeClass = 'score-high';
 
         // 標籤 HTML
         let tagsHtml = `<span class="tag ${s.hasInsert ? 'tag-logic' : 'tag-error'}">${s.logicTag}</span>`;
         
-        if (s.bonusScore > 0) tagsHtml += `<span class="tag tag-bonus">+${s.bonusScore} 創意</span>`;
-        if (s.cleanupPen > 0) tagsHtml += `<span class="tag tag-penalty">-${s.cleanupPen} 廢棄積木</span>`;
-        if (s.filenamePenalty > 0) tagsHtml += `<span class="tag tag-penalty">-${s.filenamePenalty} 檔名錯誤</span>`;
+        if (s.nestedScore > 0) tagsHtml += `<span class="tag tag-bonus">+5 雙層迴圈</span>`;
+        if (s.bonusScore > 0) tagsHtml += `<span class="tag tag-bonus">+5 創意</span>`;
+        if (s.penaltyScore > 0) tagsHtml += `<span class="tag tag-penalty">-${s.penaltyScore} 廢積木</span>`;
+        if (s.filenamePenalty > 0) tagsHtml += `<span class="tag tag-penalty">-${s.filenamePenalty} 檔名</span>`;
 
         // 檔名顯示
         let nameHtml = `<strong>${s.name}</strong>`;
@@ -394,9 +381,6 @@
     function exportToCSV() {
         let csv = ["學號,原始檔名,總分,評語,檔名扣分"];
         const rows = document.querySelectorAll("table tbody tr");
-        // 重新遍歷需要存取原始資料，這裡簡單從 DOM 抓取
-        // 為了 CSV 準確，建議將 results 存為全域變數，但這裡做簡易版
-        // 這裡僅抓取顯示文字
         rows.forEach(row => {
             let cols = row.querySelectorAll("td");
             let nameBox = cols[0];
@@ -406,7 +390,7 @@
             
             let score = cols[1].innerText;
             let comment = cols[3].innerText;
-            let penaltyCheck = cols[2].innerText.includes("檔名錯誤") ? "-5" : "0";
+            let penaltyCheck = cols[2].innerText.includes("檔名") ? "-5" : "0";
 
             csv.push(`"${newName}","${oldName}",${score},"${comment}",${penaltyCheck}`);
         });
@@ -414,7 +398,7 @@
         const csvFile = new Blob(["\uFEFF" + csv.join("\n")], {type: "text/csv"});
         const link = document.createElement("a");
         link.href = window.URL.createObjectURL(csvFile);
-        link.download = "scratch_grades_v8.csv";
+        link.download = "scratch_grades_v9.csv";
         link.click();
     }
 </script>
