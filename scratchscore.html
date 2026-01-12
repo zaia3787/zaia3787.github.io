@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scratch 插入排序法評分器 v9.0 (寬鬆標準版)</title>
+    <title>Scratch 插入排序法評分器 v9.1 (基礎85分版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root {
@@ -103,13 +103,13 @@
 <body>
 
 <div class="container">
-    <h1>Scratch 插入排序法評分器 v9.0</h1>
-    <p class="subtitle">評分重點：檔名(2開頭)、結構(90分)、創意/雙層(+5分)</p>
+    <h1>Scratch 插入排序法評分器 v9.1</h1>
+    <p class="subtitle">評分重點：檔名(2開頭)、結構(85分)、創意/雙層(+5分)</p>
     
     <div class="rules-box">
         <strong>🚩 評分規則：</strong>
         <ul>
-            <li><strong>90 分</strong>：只要有使用「插入積木」即有 90 分基礎分。</li>
+            <li><strong>85 分</strong>：只要有使用「插入積木」即有 85 分基礎分。</li>
             <li><span class="pos">加分 (+5)</span>：具備「雙層迴圈 (巢狀結構)」。</li>
             <li><span class="pos">加分 (+5)</span>：創意加分 (動作/音效/外觀/畫筆)。</li>
             <li><span class="neg">扣分 (-5)</span>：若有「未連接的廢棄積木」。</li>
@@ -311,8 +311,8 @@
         const penaltyCleanup = (s.floatingStacks > 0) ? PENALTY_CLEANUP : 0;
 
         if (s.hasInsert) {
-            // 基礎分 90
-            score = 90;
+            // 基礎分 85
+            score = 85;
             logicTag = "結構正確";
             comment = "✅ 使用插入排序法。";
 
@@ -323,7 +323,7 @@
                 comment = "⚠️ 具備核心，若有雙層迴圈更好。";
             }
             
-            // 計算總分：90 + 5(Nested?) + 5(Creative?) - 5(Cleanup?) - 5(Name?)
+            // 計算總分：85 + 5(Nested?) + 5(Creative?) - 5(Cleanup?) - 5(Name?)
             score = score + bonusNested + bonusCreative - penaltyCleanup - PENALTY_NAME;
             
             if (score > 100) score = 100;
@@ -398,7 +398,7 @@
         const csvFile = new Blob(["\uFEFF" + csv.join("\n")], {type: "text/csv"});
         const link = document.createElement("a");
         link.href = window.URL.createObjectURL(csvFile);
-        link.download = "scratch_grades_v9.csv";
+        link.download = "scratch_grades_v9.1.csv";
         link.click();
     }
 </script>
