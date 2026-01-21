@@ -24,7 +24,7 @@
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"></script>
 
     <style>
-        body { font-family: "Microsoft JhengHei", "Noto Sans TC", sans-serif; background-color: #f3f4f6; }
+        body { font-family: "Microsoft JhengHei", "Noto Sans TC", sans-serif; background-color: #f3f4f6; overscroll-behavior: none; }
         .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
         .animate-fade-in { animation: fadeIn 0.3s ease-out; }
         .animate-slide-up { animation: slideUp 0.3s ease-out; }
@@ -45,6 +45,13 @@
             20%, 40%, 60%, 80% { transform: translateX(10px); }
         }
         .shake-error { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+
+        /* Progress Bar Animation */
+        @keyframes progress {
+            0% { width: 0%; }
+            100% { width: 100%; }
+        }
+        .animate-progress { animation: progress 1.5s ease-in-out forwards; }
 
         /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -103,6 +110,16 @@
         const ALL_DEVICES = Array.from({length: 36}, (_, i) => i + 1);
 
         // --- Utility Functions ---
+        const generateUUID = () => {
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+                return crypto.randomUUID();
+            }
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        };
+
         const getDayOfWeek = (dateStr) => new Date(dateStr).getDay();
         const formatDate = (date) => {
             const d = new Date(date);
@@ -165,28 +182,47 @@
             const [isDrawing, setIsDrawing] = React.useState(false);
 
             React.useEffect(() => {
-                const canvas = canvasRef.current;
-                if (!canvas) return;
-                
-                const ratio = Math.max(window.devicePixelRatio || 1, 1);
-                canvas.width = canvas.offsetWidth * ratio;
-                canvas.height = canvas.offsetHeight * ratio;
-                canvas.getContext("2d").scale(ratio, ratio);
+                const resizeCanvas = () => {
+                    const canvas = canvasRef.current;
+                    if (!canvas) return;
+                    
+                    const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                    const rect = canvas.getBoundingClientRect();
+                    
+                    if (canvas.width !== rect.width * ratio || canvas.height !== rect.height * ratio) {
+                        canvas.width = rect.width * ratio;
+                        canvas.height = rect.height * ratio;
+                        const ctx = canvas.getContext("2d");
+                        ctx.scale(ratio, ratio);
+                        ctx.lineWidth = 2;
+                        ctx.lineCap = "round";
+                        ctx.strokeStyle = "#000";
+                    }
+                };
 
-                const ctx = canvas.getContext("2d");
-                ctx.lineWidth = 2;
-                ctx.lineCap = "round";
-                ctx.strokeStyle = "#000";
+                const timer = setTimeout(resizeCanvas, 300);
+                window.addEventListener('resize', resizeCanvas);
+                
+                return () => {
+                    clearTimeout(timer);
+                    window.removeEventListener('resize', resizeCanvas);
+                };
             }, []);
 
             const getPos = (e) => {
                 const canvas = canvasRef.current;
                 const rect = canvas.getBoundingClientRect();
-                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                let cx, cy;
+                if (e.touches && e.touches.length > 0) {
+                    cx = e.touches[0].clientX;
+                    cy = e.touches[0].clientY;
+                } else {
+                    cx = e.clientX;
+                    cy = e.clientY;
+                }
                 return {
-                    x: clientX - rect.left,
-                    y: clientY - rect.top
+                    x: cx - rect.left,
+                    y: cy - rect.top
                 };
             };
 
@@ -196,7 +232,7 @@
                 const pos = getPos(e);
                 ctx.beginPath();
                 ctx.moveTo(pos.x, pos.y);
-                if(e.type === 'touchstart') document.body.style.overflow = 'hidden';
+                if(e.cancelable) e.preventDefault();
             };
 
             const move = (e) => {
@@ -205,11 +241,12 @@
                 const pos = getPos(e);
                 ctx.lineTo(pos.x, pos.y);
                 ctx.stroke();
+                if(e.cancelable) e.preventDefault();
             };
 
-            const end = () => {
-                setIsDrawing(false);
-                document.body.style.overflow = ''; 
+            const end = (e) => {
+                if(isDrawing) setIsDrawing(false);
+                if(e.cancelable) e.preventDefault();
             };
 
             const clear = () => {
@@ -219,22 +256,19 @@
             };
 
             return (
-                <div className="flex flex-col h-full">
-                    <div className="border-2 border-gray-300 rounded-lg overflow-hidden bg-white flex-grow touch-none">
+                <div className="flex flex-col h-full select-none">
+                    <div className="border-2 border-gray-300 rounded-lg overflow-hidden bg-white flex-grow touch-none relative w-full h-full">
+                         <div className="absolute inset-0 flex items-center justify-center text-gray-200 text-4xl font-bold pointer-events-none z-0">請在此簽名</div>
                         <canvas
                             ref={canvasRef}
-                            className="w-full h-full block"
-                            onMouseDown={start}
-                            onMouseMove={move}
-                            onMouseUp={end}
-                            onMouseLeave={end}
-                            onTouchStart={start}
-                            onTouchMove={move}
-                            onTouchEnd={end}
+                            style={{ width: '100%', height: '100%', touchAction: 'none' }}
+                            className="block z-10 relative cursor-crosshair w-full h-full"
+                            onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
+                            onTouchStart={start} onTouchMove={move} onTouchEnd={end}
                         />
                     </div>
-                    <div className="mt-2 flex justify-between items-center text-sm text-gray-500">
-                        <span>請在上方區域簽名</span>
+                    <div className="mt-2 flex justify-between items-center text-sm text-gray-500 flex-shrink-0">
+                        <span>請使用手指或滑鼠簽名</span>
                         <div className="flex gap-2">
                             <button type="button" onClick={clear} className="text-red-500 hover:text-red-700 font-bold px-3 py-1 border border-red-200 rounded">清除重簽</button>
                             <button type="button" onClick={() => onEnd(canvasRef.current.toDataURL())} className="bg-blue-600 text-white font-bold px-4 py-1 rounded hover:bg-blue-700">確認簽名並送出</button>
@@ -276,13 +310,24 @@
 
         function FullScreenAnimation({ status, message, onClose }) {
             React.useEffect(() => {
-                const timer = setTimeout(onClose, status === 'success' ? 2500 : 3500);
-                return () => clearTimeout(timer);
+                if (status !== 'loading') {
+                    const timer = setTimeout(onClose, status === 'success' ? 2500 : 5000);
+                    return () => clearTimeout(timer);
+                }
             }, [onClose, status]);
 
             return (
-                <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center text-white animate-fade-in">
-                    {status === 'success' ? (
+                <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center text-white animate-fade-in p-4">
+                    {status === 'loading' && (
+                         <div className="text-center">
+                            <div className="w-64 h-3 bg-gray-700 rounded-full overflow-hidden mb-6 relative mx-auto">
+                                <div className="h-full bg-blue-500 animate-progress absolute left-0 top-0"></div>
+                            </div>
+                            <h2 className="text-3xl font-bold animate-pulse text-blue-300">系統處理中...</h2>
+                            <p className="text-gray-400 mt-2">正在分配平板與寫入資料</p>
+                        </div>
+                    )}
+                    {status === 'success' && (
                         <div className="text-center">
                             <div className="text-9xl mb-8 flex justify-center items-center gap-4 icon-jump">
                                 <span className="text-green-400">✅</span>
@@ -290,11 +335,12 @@
                             <h2 className="text-5xl font-bold mb-4 text-green-400">預約成功！</h2>
                             <p className="text-2xl text-gray-200">請記得去「預約確認」檢查是否成功喔！</p>
                         </div>
-                    ) : (
-                        <div className="text-center shake-error">
+                    )}
+                    {status === 'error' && (
+                        <div className="text-center shake-error max-w-lg">
                             <div className="text-9xl mb-8">❌</div>
-                            <h2 className="text-5xl font-bold mb-4 text-red-500">預約失敗</h2>
-                            <p className="text-3xl text-gray-200 font-bold bg-red-900/50 px-6 py-3 rounded-lg border border-red-500 inline-block">
+                            <h2 className="text-5xl font-bold mb-6 text-red-500">預約失敗</h2>
+                            <p className="text-xl text-white font-bold bg-red-600/20 px-6 py-4 rounded-xl border-2 border-red-500/50 inline-block break-words w-full">
                                 {message}
                             </p>
                         </div>
@@ -574,7 +620,7 @@
             const [form, setForm] = React.useState({ startDate: getMinDate(), endDate: addDays(getMinDate(), 30), cartId: '', user: '', ext: '', quantity: 30, needTeacherPad: false, note: '', selectedSlots: [], signature: null });
             
             React.useEffect(() => { if (carts.length > 0 && !form.cartId) setForm(f => ({...f, cartId: carts[0].id})); }, [carts]);
-            React.useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, []); // Fixed dependency
+            React.useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, []); 
             
             const toggleSlot = (day, period) => {
                 const exists = form.selectedSlots.find(s => s.day === day && s.period === period);
@@ -629,31 +675,65 @@
             };
 
             const initiateBooking = () => {
-                if (!checkConflicts()) return;
-
-                setModalConfig({
-                    type: 'custom',
-                    title: '請簽名確認',
-                    render: ({ onClose }) => (
-                        <div className="h-[300px]">
-                             <SignaturePad onEnd={(sigData) => {
-                                 if (sigData) {
-                                     finalSubmit(sigData);
-                                     onClose();
-                                 }
-                             }} />
-                        </div>
-                    )
-                });
+                if (checkConflicts()) { 
+                     setModalConfig({
+                        type: 'custom',
+                        title: '請簽名確認',
+                        render: ({ onClose }) => (
+                            <div className="h-[300px]">
+                                 <SignaturePad onEnd={(sigData) => {
+                                     if (sigData) {
+                                         setAnimationState({ status: 'loading' });
+                                         onClose();
+                                         setTimeout(() => {
+                                            finalSubmit(sigData);
+                                         }, 1500); 
+                                     }
+                                 }} />
+                            </div>
+                        )
+                    });
+                }
             };
 
             const finalSubmit = async (signatureData) => {
-                const finalForm = { ...form, signature: signatureData };
+                if (!user) {
+                     setAnimationState({ status: 'error', message: "系統連線中，請稍候再試 (User null)" });
+                     return;
+                }
+
+                const needed = parseInt(form.quantity) + (form.needTeacherPad ? 1 : 0);
+                let foundCartId = null;
+                for (const cart of carts) {
+                    let isCartValid = true;
+                    let curr = new Date(form.startDate);
+                    const end = new Date(form.endDate);
+                    while (curr <= end) {
+                        const dateStr = formatDate(curr);
+                        const dayOfWeek = curr.getDay(); 
+                        const daySlots = form.selectedSlots.filter(s => s.day === dayOfWeek);
+                        for (const slot of daySlots) {
+                            const availCount = getAvailabilityCount(cart.id, dateStr, slot.period, null);
+                            if (availCount < needed) { isCartValid = false; break; }
+                        }
+                        if (!isCartValid) break; 
+                        curr.setDate(curr.getDate() + 1);
+                    }
+                    if (isCartValid) { foundCartId = cart.id; break; }
+                }
+
+                if (!foundCartId) {
+                    setAnimationState({ status: 'error', message: "系統錯誤：無法確認車輛" });
+                    return;
+                }
+
+                const batchId = generateUUID(); 
+
+                const finalForm = { ...form, signature: signatureData, cartId: foundCartId };
                 
                 try {
                     let curr = new Date(finalForm.startDate);
                     const end = new Date(finalForm.endDate);
-                    const needed = parseInt(finalForm.quantity) + (finalForm.needTeacherPad ? 1 : 0);
                     
                     let globalIntersection = new Set(ALL_DEVICES); 
                     const intersectionMap = {};
@@ -678,7 +758,7 @@
                     }
 
                     const batch = writeBatch(db);
-                    const batchId = crypto.randomUUID();
+                    
                     let fail = false;
                     
                     finalForm.selectedSlots.forEach(s => {
@@ -738,15 +818,19 @@
                         deviceStr: useGlobal ? formatDeviceList(assignedIdsGlobal) + " (全期固定)" : "依時段分配 (詳見系統)",
                         note: finalForm.note || "無"
                     };
-                    sendEmailNotification(emailData);
+                    
+                    try {
+                         await sendEmailNotification(emailData);
+                    } catch (emailErr) {
+                         console.error("Email failed but booking succeeded", emailErr);
+                    }
 
                     setAnimationState({ status: 'success' });
                     setForm({ ...finalForm, selectedSlots: [], user: '', ext: '', note: '', signature: null }); 
                     setCheckResult(null); 
-                    setStep(1);
                 } catch (e) { 
-                    console.error(e);
-                    setAnimationState({ status: 'error', message: "系統連線錯誤，請稍後再試" });
+                    console.error("Final submit error:", e);
+                    setAnimationState({ status: 'error', message: `系統錯誤: ${e.message || "未知原因"}` });
                 }
             };
 
@@ -978,14 +1062,8 @@
             const handleViewSignature = (item) => {
                 const sig = item.signature;
                 setModalConfig({
-                    type: 'custom',
-                    title: `簽名 - ${item.user}`,
-                    render: ({ onClose }) => (
-                         <div className="flex flex-col items-center p-4">
-                             {sig ? <img src={sig} alt="Signature" className="max-w-full border rounded mb-4 bg-white" /> : <p className="text-gray-500 py-4">無簽名資料</p>}
-                             <button onClick={onClose} className="bg-gray-200 px-6 py-2 rounded font-bold hover:bg-gray-300">關閉</button>
-                         </div>
-                    )
+                    type: 'custom', title: `簽名 - ${item.user}`,
+                    render: ({ onClose }) => ( <div className="flex flex-col items-center p-4">{sig ? <img src={sig} alt="Signature" className="max-w-full border rounded mb-4 bg-white" /> : <p className="text-gray-500 py-4">無簽名資料</p>}<button onClick={onClose} className="bg-gray-200 px-6 py-2 rounded font-bold hover:bg-gray-300">關閉</button></div> )
                 });
             };
 
@@ -1002,7 +1080,7 @@
                 let dateInfo = b.date; 
                 if(b.type === 'long-term') dateInfo = `${b.startDate}~${b.endDate} (週${DAY_LABELS[b.dayOfWeek]})`; 
                 const created = b.createdAt ? new Date(b.createdAt.seconds * 1000).toLocaleString() : ''; 
-                // Removed Signature column
+                // Exclude signature from CSV for cleaner output
                 return `${type},"${dateInfo}",${b.cartId},${b.period},${b.user},${b.ext},${b.quantity},${b.needTeacherPad?'是':'否'},"${formatDeviceList(b.deviceIds)}",${b.note || ''},${b.status},${created}`; 
             }); const link = document.createElement("a"); link.setAttribute("href", URL.createObjectURL(new Blob(["\uFEFF" + headers.concat(rows).join("\n")], { type: 'text/csv;charset=utf-8;' }))); link.setAttribute("download", `報表_${new Date().toISOString().slice(0,10)}.csv`); document.body.appendChild(link); link.click(); };
 
