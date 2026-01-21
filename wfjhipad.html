@@ -31,6 +31,21 @@
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         
+        /* Jump Animation for Success */
+        @keyframes jump {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+        .icon-jump { animation: jump 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite; }
+
+        /* Error Animation */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
+            20%, 40%, 60%, 80% { transform: translateX(10px); }
+        }
+        .shake-error { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+
         /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
@@ -50,7 +65,6 @@
         import { getFirestore, collection, addDoc, query, onSnapshot, deleteDoc, doc, updateDoc, setDoc, serverTimestamp, writeBatch, getDocs, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Init ---
-        // 使用真實金鑰
         const firebaseConfig = {
           apiKey: "AIzaSyBAhA7PnvzJYT_Lil1iX-TVIEgtd9rBVHg",
           authDomain: "wfjh-87c3c.firebaseapp.com",
@@ -63,7 +77,6 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        // 固定 ID
         const appId = 'wfjh-tablet-system';
         const ADMIN_EMAIL = 'zaia3787@gmail.com'; 
 
@@ -102,7 +115,7 @@
         };
         const getMinDate = () => {
             const d = new Date();
-            d.setDate(d.getDate() + 2);
+            d.setDate(d.getDate() + 7);
             return formatDate(d);
         };
         const addDays = (dateStr, days) => {
@@ -133,7 +146,7 @@
         const sendEmailNotification = async (data) => {
             try {
                 const payload = {
-                    _subject: `[平板預約] ${data.user} - ${data.type === 'long-term' ? '長期' : '單次'}`,
+                    _subject: `[平板預約] ${data.user} - ${data.typeLabel}`,
                     _template: "table",
                     _captcha: "false",
                     ...data
@@ -145,6 +158,91 @@
                 });
             } catch (error) { console.error("Email error:", error); }
         };
+
+        // --- Signature Pad Component ---
+        function SignaturePad({ onEnd }) {
+            const canvasRef = React.useRef(null);
+            const [isDrawing, setIsDrawing] = React.useState(false);
+
+            React.useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                
+                const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                canvas.width = canvas.offsetWidth * ratio;
+                canvas.height = canvas.offsetHeight * ratio;
+                canvas.getContext("2d").scale(ratio, ratio);
+
+                const ctx = canvas.getContext("2d");
+                ctx.lineWidth = 2;
+                ctx.lineCap = "round";
+                ctx.strokeStyle = "#000";
+            }, []);
+
+            const getPos = (e) => {
+                const canvas = canvasRef.current;
+                const rect = canvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                return {
+                    x: clientX - rect.left,
+                    y: clientY - rect.top
+                };
+            };
+
+            const start = (e) => {
+                setIsDrawing(true);
+                const ctx = canvasRef.current.getContext("2d");
+                const pos = getPos(e);
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y);
+                if(e.type === 'touchstart') document.body.style.overflow = 'hidden';
+            };
+
+            const move = (e) => {
+                if (!isDrawing) return;
+                const ctx = canvasRef.current.getContext("2d");
+                const pos = getPos(e);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+            };
+
+            const end = () => {
+                setIsDrawing(false);
+                document.body.style.overflow = ''; 
+            };
+
+            const clear = () => {
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext("2d");
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            };
+
+            return (
+                <div className="flex flex-col h-full">
+                    <div className="border-2 border-gray-300 rounded-lg overflow-hidden bg-white flex-grow touch-none">
+                        <canvas
+                            ref={canvasRef}
+                            className="w-full h-full block"
+                            onMouseDown={start}
+                            onMouseMove={move}
+                            onMouseUp={end}
+                            onMouseLeave={end}
+                            onTouchStart={start}
+                            onTouchMove={move}
+                            onTouchEnd={end}
+                        />
+                    </div>
+                    <div className="mt-2 flex justify-between items-center text-sm text-gray-500">
+                        <span>請在上方區域簽名</span>
+                        <div className="flex gap-2">
+                            <button type="button" onClick={clear} className="text-red-500 hover:text-red-700 font-bold px-3 py-1 border border-red-200 rounded">清除重簽</button>
+                            <button type="button" onClick={() => onEnd(canvasRef.current.toDataURL())} className="bg-blue-600 text-white font-bold px-4 py-1 rounded hover:bg-blue-700">確認簽名並送出</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
 
         // --- UI Components ---
         function Toast({ message, type, onClose }) {
@@ -176,10 +274,39 @@
             );
         }
 
+        function FullScreenAnimation({ status, message, onClose }) {
+            React.useEffect(() => {
+                const timer = setTimeout(onClose, status === 'success' ? 2500 : 3500);
+                return () => clearTimeout(timer);
+            }, [onClose, status]);
+
+            return (
+                <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center text-white animate-fade-in">
+                    {status === 'success' ? (
+                        <div className="text-center">
+                            <div className="text-9xl mb-8 flex justify-center items-center gap-4 icon-jump">
+                                <span className="text-green-400">✅</span>
+                            </div>
+                            <h2 className="text-5xl font-bold mb-4 text-green-400">預約成功！</h2>
+                            <p className="text-2xl text-gray-200">請記得去「預約確認」檢查是否成功喔！</p>
+                        </div>
+                    ) : (
+                        <div className="text-center shake-error">
+                            <div className="text-9xl mb-8">❌</div>
+                            <h2 className="text-5xl font-bold mb-4 text-red-500">預約失敗</h2>
+                            <p className="text-3xl text-gray-200 font-bold bg-red-900/50 px-6 py-3 rounded-lg border border-red-500 inline-block">
+                                {message}
+                            </p>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         // --- Main App ---
         function App() {
             const [user, setUser] = React.useState(null);
-            const [view, setView] = React.useState('frontend');
+            const [view, setView] = React.useState('home'); 
             const [carts, setCarts] = React.useState([]);
             const [bookings, setBookings] = React.useState([]);
             const [cartStatus, setCartStatus] = React.useState({});
@@ -191,6 +318,7 @@
 
             const [toast, setToast] = React.useState(null); 
             const [modalConfig, setModalConfig] = React.useState(null); 
+            const [animationState, setAnimationState] = React.useState(null);
 
             const showToast = (message, type = 'success') => setToast({ message, type });
             const closeToast = () => setToast(null);
@@ -212,22 +340,9 @@
                 if (!user) return;
                 const qCarts = query(collection(db, 'artifacts', appId, 'public', 'data', 'carts'));
                 const unsubCarts = onSnapshot(qCarts, async (snap) => {
-                    if (snap.empty && !seededRef.current) {
-                        seededRef.current = true;
-                        const checkSnap = await getDocs(qCarts);
-                        if (checkSnap.empty) {
-                            const batch = writeBatch(db);
-                            INITIAL_CARTS.forEach(c => {
-                                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'carts', c.id);
-                                batch.set(docRef, c);
-                            });
-                            await batch.commit();
-                        }
-                    } else {
-                        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                        list.sort((a, b) => a.id.localeCompare(b.id));
-                        setCarts(list);
-                    }
+                     const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                     list.sort((a, b) => a.id.localeCompare(b.id));
+                     setCarts(list);
                 });
                 const qBookings = query(collection(db, 'artifacts', appId, 'public', 'data', 'bookings'));
                 const unsubBookings = onSnapshot(qBookings, (snap) => setBookings(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
@@ -285,8 +400,14 @@
                 setModalConfig({
                     type: 'password', title: '管理員登入', message: '請輸入管理後台密碼',
                     onConfirm: (val) => {
-                        if (val === "wfjhadmin") { setIsAdmin(true); setView('backend'); showToast("登入成功"); }
-                        else showToast("密碼錯誤", "error");
+                        if (val === "wfjhadmin") { 
+                            setIsAdmin(true); 
+                            setView('backend'); 
+                            showToast("登入成功"); 
+                        }
+                        else {
+                            showToast("密碼錯誤", "error");
+                        }
                     }
                 });
             };
@@ -296,36 +417,13 @@
             };
 
             return (
-                <div className="min-h-screen flex flex-col relative">
-                    {/* Welcome Popup */}
-                    {showWelcome && (
-                        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
-                            <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
-                                <div className="bg-blue-600 p-4 text-white text-center font-bold text-xl shrink-0">
-                                    ⚠️ 租借注意事項
-                                </div>
-                                <div className="p-0 overflow-y-auto flex-grow flex justify-center bg-gray-100">
-                                     <img 
-                                        src="https://i.ibb.co/93hfxjtH/unnamed.jpg" 
-                                        alt="租借規則說明" 
-                                        className="max-w-full h-auto object-contain"
-                                        onError={(e) => {
-                                            e.target.style.display='none';
-                                            e.target.parentNode.innerHTML = '<div class="p-8 text-center text-gray-500 flex flex-col items-center"><i data-lucide="image-off" class="w-12 h-12 mb-2"></i><p>圖片無法載入，請確認網路連線或連結權限。</p></div>';
-                                            if(window.lucide) window.lucide.createIcons();
-                                        }}
-                                     />
-                                </div>
-                                <div className="p-4 bg-white border-t shrink-0">
-                                    <button 
-                                        onClick={() => setShowWelcome(false)}
-                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg text-lg transition shadow-md transform hover:scale-[1.01]"
-                                    >
-                                        我知道了，開始借用
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                <div className="min-h-screen flex flex-col relative bg-gray-50">
+                    {animationState && (
+                        <FullScreenAnimation 
+                            status={animationState.status} 
+                            message={animationState.message} 
+                            onClose={() => setAnimationState(null)} 
+                        />
                     )}
 
                     {toast && <Toast message={toast.message} type={toast.type} onClose={closeToast} />}
@@ -333,11 +431,12 @@
                     
                     <header className="bg-blue-600 text-white shadow-lg sticky top-0 z-40">
                         <div className="container mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-2">
-                            <h1 className="text-xl font-bold flex items-center gap-2"><i data-lucide="tablet" className="w-6 h-6"></i> 五福國中平板車租借系統 v1.0</h1>
+                            <button onClick={() => setView('home')} className="text-xl font-bold flex items-center gap-2 hover:opacity-90 transition">
+                                <i data-lucide="tablet" className="w-6 h-6"></i> 五福國中平板車租借系統 v1.0
+                            </button>
                             <div className="flex bg-blue-700 rounded-lg p-1 overflow-x-auto">
-                                <button onClick={() => setView('frontend')} className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition ${view === 'frontend' ? 'bg-white text-blue-700 shadow' : 'text-blue-200 hover:text-white'}`}>單次預約</button>
-                                <button onClick={() => setView('long-term')} className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition ${view === 'long-term' ? 'bg-white text-blue-700 shadow' : 'text-blue-200 hover:text-white'}`}>長期/批次預約</button>
-                                <button onClick={() => setView('my-bookings')} className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition ${view === 'my-bookings' ? 'bg-white text-blue-700 shadow' : 'text-blue-200 hover:text-white'}`}>借閱確認</button>
+                                <button onClick={() => setView('booking')} className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition ${view === 'booking' ? 'bg-white text-blue-700 shadow' : 'text-blue-200 hover:text-white'}`}>預約</button>
+                                <button onClick={() => setView('check')} className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition ${view === 'check' ? 'bg-white text-blue-700 shadow' : 'text-blue-200 hover:text-white'}`}>預約確認</button>
                             </div>
                         </div>
                     </header>
@@ -346,9 +445,9 @@
                             <div className="flex flex-col items-center justify-center h-64 text-gray-500 gap-2"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div><p>系統資料載入中...</p></div>
                         ) : (
                             <>
-                                {view === 'frontend' && <FrontendView carts={carts.filter(c => c.enableOneTime)} bookings={bookings} cartStatus={cartStatus} getAvailabilityCount={getAvailabilityCount} getAvailableDeviceIds={getAvailableDeviceIds} user={user} db={db} appId={appId} showToast={showToast} />}
-                                {view === 'long-term' && <LongTermView carts={carts.filter(c => c.enableLongTerm)} getAvailabilityCount={getAvailabilityCount} getAvailableDeviceIds={getAvailableDeviceIds} user={user} db={db} appId={appId} showToast={showToast} />}
-                                {view === 'my-bookings' && <MyBookingsView bookings={bookings} />}
+                                {view === 'home' && <HomeView carts={carts.filter(c => c.enableOneTime)} getAvailabilityCount={getAvailabilityCount} setView={setView} />}
+                                {view === 'booking' && <BookingView carts={carts.filter(c => c.enableLongTerm)} getAvailabilityCount={getAvailabilityCount} getAvailableDeviceIds={getAvailableDeviceIds} user={user} db={db} appId={appId} setAnimationState={setAnimationState} setModalConfig={setModalConfig} />}
+                                {view === 'check' && <MyBookingsView bookings={bookings} />}
                                 {view === 'backend' && <BackendView carts={carts} bookings={bookings} cartStatus={cartStatus} db={db} appId={appId} showToast={showToast} setModalConfig={setModalConfig} />}
                             </>
                         )}
@@ -386,6 +485,362 @@
                         <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">確定</button>
                     </div>
                 </form>
+            );
+        }
+
+        // --- Home View ---
+        function HomeView({ carts, getAvailabilityCount, setView }) {
+            const today = formatDate(new Date());
+            React.useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
+            return (
+                <div className="space-y-8 animate-fade-in">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6 px-4">
+                        <button 
+                            onClick={() => setView('booking')}
+                            className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-8 rounded-3xl shadow-xl hover:shadow-2xl hover:scale-105 transition transform flex flex-col items-center justify-center gap-3 group w-full h-full"
+                        >
+                            <i data-lucide="calendar-plus" className="w-16 h-16 mb-2 group-hover:animate-bounce"></i>
+                            <span className="text-4xl font-bold tracking-wider">我要預約</span>
+                            <span className="text-blue-100 text-lg">點此進入借用申請</span>
+                        </button>
+
+                        <button 
+                            onClick={() => setView('check')}
+                            className="bg-white border-4 border-blue-600 text-blue-600 px-8 py-8 rounded-3xl shadow-xl hover:shadow-2xl hover:bg-blue-50 hover:scale-105 transition transform flex flex-col items-center justify-center gap-3 w-full h-full"
+                        >
+                            <i data-lucide="search-check" className="w-16 h-16 mb-2"></i>
+                            <span className="text-4xl font-bold tracking-wider">預約確認</span>
+                            <span className="text-gray-500 text-lg">輸入姓名確認是否成功</span>
+                        </button>
+                    </div>
+
+                    <div className="bg-white rounded-xl card-shadow overflow-hidden">
+                        <div className="bg-gray-800 text-white p-4 flex justify-between items-center">
+                            <h2 className="text-xl font-bold flex items-center gap-2">
+                                <i data-lucide="activity" className="w-5 h-5 text-green-400"></i>
+                                今日各車借閱狀況 ({today})
+                            </h2>
+                            <span className="text-xs text-gray-400">不含週末</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-center whitespace-nowrap text-sm">
+                                <thead className="bg-gray-100 border-b text-gray-600">
+                                    <tr>
+                                        <th className="p-3 text-left sticky left-0 bg-gray-100 z-10">車號 / 位置</th>
+                                        {PERIODS.map(p => <th key={p} className="p-3 min-w-[60px]">第 {p} 節</th>)}
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {carts.map(cart => (
+                                        <tr key={cart.id} className="hover:bg-gray-50">
+                                            <td className="p-3 text-left sticky left-0 bg-white z-10 border-r font-bold text-gray-700">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs">{cart.id} 車</span>
+                                                    <span className="text-xs text-gray-400 font-normal">{cart.location}</span>
+                                                </div>
+                                            </td>
+                                            {PERIODS.map(p => {
+                                                const avail = getAvailabilityCount(cart.id, today, p);
+                                                let content = <span className="text-green-600 font-bold">{avail}</span>;
+                                                let cellClass = "bg-green-50";
+                                                
+                                                if (avail === 0) {
+                                                    content = <span className="text-red-400 font-bold">0</span>;
+                                                    cellClass = "bg-red-50";
+                                                } else if (avail < 10) {
+                                                    content = <span className="text-yellow-600 font-bold">{avail}</span>;
+                                                    cellClass = "bg-yellow-50";
+                                                }
+
+                                                return (
+                                                    <td key={p} className={`p-2 border-l border-white ${cellClass}`}>
+                                                        {content}
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- Booking View ---
+        function BookingView({ carts, getAvailabilityCount, getAvailableDeviceIds, user, db, appId, setAnimationState, setModalConfig }) {
+            const [checkResult, setCheckResult] = React.useState(null);
+            const [form, setForm] = React.useState({ startDate: getMinDate(), endDate: addDays(getMinDate(), 30), cartId: '', user: '', ext: '', quantity: 30, needTeacherPad: false, note: '', selectedSlots: [], signature: null });
+            
+            React.useEffect(() => { if (carts.length > 0 && !form.cartId) setForm(f => ({...f, cartId: carts[0].id})); }, [carts]);
+            React.useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, []); // Fixed dependency
+            
+            const toggleSlot = (day, period) => {
+                const exists = form.selectedSlots.find(s => s.day === day && s.period === period);
+                if (exists) setForm({ ...form, selectedSlots: form.selectedSlots.filter(s => s !== exists) });
+                else setForm({ ...form, selectedSlots: [...form.selectedSlots, { day, period }] });
+                setCheckResult(null);
+            };
+            
+            const checkConflicts = () => {
+                if (form.selectedSlots.length === 0) { setAnimationState({ status: 'error', message: "請至少選擇一個時段" }); return false; }
+                if (form.startDate > form.endDate) { setAnimationState({ status: 'error', message: "結束日期不能早於開始日期" }); return false; }
+                if (!form.user.trim()) { setAnimationState({ status: 'error', message: "請填寫申請人姓名" }); return false; }
+                
+                const needed = parseInt(form.quantity) + (form.needTeacherPad ? 1 : 0);
+                let foundCartId = null;
+
+                for (const cart of carts) {
+                    let isCartValid = true;
+                    let curr = new Date(form.startDate);
+                    const end = new Date(form.endDate);
+                    
+                    while (curr <= end) {
+                        const dateStr = formatDate(curr);
+                        const dayOfWeek = curr.getDay(); 
+                        const daySlots = form.selectedSlots.filter(s => s.day === dayOfWeek);
+                        
+                        for (const slot of daySlots) {
+                            const availCount = getAvailabilityCount(cart.id, dateStr, slot.period, null);
+                            if (availCount < needed) {
+                                isCartValid = false;
+                                break;
+                            }
+                        }
+                        
+                        if (!isCartValid) break; 
+                        curr.setDate(curr.getDate() + 1);
+                    }
+                    
+                    if (isCartValid) {
+                        foundCartId = cart.id;
+                        break; 
+                    }
+                }
+
+                if (foundCartId) {
+                    setForm(prev => ({ ...prev, cartId: foundCartId }));
+                    return true;
+                } else {
+                    setAnimationState({ status: 'error', message: "所有車輛在指定時段皆無足夠庫存，請減少數量或更換時段" });
+                    return false;
+                }
+            };
+
+            const initiateBooking = () => {
+                if (!checkConflicts()) return;
+
+                setModalConfig({
+                    type: 'custom',
+                    title: '請簽名確認',
+                    render: ({ onClose }) => (
+                        <div className="h-[300px]">
+                             <SignaturePad onEnd={(sigData) => {
+                                 if (sigData) {
+                                     finalSubmit(sigData);
+                                     onClose();
+                                 }
+                             }} />
+                        </div>
+                    )
+                });
+            };
+
+            const finalSubmit = async (signatureData) => {
+                const finalForm = { ...form, signature: signatureData };
+                
+                try {
+                    let curr = new Date(finalForm.startDate);
+                    const end = new Date(finalForm.endDate);
+                    const needed = parseInt(finalForm.quantity) + (finalForm.needTeacherPad ? 1 : 0);
+                    
+                    let globalIntersection = new Set(ALL_DEVICES); 
+                    const intersectionMap = {};
+                    finalForm.selectedSlots.forEach(s => intersectionMap[`${s.day}-${s.period}`] = new Set(ALL_DEVICES));
+
+                    while(curr <= end) {
+                        const dStr = formatDate(curr);
+                        const dow = curr.getDay();
+                        finalForm.selectedSlots.filter(s => s.day === dow).forEach(s => {
+                             const idsOnDate = getAvailableDeviceIds(finalForm.cartId, dStr, s.period, finalForm.user);
+                             const slotSet = intersectionMap[`${dow}-${s.period}`];
+                             for (let id of slotSet) if (!idsOnDate.includes(id)) slotSet.delete(id);
+                             for (let id of globalIntersection) if (!idsOnDate.includes(id)) globalIntersection.delete(id);
+                        });
+                        curr.setDate(curr.getDate() + 1);
+                    }
+
+                    let useGlobal = globalIntersection.size >= needed;
+                    let assignedIdsGlobal = [];
+                    if (useGlobal) {
+                        assignedIdsGlobal = Array.from(globalIntersection).sort((a,b)=>a-b).slice(0, needed);
+                    }
+
+                    const batch = writeBatch(db);
+                    const batchId = crypto.randomUUID();
+                    let fail = false;
+                    
+                    finalForm.selectedSlots.forEach(s => {
+                        let assignedIds = [];
+                        if (useGlobal) {
+                            assignedIds = assignedIdsGlobal;
+                        } else {
+                            const availableSet = intersectionMap[`${s.day}-${s.period}`];
+                            if (availableSet.size < needed) { fail = true; return; }
+                            assignedIds = Array.from(availableSet).sort((a,b)=>a-b).slice(0, needed);
+                        }
+
+                        const ref = doc(collection(db, 'artifacts', appId, 'public', 'data', 'bookings'));
+                        batch.set(ref, { 
+                            type: 'long-term', 
+                            batchId: batchId, 
+                            startDate: finalForm.startDate, 
+                            endDate: finalForm.endDate, 
+                            dayOfWeek: s.day, 
+                            period: s.period, 
+                            cartId: finalForm.cartId, 
+                            cartLoc: carts.find(c => c.id === finalForm.cartId).location, 
+                            user: finalForm.user, 
+                            ext: finalForm.ext, 
+                            quantity: parseInt(finalForm.quantity), 
+                            needTeacherPad: finalForm.needTeacherPad, 
+                            note: finalForm.note, 
+                            signature: finalForm.signature,
+                            status: 'active', 
+                            deviceIds: assignedIds, 
+                            createdAt: serverTimestamp(), 
+                            createdBy: user.uid 
+                        });
+                    });
+                    
+                    if(fail) { 
+                        setAnimationState({ status: 'error', message: "部分時段無法分配連續相同的編號，請分開預約" });
+                        return; 
+                    }
+                    
+                    await batch.commit(); 
+
+                    let typeLabel = '長期';
+                    if (finalForm.startDate === finalForm.endDate) {
+                        typeLabel = '短期';
+                    }
+                    
+                    const emailData = {
+                        type: 'long-term',
+                        typeLabel: typeLabel,
+                        user: finalForm.user,
+                        ext: finalForm.ext,
+                        dateStr: `${finalForm.startDate} ~ ${finalForm.endDate}`,
+                        periodStr: `共 ${finalForm.selectedSlots.length} 個時段`, 
+                        cartId: finalForm.cartId,
+                        quantity: needed,
+                        deviceStr: useGlobal ? formatDeviceList(assignedIdsGlobal) + " (全期固定)" : "依時段分配 (詳見系統)",
+                        note: finalForm.note || "無"
+                    };
+                    sendEmailNotification(emailData);
+
+                    setAnimationState({ status: 'success' });
+                    setForm({ ...finalForm, selectedSlots: [], user: '', ext: '', note: '', signature: null }); 
+                    setCheckResult(null); 
+                    setStep(1);
+                } catch (e) { 
+                    console.error(e);
+                    setAnimationState({ status: 'error', message: "系統連線錯誤，請稍後再試" });
+                }
+            };
+
+            return (
+                <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+                    <div className="bg-white p-6 rounded-lg card-shadow">
+                        <div className="border-b pb-4 mb-4"><h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><i data-lucide="calendar-plus" className="w-6 h-6 text-purple-600"></i> 平板預約</h2><p className="text-gray-500 mt-1">預約這次系統僅開放 <b>前一週</b> 進行預約，若有特殊需求的老師請直接聯絡資訊秘書（分機：18），謝謝！</p></div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <label className="block text-xl font-bold text-gray-700 mb-2">1. 日期區間 <span className="text-red-500">*</span></label>
+                                <div className="flex items-center gap-2">
+                                    <input type="date" className="border rounded p-3 w-full text-lg" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value, checkResult: null})} />
+                                    <span className="text-gray-400">至</span>
+                                    <input type="date" className="border rounded p-3 w-full text-lg" value={form.endDate} onChange={e => setForm({...form, endDate: e.target.value, checkResult: null})} />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="mb-6">
+                            <label className="block text-xl font-bold text-gray-700 mb-2">2. 勾選需要時段 <span className="text-red-500">*</span></label>
+                            <div className="overflow-x-auto border rounded-lg">
+                                <table className="w-full text-center text-sm">
+                                    <thead className="bg-purple-50 text-purple-900 font-bold">
+                                        <tr>
+                                            <th className="p-3 border-b border-r">節次</th>
+                                            {DAYS_OF_WEEK.map(d => <th key={d} className="p-3 border-b min-w-[80px]">週{DAY_LABELS[d]}</th>)}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {PERIODS.map(p => (
+                                            <tr key={p} className="hover:bg-gray-50">
+                                                <td className="p-3 border-r font-bold text-gray-500">第 {p} 節</td>
+                                                {DAYS_OF_WEEK.map(d => {
+                                                    const isSelected = form.selectedSlots.some(s => s.day === d && s.period === p);
+                                                    return (
+                                                        <td key={d} className="p-1 border matrix-cell">
+                                                            <label className="cursor-pointer block h-full w-full">
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    className="hidden" 
+                                                                    checked={isSelected}
+                                                                    onChange={() => toggleSlot(d, p)}
+                                                                />
+                                                                <div className={`py-4 rounded transition hover:bg-blue-50 flex items-center justify-center ${isSelected ? 'bg-blue-100 text-blue-700 font-bold ring-2 ring-blue-300' : 'text-gray-300'}`}>
+                                                                    {isSelected ? '✅' : '-'}
+                                                                </div>
+                                                            </label>
+                                                        </td>
+                                                    )
+                                                })}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div className="bg-gray-50 p-4 rounded-lg border mb-6">
+                             <label className="block text-xl font-bold text-gray-700 mb-4">3. 填寫借用資訊 <span className="text-red-500">*</span></label>
+                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-500 mb-1">申請人姓名 (全名)</label>
+                                    <input type="text" className="w-full border rounded p-3 text-lg" placeholder="王小明" value={form.user} onChange={e => setForm({...form, user: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-500 mb-1">分機號碼</label>
+                                    <input type="text" className="w-full border rounded p-3 text-lg" placeholder="1234" value={form.ext} onChange={e => setForm({...form, ext: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-500 mb-1">學生機數量</label>
+                                    <div className="flex gap-3 items-center">
+                                        <input type="number" className="w-24 border rounded p-3 text-lg" value={form.quantity} onChange={e => setForm({...form, quantity: e.target.value})} />
+                                        <label className="flex items-center gap-2 text-base text-gray-700 cursor-pointer select-none">
+                                            <input type="checkbox" checked={form.needTeacherPad} onChange={e => setForm({...form, needTeacherPad: e.target.checked})} className="w-5 h-5 accent-purple-600"/>
+                                            需教師機
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                             <div className="mb-4">
+                                <label className="block text-sm font-bold text-gray-500 mb-1">備註 (選填)</label>
+                                <textarea className="w-full border rounded p-3 text-lg" rows="2" placeholder="用途說明..." value={form.note} onChange={e => setForm({...form, note: e.target.value})}></textarea>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-center mt-8">
+                             <button 
+                                onClick={initiateBooking}
+                                disabled={form.selectedSlots.length === 0}
+                                className="bg-purple-600 text-white px-12 py-4 rounded-xl font-bold text-2xl hover:bg-purple-700 disabled:opacity-50 transition shadow-lg transform hover:scale-105 flex items-center gap-3"
+                            >
+                                預約平板
+                            </button>
+                        </div>
+                    </div>
+                </div>
             );
         }
 
@@ -436,7 +891,8 @@
                 e.preventDefault();
                 if (!name.trim()) return;
                 
-                const found = bookings.filter(b => b.user.trim() === name.trim() && b.status === 'active');
+                // Safe check for b.user existence
+                const found = bookings.filter(b => b.user && b.user.trim() === name.trim() && b.status === 'active');
                 const grouped = groupBookings(found);
                 
                 setResult(grouped);
@@ -447,7 +903,7 @@
                     <div className="bg-white p-6 rounded-lg card-shadow">
                         <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                             <i data-lucide="search" className="w-6 h-6 text-blue-600"></i>
-                            借閱確認 / 查詢
+                            預約確認 / 查詢
                         </h2>
                         <form onSubmit={handleSearch} className="flex gap-2 mb-6">
                             <input 
@@ -500,270 +956,6 @@
             );
         }
 
-        // --- Frontend View ---
-        function FrontendView({ carts, bookings, cartStatus, getAvailabilityCount, getAvailableDeviceIds, user, db, appId, showToast }) {
-            const [date, setDate] = React.useState(getMinDate());
-            const [selectedSlot, setSelectedSlot] = React.useState(null); 
-            const [form, setForm] = React.useState({ user: '', ext: '', quantity: 30, needTeacherPad: false, note: '', type: 'one-time' });
-            
-            React.useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
-
-            // Generate Device Status Map for UI
-            const getDeviceStatusMap = (cartId, dateStr, period) => {
-                const dayOfWeek = getDayOfWeek(dateStr);
-                const map = {}; 
-                for(let i=1; i<=36; i++) map[i] = { status: 'available', label: '可借' };
-
-                // 1. Maintenance
-                const maintenance = cartStatus[cartId];
-                if (maintenance) {
-                    if (maintenance.brokenIds) {
-                        maintenance.brokenIds.forEach(id => map[id] = { status: 'locked', label: '維修/鎖定' });
-                    } else if (maintenance.brokenCount) {
-                        // Legacy support
-                        for(let i=1; i<=maintenance.brokenCount; i++) map[i] = { status: 'locked', label: '維修/鎖定' };
-                    }
-                }
-
-                // 2. Bookings
-                bookings.forEach(b => {
-                    if (b.cartId !== cartId || b.status === 'cancelled') return;
-                    
-                    let isSameDate = false;
-                    if (b.type === 'long-term') {
-                        if (parseInt(b.dayOfWeek) === dayOfWeek && (!b.startDate || (dateStr >= b.startDate && dateStr <= b.endDate))) isSameDate = true;
-                    } else if (b.date === dateStr) isSameDate = true;
-
-                    if (isSameDate && b.deviceIds) {
-                         if (parseInt(b.period) === parseInt(period)) {
-                             b.deviceIds.forEach(id => { if (map[id]) map[id] = { status: 'booked', label: b.user }; });
-                         }
-                         else {
-                             b.deviceIds.forEach(id => { 
-                                 if (map[id]) {
-                                     if(map[id].status === 'available') {
-                                         map[id] = { status: 'booked', label: `${b.user} (全日)` }; 
-                                     }
-                                 } 
-                             });
-                         }
-                    }
-                });
-                return map;
-            };
-
-            const handleSubmit = async (e) => {
-                e.preventDefault();
-                if (!user) return;
-                const dBook = new Date(date);
-                const dToday = new Date(); dToday.setHours(0,0,0,0);
-                if ((dBook - dToday) / (1000 * 3600 * 24) < 2) { showToast("錯誤：必須於兩天前預約", "error"); return; }
-                const availableIds = getAvailableDeviceIds(selectedSlot.cart.id, date, selectedSlot.period, form.user);
-                const needed = parseInt(form.quantity) + (form.needTeacherPad ? 1 : 0);
-                if (needed > availableIds.length) { showToast(`庫存不足！該時段僅剩 ${availableIds.length} 台`, "error"); return; }
-                const userBookingsToday = bookings.filter(b => b.date === date && b.cartId === selectedSlot.cart.id && b.user === form.user && b.status === 'active');
-                const preferredIds = new Set();
-                userBookingsToday.forEach(b => b.deviceIds.forEach(id => preferredIds.add(id)));
-                availableIds.sort((a, b) => {
-                    const aPref = preferredIds.has(a);
-                    const bPref = preferredIds.has(b);
-                    if (aPref && !bPref) return -1;
-                    if (!aPref && bPref) return 1;
-                    return a - b;
-                });
-                const assignedIds = availableIds.slice(0, needed);
-                try {
-                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'bookings'), { ...form, cartId: selectedSlot.cart.id, cartLoc: selectedSlot.cart.location, date: date, dayOfWeek: getDayOfWeek(date), period: selectedSlot.period, status: 'active', deviceIds: assignedIds, createdAt: serverTimestamp(), createdBy: user.uid });
-                    
-                    // Send Email Notification
-                    const emailData = {
-                        type: 'one-time',
-                        user: form.user,
-                        ext: form.ext,
-                        dateStr: date,
-                        periodStr: `第 ${selectedSlot.period} 節`,
-                        cartId: selectedSlot.cart.id,
-                        quantity: needed,
-                        deviceStr: formatDeviceList(assignedIds),
-                        note: form.note || "無"
-                    };
-                    sendEmailNotification(emailData);
-
-                    showToast(`預約成功！分配編號: ${formatDeviceList(assignedIds)}`); setSelectedSlot(null); setForm({ ...form, note: '', quantity: 30 });
-                } catch (err) { showToast("預約失敗", "error"); }
-            };
-
-            return (
-                <div className="space-y-6 animate-fade-in">
-                    <div className="bg-white p-5 rounded-lg card-shadow border-l-4 border-blue-500 flex flex-wrap items-end gap-4 justify-between">
-                        <div><h2 className="text-2xl font-bold text-gray-800">單次預約平板</h2><p className="text-gray-500 text-sm mt-1">若老師您是每周固定租借的需求請點選上方（長期/批次預約）。目前系統僅開放前兩天進行預約，若有特殊需求的老師請直接聯絡資訊執秘（分機：18），謝謝！</p></div>
-                        <div className="flex flex-col gap-1"><label className="text-sm font-bold text-gray-700">選擇日期</label><input type="date" min={getMinDate()} value={date} onChange={e => setDate(e.target.value)} className="border-2 border-blue-200 rounded px-3 py-2 text-lg focus:ring-2 focus:ring-blue-500 outline-none" /></div>
-                    </div>
-                    <div className="bg-white rounded-lg card-shadow overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-center whitespace-nowrap">
-                                <thead className="bg-gray-100 border-b">
-                                    <tr><th className="p-4 text-left font-bold text-gray-600 sticky left-0 bg-gray-100 z-10">車號 / 位置</th>{PERIODS.map(p => <th key={p} className="p-4 font-bold text-gray-600 min-w-[80px]">第 {p} 節</th>)}</tr>
-                                </thead>
-                                <tbody className="divide-y">
-                                    {carts.map(cart => (
-                                        <tr key={cart.id} className="hover:bg-gray-50">
-                                            <td className="p-3 text-left sticky left-0 bg-white z-10 border-r group-hover:bg-gray-50"><div className="flex items-center gap-2"><span className="bg-blue-100 text-blue-800 font-bold px-2 py-1 rounded">{cart.id} 車</span><span className="text-xs text-gray-500">{cart.location}</span></div></td>
-                                            {PERIODS.map(p => {
-                                                const avail = getAvailabilityCount(cart.id, date, p);
-                                                const statusColor = avail === 0 ? 'bg-red-50 text-red-400' : avail < 10 ? 'bg-yellow-50 text-yellow-700' : 'bg-green-50 text-green-700';
-                                                return (<td key={p} className="p-2"><button disabled={avail === 0} onClick={() => setSelectedSlot({ cart, period: p, available: avail })} className={`w-full h-12 rounded-lg flex flex-col items-center justify-center transition ${statusColor} ${avail > 0 ? 'hover:scale-105 shadow-sm' : 'cursor-not-allowed opacity-60'}`}><span className="font-bold">{avail}</span><span className="text-[10px] opacity-80">可借</span></button></td>);
-                                            })}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    {selectedSlot && (
-                        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-                            <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[90vh]">
-                                <div className="bg-blue-600 p-4 flex justify-between items-center text-white flex-shrink-0"><h3 className="font-bold text-lg">預約單 - {selectedSlot.cart.id}車 第{selectedSlot.period}節</h3><button onClick={() => setSelectedSlot(null)} className="hover:bg-blue-700 p-1 rounded"><i data-lucide="x"></i></button></div>
-                                <div className="p-6 overflow-y-auto flex-grow">
-                                    <div className="mb-6">
-                                        <h4 className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2"><i data-lucide="grid" className="w-4 h-4"></i> 即時庫存狀態表 (當日)</h4>
-                                        <div className="grid grid-cols-6 sm:grid-cols-9 gap-1.5">
-                                            {ALL_DEVICES.map(n => {
-                                                const status = getDeviceStatusMap(selectedSlot.cart.id, date, selectedSlot.period)[n];
-                                                let bgClass = "bg-green-100 border-green-300 text-green-700";
-                                                if (status.status === 'locked') bgClass = "bg-red-100 border-red-300 text-red-700";
-                                                if (status.status === 'booked') bgClass = "bg-blue-100 border-blue-300 text-blue-700";
-                                                return (<div key={n} title={status.status === 'booked' ? `借用人: ${status.label}` : status.label} className={`border rounded p-1 text-center text-xs flex flex-col justify-center items-center h-10 ${bgClass}`}><span className="font-bold">{n}</span>{status.status === 'booked' && <span className="scale-75 w-full truncate">{status.label}</span>}</div>)
-                                            })}
-                                        </div>
-                                        <div className="flex gap-4 mt-2 text-xs text-gray-500 justify-end"><div className="flex items-center gap-1"><div className="w-3 h-3 bg-green-100 border border-green-300 rounded"></div>可借</div><div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-100 border border-blue-300 rounded"></div>已借出/全日鎖定</div><div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-100 border border-red-300 rounded"></div>維修</div></div>
-                                    </div>
-                                    <form onSubmit={handleSubmit} className="space-y-4 border-t pt-4">
-                                        <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-bold text-gray-700 mb-1">申請人 (請填全名)</label><input required type="text" value={form.user} onChange={e => setForm({...form, user: e.target.value})} className="w-full border rounded px-3 py-2" placeholder="王老師" /></div><div><label className="block text-sm font-bold text-gray-700 mb-1">分機</label><input required type="text" value={form.ext} onChange={e => setForm({...form, ext: e.target.value})} className="w-full border rounded px-3 py-2" /></div></div>
-                                        <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-bold text-gray-700 mb-1">學生機數量</label><input required type="number" min="1" max="36" value={form.quantity} onChange={e => setForm({...form, quantity: e.target.value})} className="w-full border rounded px-3 py-2" /></div><div className="flex items-center pt-6"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={form.needTeacherPad} onChange={e => setForm({...form, needTeacherPad: e.target.checked})} className="w-5 h-5 accent-blue-600" /><span className="text-gray-700 font-medium">需教師機 (+1)</span></label></div></div>
-                                        <div><label className="block text-sm font-bold text-gray-700 mb-1">備註</label><textarea value={form.note} onChange={e => setForm({...form, note: e.target.value})} className="w-full border rounded px-3 py-2" rows="2"></textarea></div>
-                                        <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow transition">確認送出</button>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        // --- Long Term View ---
-        function LongTermView({ carts, getAvailabilityCount, getAvailableDeviceIds, user, db, appId, showToast }) {
-            const [step, setStep] = React.useState(1);
-            const [checkResult, setCheckResult] = React.useState(null);
-            const [form, setForm] = React.useState({ startDate: getMinDate(), endDate: addDays(getMinDate(), 30), cartId: '', user: '', ext: '', quantity: 30, needTeacherPad: false, note: '', selectedSlots: [] });
-            React.useEffect(() => { if (carts.length > 0 && !form.cartId) setForm(f => ({...f, cartId: carts[0].id})); }, [carts]);
-            React.useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [step]);
-            const toggleSlot = (day, period) => {
-                const exists = form.selectedSlots.find(s => s.day === day && s.period === period);
-                if (exists) setForm({ ...form, selectedSlots: form.selectedSlots.filter(s => s !== exists) });
-                else setForm({ ...form, selectedSlots: [...form.selectedSlots, { day, period }] });
-                setCheckResult(null);
-            };
-            
-            const checkConflicts = () => {
-                if (form.selectedSlots.length === 0) { showToast("請至少選擇一個時段", "error"); return; }
-                if (form.startDate > form.endDate) { showToast("結束日期不能早於開始日期", "error"); return; }
-                const needed = parseInt(form.quantity) + (form.needTeacherPad ? 1 : 0);
-                let foundCartId = null;
-                for (const cart of carts) {
-                    let isCartValid = true;
-                    let curr = new Date(form.startDate);
-                    const end = new Date(form.endDate);
-                    while (curr <= end) {
-                        const dateStr = formatDate(curr);
-                        const dayOfWeek = curr.getDay(); 
-                        const daySlots = form.selectedSlots.filter(s => s.day === dayOfWeek);
-                        for (const slot of daySlots) {
-                            const availCount = getAvailabilityCount(cart.id, dateStr, slot.period, null);
-                            if (availCount < needed) { isCartValid = false; break; }
-                        }
-                        if (!isCartValid) break; 
-                        curr.setDate(curr.getDate() + 1);
-                    }
-                    if (isCartValid) { foundCartId = cart.id; break; }
-                }
-                if (foundCartId) { setForm(prev => ({ ...prev, cartId: foundCartId })); setCheckResult([]); showToast(`自動分配：${foundCartId} 車`); } else { setCheckResult([{ error: "所有車輛在指定時段皆無足夠庫存" }]); }
-            };
-
-            const handleConfirm = async () => {
-                if (!checkResult || checkResult.length > 0) return;
-                try {
-                    let curr = new Date(form.startDate);
-                    const end = new Date(form.endDate);
-                    let globalIntersection = new Set(ALL_DEVICES); 
-                    const needed = parseInt(form.quantity) + (form.needTeacherPad ? 1 : 0);
-                    const intersectionMap = {};
-                    form.selectedSlots.forEach(s => intersectionMap[`${s.day}-${s.period}`] = new Set(ALL_DEVICES));
-                    while(curr <= end) {
-                        const dStr = formatDate(curr);
-                        const dow = curr.getDay();
-                        form.selectedSlots.filter(s => s.day === dow).forEach(s => {
-                             const idsOnDate = getAvailableDeviceIds(form.cartId, dStr, s.period, form.user);
-                             const slotSet = intersectionMap[`${dow}-${s.period}`];
-                             for (let id of slotSet) if (!idsOnDate.includes(id)) slotSet.delete(id);
-                             for (let id of globalIntersection) if (!idsOnDate.includes(id)) globalIntersection.delete(id);
-                        });
-                        curr.setDate(curr.getDate() + 1);
-                    }
-                    let useGlobal = globalIntersection.size >= needed;
-                    let assignedIdsGlobal = [];
-                    if (useGlobal) assignedIdsGlobal = Array.from(globalIntersection).sort((a,b)=>a-b).slice(0, needed);
-                    const batch = writeBatch(db);
-                    const batchId = crypto.randomUUID();
-                    let fail = false;
-                    form.selectedSlots.forEach(s => {
-                        let assignedIds = [];
-                        if (useGlobal) assignedIds = assignedIdsGlobal;
-                        else {
-                            const availableSet = intersectionMap[`${s.day}-${s.period}`];
-                            if (availableSet.size < needed) { fail = true; return; }
-                            assignedIds = Array.from(availableSet).sort((a,b)=>a-b).slice(0, needed);
-                        }
-                        const ref = doc(collection(db, 'artifacts', appId, 'public', 'data', 'bookings'));
-                        batch.set(ref, { type: 'long-term', batchId: batchId, startDate: form.startDate, endDate: form.endDate, dayOfWeek: s.day, period: s.period, cartId: form.cartId, cartLoc: carts.find(c => c.id === form.cartId).location, user: form.user, ext: form.ext, quantity: parseInt(form.quantity), needTeacherPad: form.needTeacherPad, note: form.note, status: 'active', deviceIds: assignedIds, createdAt: serverTimestamp(), createdBy: user.uid });
-                    });
-                    if(fail) { showToast("部分時段無法分配連續相同的編號", "error"); return; }
-                    await batch.commit(); 
-                    
-                    // Send Email Notification (Batch)
-                    const emailData = {
-                        type: 'long-term',
-                        user: form.user,
-                        ext: form.ext,
-                        dateStr: `${form.startDate} ~ ${form.endDate}`,
-                        periodStr: `共 ${form.selectedSlots.length} 個時段`, 
-                        cartId: form.cartId,
-                        quantity: needed,
-                        deviceStr: useGlobal ? formatDeviceList(assignedIdsGlobal) + " (全期固定)" : "依時段分配 (詳見系統)",
-                        note: form.note || "無"
-                    };
-                    sendEmailNotification(emailData);
-
-                    showToast(useGlobal ? "租借成功！全程鎖定相同編號。" : "租借成功！每週固定時段編號相同。"); 
-                    setForm({ ...form, selectedSlots: [], user: '', ext: '', note: '' }); setCheckResult(null); setStep(1);
-                } catch (e) { showToast("建立失敗", "error"); }
-            };
-
-            return (
-                <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
-                    <div className="bg-white p-6 rounded-lg card-shadow">
-                        <div className="border-b pb-4 mb-4"><h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><i data-lucide="calendar-range" className="w-6 h-6 text-purple-600"></i> 長期/批次預約平板</h2><p className="text-gray-500 mt-1">系統將自動尋找可用的車輛與連續編號。</p></div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6"><div><label className="block text-sm font-bold text-gray-700 mb-2">1. 日期區間</label><div className="flex items-center gap-2"><input type="date" className="border rounded p-2 w-full" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value, checkResult: null})} /><span className="text-gray-400">至</span><input type="date" className="border rounded p-2 w-full" value={form.endDate} onChange={e => setForm({...form, endDate: e.target.value, checkResult: null})} /></div></div></div>
-                        <div className="mb-6"><label className="block text-sm font-bold text-gray-700 mb-2">2. 勾選每週固定時段</label><div className="overflow-x-auto border rounded-lg"><table className="w-full text-center text-sm"><thead className="bg-purple-50 text-purple-900 font-bold"><tr><th className="p-2 border-b border-r">節次</th>{DAYS_OF_WEEK.map(d => <th key={d} className="p-2 border-b min-w-[60px]">週{DAY_LABELS[d]}</th>)}</tr></thead><tbody>{PERIODS.map(p => (<tr key={p} className="hover:bg-gray-50"><td className="p-2 border-r font-bold text-gray-500">第 {p} 節</td>{DAYS_OF_WEEK.map(d => { const isSelected = form.selectedSlots.some(s => s.day === d && s.period === p); return (<td key={d} className="p-1 border matrix-cell"><label className="cursor-pointer block h-full w-full"><input type="checkbox" className="hidden" checked={isSelected} onChange={() => toggleSlot(d, p)} /><div className={`py-3 rounded transition hover:bg-blue-50 ${isSelected ? 'bg-blue-100 text-blue-700 font-bold ring-2 ring-blue-300' : 'text-gray-300'}`}>{isSelected ? '✅' : '-'}</div></label></td>) })}</tr>))}</tbody></table></div></div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded border"><div><label className="block text-xs font-bold text-gray-500">申請人</label><input type="text" className="w-full border rounded p-2 mt-1" placeholder="王小明" value={form.user} onChange={e => setForm({...form, user: e.target.value})} /></div><div><label className="block text-xs font-bold text-gray-500">分機</label><input type="text" className="w-full border rounded p-2 mt-1" placeholder="1234" value={form.ext} onChange={e => setForm({...form, ext: e.target.value})} /></div><div><label className="block text-xs font-bold text-gray-500">數量</label><div className="flex gap-2 items-center mt-1"><input type="number" className="w-20 border rounded p-2" value={form.quantity} onChange={e => setForm({...form, quantity: e.target.value})} /><label className="flex items-center gap-1 text-sm text-gray-700 cursor-pointer"><input type="checkbox" checked={form.needTeacherPad} onChange={e => setForm({...form, needTeacherPad: e.target.checked})} />需教師機</label></div></div></div>
-                        <div className="mb-6"><label className="block text-sm font-bold text-gray-700 mb-1">備註</label><textarea value={form.note} onChange={e => setForm({...form, note: e.target.value})} className="w-full border rounded px-3 py-2" rows="2"></textarea></div>
-                        <div className="flex justify-end gap-3">{!checkResult ? (<button onClick={checkConflicts} disabled={form.selectedSlots.length === 0} className="bg-purple-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow">檢查庫存狀況</button>) : (<div className="w-full">{checkResult.length === 0 ? (<div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-lg flex justify-between items-center mb-4"><div className="flex items-center gap-2"><i data-lucide="check-circle" className="w-6 h-6 text-green-600"></i><span>檢查通過！</span></div><button onClick={handleConfirm} className="bg-green-600 text-white px-6 py-2 rounded shadow hover:bg-green-700 font-bold">確認預約</button></div>) : (<div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-lg mb-4"><div className="font-bold flex items-center gap-2 mb-2"><i data-lucide="x-circle" className="w-5 h-5"></i>{checkResult[0].error || `發現 ${checkResult.length} 個衝突時段`}</div><button onClick={() => setCheckResult(null)} className="mt-2 text-red-600 underline text-sm hover:text-red-800">返回修改</button></div>)}</div>)}</div>
-                    </div>
-                </div>
-            );
-        }
-
         // --- Backend View ---
         function BackendView({ carts, bookings, cartStatus, db, appId, showToast, setModalConfig }) {
             const [filter, setFilter] = React.useState('all');
@@ -782,6 +974,20 @@
             const handleEdit = (item) => {
                 setModalConfig({ type: 'custom', title: `編輯分配 - ${item.user} (${item.cartId}車)`, render: ({ onClose }) => ( <AllocationEditor item={item} allBookings={bookings} carts={carts} cartStatus={cartStatus} onClose={onClose} onSave={async (newIds, newCartId) => { try { const targetCart = carts.find(c => c.id === newCartId); const newLoc = targetCart ? targetCart.location : item.cartLoc; if (item.isGroup) { const batch = writeBatch(db); const relatedDocs = bookings.filter(b => b.batchId === item.batchId); relatedDocs.forEach(docData => { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'bookings', docData.id); batch.update(ref, { deviceIds: newIds, quantity: newIds.length, cartId: newCartId, cartLoc: newLoc }); }); await batch.commit(); showToast(`已更新批次共 ${relatedDocs.length} 筆預約`); } else { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'bookings', item.id), { deviceIds: newIds, quantity: newIds.length, cartId: newCartId, cartLoc: newLoc }); showToast("更新成功"); } onClose(); } catch(e) { showToast("更新失敗", "error"); } }} showToast={showToast} /> ) });
             };
+            
+            const handleViewSignature = (item) => {
+                const sig = item.signature;
+                setModalConfig({
+                    type: 'custom',
+                    title: `簽名 - ${item.user}`,
+                    render: ({ onClose }) => (
+                         <div className="flex flex-col items-center p-4">
+                             {sig ? <img src={sig} alt="Signature" className="max-w-full border rounded mb-4 bg-white" /> : <p className="text-gray-500 py-4">無簽名資料</p>}
+                             <button onClick={onClose} className="bg-gray-200 px-6 py-2 rounded font-bold hover:bg-gray-300">關閉</button>
+                         </div>
+                    )
+                });
+            };
 
             const openMaintenanceModal = (cartId) => { const status = cartStatus[cartId] || {}; let ids = status.brokenIds || (status.brokenCount ? Array.from({length: status.brokenCount}, (_,i)=>i+1) : []); setEditingMaintenance({ cartId, brokenIds: new Set(ids) }); setModalConfig({ type: 'custom', title: `${cartId} 車 - 鎖定管理`, render: ({ onClose }) => <MaintenanceGrid cartId={cartId} initialIds={ids} onClose={onClose} db={db} appId={appId} showToast={showToast} /> }); };
             
@@ -789,7 +995,16 @@
             const handleUpdateCart = async (cart, field, val) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'carts', cart.id), { [field]: val });
             const handleDeleteCart = (id) => { setModalConfig({ type: 'confirm', title: '確認刪除車輛', message: `確定要刪除 ${id} 車嗎？`, onConfirm: async () => { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'carts', id)); showToast("已刪除"); } }); };
             
-            const exportCSV = () => { const headers = ["類型,日期範圍/單日,車號,節次,申請人,分機,學生機,教師機,分配編號,備註,狀態,建立時間"]; const rows = bookings.map(b => { const type = b.type === 'long-term' ? '長期' : '單次'; let dateInfo = b.date; if(b.type === 'long-term') dateInfo = `${b.startDate}~${b.endDate} (週${DAY_LABELS[b.dayOfWeek]})`; const created = b.createdAt ? new Date(b.createdAt.seconds * 1000).toLocaleString() : ''; return `${type},"${dateInfo}",${b.cartId},${b.period},${b.user},${b.ext},${b.quantity},${b.needTeacherPad?'是':'否'},"${formatDeviceList(b.deviceIds)}",${b.note || ''},${b.status},${created}`; }); const link = document.createElement("a"); link.setAttribute("href", URL.createObjectURL(new Blob(["\uFEFF" + headers.concat(rows).join("\n")], { type: 'text/csv;charset=utf-8;' }))); link.setAttribute("download", `報表_${new Date().toISOString().slice(0,10)}.csv`); document.body.appendChild(link); link.click(); };
+            const exportCSV = () => { const headers = ["類型,日期範圍/單日,車號,節次,申請人,分機,學生機,教師機,分配編號,備註,狀態,建立時間"]; const rows = bookings.map(b => { 
+                let type = '長期';
+                if (b.startDate === b.endDate) type = '短期';
+
+                let dateInfo = b.date; 
+                if(b.type === 'long-term') dateInfo = `${b.startDate}~${b.endDate} (週${DAY_LABELS[b.dayOfWeek]})`; 
+                const created = b.createdAt ? new Date(b.createdAt.seconds * 1000).toLocaleString() : ''; 
+                // Removed Signature column
+                return `${type},"${dateInfo}",${b.cartId},${b.period},${b.user},${b.ext},${b.quantity},${b.needTeacherPad?'是':'否'},"${formatDeviceList(b.deviceIds)}",${b.note || ''},${b.status},${created}`; 
+            }); const link = document.createElement("a"); link.setAttribute("href", URL.createObjectURL(new Blob(["\uFEFF" + headers.concat(rows).join("\n")], { type: 'text/csv;charset=utf-8;' }))); link.setAttribute("download", `報表_${new Date().toISOString().slice(0,10)}.csv`); document.body.appendChild(link); link.click(); };
 
             const groupBookings = (list) => { const groups = {}; const singles = []; list.forEach(b => { if (b.status === 'active' && b.type === 'long-term' && b.batchId) { if (!groups[b.batchId]) groups[b.batchId] = { ...b, isGroup: true, slots: [] }; groups[b.batchId].slots.push({ day: b.dayOfWeek, period: b.period }); } else singles.push(b); }); const groupArray = Object.values(groups).map(g => { g.slots.sort((a,b) => a.day - b.day || a.period - b.period); const days = {}; g.slots.forEach(s => { if(!days[s.day]) days[s.day] = []; days[s.day].push(s.period); }); const textParts = Object.keys(days).sort().map(d => `週${DAY_LABELS[d]} / 第 ${days[d].join('、')} 節`); g.scheduleText = textParts.join(' ; '); return g; }); return [...singles, ...groupArray].sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)); };
 
@@ -802,19 +1017,19 @@
                     <div className="bg-white p-5 rounded-lg card-shadow border-t-4 border-gray-600">
                         <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg flex items-center gap-2 text-gray-800"><i data-lucide="truck" className="w-5 h-5"></i> 車輛管理設定</h3><button onClick={() => setIsAddingCart(true)} className="bg-gray-800 text-white px-3 py-1 rounded text-sm hover:bg-black transition flex items-center gap-1"><i data-lucide="plus" className="w-4 h-4"></i> 新增車輛</button></div>
                         {isAddingCart && ( <div className="bg-gray-100 p-4 rounded mb-4 animate-fade-in"><h4 className="font-bold text-sm mb-2">新增車輛</h4><div className="flex flex-wrap gap-2 items-end"><div className="w-20"><label className="text-xs">代號</label><input type="text" className="w-full border p-1 rounded uppercase" placeholder="Z" value={newCart.id} onChange={e => setNewCart({...newCart, id: e.target.value})} /></div><div className="flex-1"><label className="text-xs">位置</label><input type="text" className="w-full border p-1 rounded" placeholder="教務處" value={newCart.location} onChange={e => setNewCart({...newCart, location: e.target.value})} /></div><div className="w-20"><label className="text-xs">總量</label><input type="number" className="w-full border p-1 rounded" value={newCart.total} onChange={e => setNewCart({...newCart, total: parseInt(e.target.value)})} /></div><button onClick={handleAddCart} className="bg-green-600 text-white px-3 py-1 rounded text-sm">儲存</button><button onClick={() => setIsAddingCart(false)} className="text-gray-500 text-sm px-2">取消</button></div></div> )}
-                        <div className="overflow-x-auto"><table className="w-full text-sm text-left border-collapse"><thead className="bg-gray-50 text-gray-600"><tr><th className="p-2 border">ID</th><th className="p-2 border">位置</th><th className="p-2 border">單次</th><th className="p-2 border">長期</th><th className="p-2 border text-right">操作</th></tr></thead><tbody>{carts.map(c => (<tr key={c.id} className="hover:bg-gray-50"><td className="p-2 border font-bold">{c.id}</td><td className="p-2 border"><input type="text" className="bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none w-full" defaultValue={c.location} onBlur={(e) => handleUpdateCart(c, 'location', e.target.value)} /></td><td className="p-2 border text-center"><input type="checkbox" checked={c.enableOneTime} onChange={(e) => handleUpdateCart(c, 'enableOneTime', e.target.checked)} className="accent-blue-600 w-4 h-4" /></td><td className="p-2 border text-center"><input type="checkbox" checked={c.enableLongTerm} onChange={(e) => handleUpdateCart(c, 'enableLongTerm', e.target.checked)} className="accent-blue-600 w-4 h-4" /></td><td className="p-2 border text-right"><button onClick={() => handleDeleteCart(c.id)} className="text-red-400 hover:text-red-600 px-2"><i data-lucide="trash" className="w-4 h-4"></i></button></td></tr>))}</tbody></table></div>
+                        <div className="overflow-x-auto"><table className="w-full text-sm text-left border-collapse"><thead className="bg-gray-50 text-gray-600"><tr><th className="p-2 border">ID</th><th className="p-2 border">位置</th><th className="p-2 border">首頁顯示</th><th className="p-2 border">長期</th><th className="p-2 border text-right">操作</th></tr></thead><tbody>{carts.map(c => (<tr key={c.id} className="hover:bg-gray-50"><td className="p-2 border font-bold">{c.id}</td><td className="p-2 border"><input type="text" className="bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none w-full" defaultValue={c.location} onBlur={(e) => handleUpdateCart(c, 'location', e.target.value)} /></td><td className="p-2 border text-center"><input type="checkbox" checked={c.enableOneTime} onChange={(e) => handleUpdateCart(c, 'enableOneTime', e.target.checked)} className="accent-blue-600 w-4 h-4" /></td><td className="p-2 border text-center"><input type="checkbox" checked={c.enableLongTerm} onChange={(e) => handleUpdateCart(c, 'enableLongTerm', e.target.checked)} className="accent-blue-600 w-4 h-4" /></td><td className="p-2 border text-right"><button onClick={() => handleDeleteCart(c.id)} className="text-red-400 hover:text-red-600 px-2"><i data-lucide="trash" className="w-4 h-4"></i></button></td></tr>))}</tbody></table></div>
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                         <div className="lg:col-span-1 bg-white p-5 rounded-lg card-shadow h-fit"><h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-gray-700"><i data-lucide="tool" className="w-5 h-5"></i> 鎖定控制管理</h3><div className="space-y-2 max-h-[600px] overflow-y-auto pr-1 custom-scrollbar">{carts.map(cart => { const status = cartStatus[cart.id] || {}; const brokenCount = status.brokenIds ? status.brokenIds.length : (status.brokenCount || 0); return (<div key={cart.id} className="border rounded p-3 bg-gray-50 flex justify-between items-center"><div><div className="font-bold text-gray-700">{cart.id} 車</div><div className="text-xs text-gray-500">{cart.location}</div></div><div className="flex items-center gap-2"><span className={`text-sm font-bold ${brokenCount > 0 ? 'text-red-600' : 'text-green-600'}`}>{brokenCount > 0 ? `鎖定 ${brokenCount}` : '正常'}</span><button onClick={() => openMaintenanceModal(cart.id)} className="text-gray-400 hover:text-blue-600"><i data-lucide="settings-2" className="w-4 h-4"></i></button></div></div>) })}</div></div>
                         <div className="lg:col-span-3 bg-white p-5 rounded-lg card-shadow">
-                            <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
-                                <h3 className="font-bold text-lg flex items-center gap-2 text-gray-700"><i data-lucide="list" className="w-5 h-5"></i> 預約紀錄</h3>
-                                <div className="flex gap-2">
-                                    <button onClick={exportCSV} className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition"><i data-lucide="download" className="w-4 h-4"></i> CSV</button>
-                                    <div className="bg-gray-100 rounded p-1 flex">{['all','active','long-term'].map(f => <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1 rounded text-sm ${filter === f ? 'bg-white shadow text-blue-600 font-bold' : 'text-gray-500 hover:text-gray-700'}`}>{f==='all'?'全部':f==='active'?'有效':'長期'}</button>)}</div>
-                                </div>
-                            </div>
-                            <div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-gray-50 text-gray-600 uppercase"><tr><th className="p-3">類型/時間</th><th className="p-3">車號</th><th className="p-3">借用人</th><th className="p-3">數量</th><th className="p-3">分配編號</th><th className="p-3">操作</th></tr></thead><tbody className="divide-y">{displayList.map(b => (<tr key={b.id || b.batchId} className="hover:bg-gray-50"><td className="p-3">{b.type === 'long-term' ? (<div><span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-bold mr-2">長期</span><br/>{b.startDate}~{b.endDate}<div className="text-purple-600 text-xs mt-1 font-bold">{b.isGroup ? b.scheduleText : `週${DAY_LABELS[b.dayOfWeek]} / 第 ${b.period} 節`}</div></div>) : (<div><span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-bold mr-2">單次</span><br/>{b.date}<div className="text-gray-500 text-xs mt-1">第 {b.period} 節</div></div>)}</td><td className="p-3 font-bold text-gray-700">{b.cartId} 車</td><td className="p-3"><div>{b.user}</div><div className="text-xs text-gray-400">分機 {b.ext}</div></td><td className="p-3">{b.quantity} 生 {b.needTeacherPad && '+ 1 師'}</td><td className="p-3 text-xs text-gray-600 max-w-[150px] truncate" title={formatDeviceList(b.deviceIds)}>{formatDeviceList(b.deviceIds)}</td><td className="p-3 flex gap-2"><button onClick={() => handleDelete(b)} className="text-red-500 hover:bg-red-50 p-2 rounded"><i data-lucide="trash-2" className="w-4 h-4"></i></button><button onClick={() => handleEdit(b)} className="text-blue-500 hover:bg-blue-50 p-2 rounded"><i data-lucide="edit" className="w-4 h-4"></i></button></td></tr>))}{displayList.length === 0 && <tr><td colSpan="6" className="p-8 text-center text-gray-400">無資料</td></tr>}</tbody></table></div>
+                            <div className="flex flex-wrap justify-between items-center mb-6 gap-4"><h3 className="font-bold text-lg flex items-center gap-2 text-gray-700"><i data-lucide="list" className="w-5 h-5"></i> 預約紀錄</h3><div className="flex gap-2"><button onClick={exportCSV} className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition"><i data-lucide="download" className="w-4 h-4"></i> CSV</button><div className="bg-gray-100 rounded p-1 flex">{['all','active','long-term'].map(f => <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1 rounded text-sm ${filter === f ? 'bg-white shadow text-blue-600 font-bold' : 'text-gray-500 hover:text-gray-700'}`}>{f==='all'?'全部':f==='active'?'有效':'長期'}</button>)}</div></div></div>
+                            <div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-gray-50 text-gray-600 uppercase"><tr><th className="p-3">類型/時間</th><th className="p-3">車號</th><th className="p-3">借用人</th><th className="p-3">數量</th><th className="p-3">分配編號</th><th className="p-3">操作</th></tr></thead><tbody className="divide-y">{displayList.map(b => {
+                                let typeLabel = '長期';
+                                if (b.startDate === b.endDate) typeLabel = '短期';
+
+                                return (
+                                <tr key={b.id || b.batchId} className="hover:bg-gray-50"><td className="p-3">{b.type === 'long-term' ? (<div><span className={`px-2 py-0.5 rounded text-xs font-bold mr-2 ${typeLabel === '短期' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{typeLabel}</span><br/>{b.startDate}~{b.endDate}<div className="text-purple-600 text-xs mt-1 font-bold">{b.isGroup ? b.scheduleText : `週${DAY_LABELS[b.dayOfWeek]} / 第 ${b.period} 節`}</div></div>) : (<div><span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-bold mr-2">單次</span><br/>{b.date}<div className="text-gray-500 text-xs mt-1">第 {b.period} 節</div></div>)}</td><td className="p-3 font-bold text-gray-700">{b.cartId} 車</td><td className="p-3"><div>{b.user}</div><div className="text-xs text-gray-400">分機 {b.ext}</div></td><td className="p-3">{b.quantity} 生 {b.needTeacherPad && '+ 1 師'}</td><td className="p-3 text-xs text-gray-600 max-w-[150px] truncate" title={formatDeviceList(b.deviceIds)}>{formatDeviceList(b.deviceIds)}</td><td className="p-3 flex gap-2"><button onClick={() => handleDelete(b)} className="text-red-500 hover:bg-red-50 p-2 rounded"><i data-lucide="trash-2" className="w-4 h-4"></i></button><button onClick={() => handleEdit(b)} className="text-blue-500 hover:bg-blue-50 p-2 rounded"><i data-lucide="edit" className="w-4 h-4"></i></button>{b.signature && <button onClick={() => handleViewSignature(b)} className="text-blue-600 hover:bg-blue-100 p-2 rounded" title="查看簽名"><i data-lucide="pen-tool" className="w-4 h-4"></i></button>}</td></tr>
+                            )})}</tbody></table></div>
                         </div>
                     </div>
                 </div>
