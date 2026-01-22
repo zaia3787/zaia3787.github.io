@@ -731,6 +731,8 @@
 
                 const finalForm = { ...form, signature: signatureData, cartId: foundCartId };
                 
+                console.log("Submitting booking...", finalForm);
+
                 try {
                     let curr = new Date(finalForm.startDate);
                     const end = new Date(finalForm.endDate);
@@ -738,6 +740,8 @@
                     let globalIntersection = new Set(ALL_DEVICES); 
                     const intersectionMap = {};
                     finalForm.selectedSlots.forEach(s => intersectionMap[`${s.day}-${s.period}`] = new Set(ALL_DEVICES));
+
+                    console.log("Calculating intersections...");
 
                     while(curr <= end) {
                         const dStr = formatDate(curr);
@@ -757,6 +761,7 @@
                         assignedIdsGlobal = Array.from(globalIntersection).sort((a,b)=>a-b).slice(0, needed);
                     }
 
+                    console.log("Starting batch commit...");
                     const batch = writeBatch(db);
                     
                     let fail = false;
@@ -800,6 +805,7 @@
                     }
                     
                     await batch.commit(); 
+                    console.log("Batch committed.");
 
                     let typeLabel = '長期';
                     if (finalForm.startDate === finalForm.endDate) {
@@ -822,15 +828,15 @@
                     try {
                          await sendEmailNotification(emailData);
                     } catch (emailErr) {
-                         console.error("Email failed", emailErr);
+                         console.error("Email failed but booking succeeded", emailErr);
                     }
 
                     setAnimationState({ status: 'success' });
                     setForm({ ...finalForm, selectedSlots: [], user: '', ext: '', note: '', signature: null }); 
                     setCheckResult(null); 
                 } catch (e) { 
-                    console.error(e);
-                    setAnimationState({ status: 'error', message: "系統連線錯誤，請稍後再試" });
+                    console.error("Final submit error:", e);
+                    setAnimationState({ status: 'error', message: `系統錯誤: ${e.message || "未知原因"}` });
                 }
             };
 
@@ -842,32 +848,30 @@
                             <div>
                                 <label className="block text-xl font-bold text-gray-700 mb-2">1. 日期區間 <span className="text-red-500">*</span></label>
                                 <div className="flex items-center gap-2">
-                                    <input type="date" className="border rounded p-2 text-base md:p-3 md:text-lg w-full" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value, checkResult: null})} />
+                                    <input type="date" className="border rounded p-3 w-full text-lg" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value, checkResult: null})} />
                                     <span className="text-gray-400">至</span>
-                                    <input type="date" className="border rounded p-2 text-base md:p-3 md:text-lg w-full" value={form.endDate} onChange={e => setForm({...form, endDate: e.target.value, checkResult: null})} />
+                                    <input type="date" className="border rounded p-3 w-full text-lg" value={form.endDate} onChange={e => setForm({...form, endDate: e.target.value, checkResult: null})} />
                                 </div>
                             </div>
                         </div>
                         <div className="mb-6">
                             <label className="block text-xl font-bold text-gray-700 mb-2">2. 勾選需要時段 <span className="text-red-500">*</span></label>
-                            
-                            {/* Compact Table for Mobile/Tablet Optimization */}
                             <div className="overflow-x-auto border rounded-lg">
-                                <table className="w-full text-center text-xs md:text-sm">
+                                <table className="w-full text-center text-sm">
                                     <thead className="bg-purple-50 text-purple-900 font-bold">
                                         <tr>
-                                            <th className="p-1 md:p-3 border-b border-r">節次</th>
-                                            {DAYS_OF_WEEK.map(d => <th key={d} className="p-1 md:p-3 border-b min-w-[40px] md:min-w-[80px]">週{DAY_LABELS[d]}</th>)}
+                                            <th className="p-3 border-b border-r">節次</th>
+                                            {DAYS_OF_WEEK.map(d => <th key={d} className="p-3 border-b min-w-[80px]">週{DAY_LABELS[d]}</th>)}
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {PERIODS.map(p => (
                                             <tr key={p} className="hover:bg-gray-50">
-                                                <td className="p-1 md:p-3 border-r font-bold text-gray-500">第 {p} 節</td>
+                                                <td className="p-3 border-r font-bold text-gray-500">第 {p} 節</td>
                                                 {DAYS_OF_WEEK.map(d => {
                                                     const isSelected = form.selectedSlots.some(s => s.day === d && s.period === p);
                                                     return (
-                                                        <td key={d} className="p-0.5 md:p-1 border matrix-cell">
+                                                        <td key={d} className="p-1 border matrix-cell">
                                                             <label className="cursor-pointer block h-full w-full">
                                                                 <input 
                                                                     type="checkbox" 
@@ -875,7 +879,7 @@
                                                                     checked={isSelected}
                                                                     onChange={() => toggleSlot(d, p)}
                                                                 />
-                                                                <div className={`py-2 md:py-4 rounded transition hover:bg-blue-50 flex items-center justify-center ${isSelected ? 'bg-blue-100 text-blue-700 font-bold ring-2 ring-blue-300' : 'text-gray-300'}`}>
+                                                                <div className={`py-4 rounded transition hover:bg-blue-50 flex items-center justify-center ${isSelected ? 'bg-blue-100 text-blue-700 font-bold ring-2 ring-blue-300' : 'text-gray-300'}`}>
                                                                     {isSelected ? '✅' : '-'}
                                                                 </div>
                                                             </label>
@@ -925,6 +929,118 @@
                                 預約平板
                             </button>
                         </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- My Bookings View (NEW) ---
+        function MyBookingsView({ bookings }) {
+            const [name, setName] = React.useState('');
+            const [result, setResult] = React.useState(null);
+
+            React.useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
+
+            const groupBookings = (list) => {
+                const groups = {};
+                const singles = [];
+                
+                list.forEach(b => {
+                    if (b.status === 'active' && b.type === 'long-term' && b.batchId) {
+                        if (!groups[b.batchId]) {
+                            groups[b.batchId] = {
+                                ...b,
+                                isGroup: true,
+                                slots: []
+                            };
+                        }
+                        groups[b.batchId].slots.push({ day: b.dayOfWeek, period: b.period });
+                    } else {
+                        singles.push(b);
+                    }
+                });
+
+                const groupArray = Object.values(groups).map(g => {
+                    g.slots.sort((a,b) => a.day - b.day || a.period - b.period);
+                    const days = {};
+                    g.slots.forEach(s => {
+                        if(!days[s.day]) days[s.day] = [];
+                        days[s.day].push(s.period);
+                    });
+                    const textParts = Object.keys(days).sort().map(d => {
+                        return `週${DAY_LABELS[d]} / 第 ${days[d].join('、')} 節`;
+                    });
+                    g.scheduleText = textParts.join(' ; ');
+                    return g;
+                });
+
+                return [...singles, ...groupArray].sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+            };
+
+            const handleSearch = (e) => {
+                e.preventDefault();
+                if (!name.trim()) return;
+                
+                // Safe check for b.user existence
+                const found = bookings.filter(b => b.user && b.user.trim() === name.trim() && b.status === 'active');
+                const grouped = groupBookings(found);
+                
+                setResult(grouped);
+            };
+
+            return (
+                <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
+                    <div className="bg-white p-6 rounded-lg card-shadow">
+                        <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                            <i data-lucide="search" className="w-6 h-6 text-blue-600"></i>
+                            預約確認 / 查詢
+                        </h2>
+                        <form onSubmit={handleSearch} className="flex gap-2 mb-6">
+                            <input 
+                                type="text" 
+                                className="flex-1 border rounded p-3 text-lg" 
+                                placeholder="請輸入申請人姓名 (全名)" 
+                                value={name} 
+                                onChange={e => setName(e.target.value)}
+                            />
+                            <button type="submit" className="bg-blue-600 text-white px-6 py-3 rounded font-bold hover:bg-blue-700">查詢</button>
+                        </form>
+
+                        {result !== null && (
+                            <div>
+                                {result.length === 0 ? (
+                                    <div className="text-center text-gray-500 py-8">查無資料，請確認姓名是否輸入正確。</div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <h3 className="font-bold text-lg text-gray-700 border-b pb-2">查詢結果：{name} 老師 ({result.length} 筆)</h3>
+                                        {result.map(b => (
+                                            <div key={b.id || b.batchId} className="border rounded-lg p-4 hover:bg-gray-50 transition">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <div className="font-bold text-lg text-blue-800 flex items-center gap-2">
+                                                            {b.type === 'long-term' ? <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded">長期</span> : <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">單次</span>}
+                                                            {b.type === 'long-term' ? `${b.startDate} ~ ${b.endDate}` : b.date}
+                                                        </div>
+                                                        <div className="text-gray-600 mt-1">
+                                                            <span className="font-bold mr-2">{b.cartId}車 ({b.cartLoc})</span>
+                                                            {b.isGroup ? (
+                                                                <span className="block mt-1 font-medium text-gray-800">{b.scheduleText}</span>
+                                                            ) : (
+                                                                <span className="mr-2">週{['日','一','二','三','四','五','六'][b.dayOfWeek]} 第 {b.period} 節</span>
+                                                            )}
+                                                            <span className="text-sm text-gray-500 ml-2">(數量: {b.quantity})</span>
+                                                        </div>
+                                                        <div className="text-sm text-gray-500 mt-2 bg-gray-100 p-2 rounded">
+                                                            分配編號：{formatDeviceList(b.deviceIds)}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             );
