@@ -702,7 +702,7 @@
         // --- Booking View ---
         function BookingView({ carts, getAvailabilityCount, getAvailableDeviceIds, user, db, appId, setAnimationState, setModalConfig }) {
             const [checkResult, setCheckResult] = React.useState(null);
-            const [form, setForm] = React.useState({ startDate: getMinDate(), endDate: addDays(getMinDate(), 30), cartId: '', user: '', ext: '', quantity: 30, needTeacherPad: false, note: '', selectedSlots: [], signature: null });
+            const [form, setForm] = React.useState({ startDate: getMinDate(), endDate: addDays(getMinDate(), 30), cartId: '', user: '', ext: '', quantity: 17, needTeacherPad: false, note: '', selectedSlots: [], signature: null });
             
             React.useEffect(() => { if (carts.length > 0 && !form.cartId) setForm(f => ({...f, cartId: carts[0].id})); }, [carts]);
             React.useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, []); 
@@ -1288,4 +1288,5 @@
     </script>
 </body>
 </html>
+
 
