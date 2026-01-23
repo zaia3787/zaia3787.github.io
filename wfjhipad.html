@@ -5,20 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>校園平板車租借系統</title>
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     
-    <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"></script>
@@ -118,6 +113,10 @@
         const DAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
         const ALL_DEVICES = Array.from({length: 36}, (_, i) => i + 1);
 
+        // --- UPDATE 1: Define ID Pools ---
+        const TEACHER_DEVICE_IDS = [34, 35, 36];
+        const STUDENT_MAX_ID = 33; // IDs 1 to 33 are for students
+
         // --- Utility Functions ---
         const generateUUID = () => {
             if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -150,11 +149,9 @@
             return formatDate(d);
         };
 
-        // NEW: Helper to get Mon-Fri dates for current week
         const getCurrentWeekDays = () => {
             const curr = new Date();
-            const day = curr.getDay(); // 0-6
-            // Calculate Monday's date. If Sunday (0), Monday was 6 days ago. If Mon (1), diff is 0.
+            const day = curr.getDay(); 
             const diff = curr.getDate() - day + (day === 0 ? -6 : 1); 
             const monday = new Date(curr.setDate(diff));
             
@@ -499,6 +496,31 @@
                  return Math.max(0, total - usedCount);
             };
 
+            // UPDATE 2: Helper to calculate cart "Busyness" for priority allocation
+            const calculateCartUsageScore = (cartId, startDate, endDate, selectedSlots) => {
+                 let score = 0;
+                 // We roughly check usage for the selected days to prioritize carts that are already "open" (in use)
+                 // This helps grouping bookings into fewer carts.
+                 
+                 bookings.forEach(b => {
+                     if (b.cartId !== cartId || b.status === 'cancelled') return;
+                     
+                     // Check if booking overlaps with request date range
+                     let overlapsDate = false;
+                     if (b.type === 'long-term') {
+                          if (startDate <= b.endDate && endDate >= b.startDate) overlapsDate = true;
+                     } else {
+                          if (b.date >= startDate && b.date <= endDate) overlapsDate = true;
+                     }
+
+                     if (overlapsDate) {
+                         // Add score based on quantity, giving weight to active carts
+                         score += (b.quantity || 1);
+                     }
+                 });
+                 return score;
+            };
+
             const handleBackendAccess = () => {
                 if (isAdmin) { setView('backend'); return; }
                 setModalConfig({
@@ -550,7 +572,7 @@
                         ) : (
                             <>
                                 {view === 'home' && <HomeView carts={carts.filter(c => c.enableOneTime)} getRealPeriodAvailability={getRealPeriodAvailability} setView={setView} />}
-                                {view === 'booking' && <BookingView carts={carts.filter(c => c.enableLongTerm)} getAvailabilityCount={getAvailabilityCount} getAvailableDeviceIds={getAvailableDeviceIds} user={user} db={db} appId={appId} setAnimationState={setAnimationState} setModalConfig={setModalConfig} />}
+                                {view === 'booking' && <BookingView carts={carts.filter(c => c.enableLongTerm)} calculateCartUsageScore={calculateCartUsageScore} getAvailableDeviceIds={getAvailableDeviceIds} user={user} db={db} appId={appId} setAnimationState={setAnimationState} setModalConfig={setModalConfig} />}
                                 {view === 'check' && <MyBookingsView bookings={bookings} />}
                                 {view === 'backend' && <BackendView carts={carts} bookings={bookings} cartStatus={cartStatus} db={db} appId={appId} showToast={showToast} setModalConfig={setModalConfig} />}
                             </>
@@ -700,7 +722,7 @@
         }
 
         // --- Booking View ---
-        function BookingView({ carts, getAvailabilityCount, getAvailableDeviceIds, user, db, appId, setAnimationState, setModalConfig }) {
+        function BookingView({ carts, calculateCartUsageScore, getAvailableDeviceIds, user, db, appId, setAnimationState, setModalConfig }) {
             const [checkResult, setCheckResult] = React.useState(null);
             const [form, setForm] = React.useState({ startDate: getMinDate(), endDate: addDays(getMinDate(), 30), cartId: '', user: '', ext: '', quantity: 17, needTeacherPad: false, note: '', selectedSlots: [], signature: null });
             
@@ -714,15 +736,27 @@
                 setCheckResult(null);
             };
             
+            // --- UPDATE 3: Modified checkConflicts ---
+            // 1. Sorts carts by usage (prioritizes busy carts).
+            // 2. Checks Student IDs (<=33) vs Teacher IDs (>=34) availability separately.
             const checkConflicts = () => {
                 if (form.selectedSlots.length === 0) { setAnimationState({ status: 'error', message: "請至少選擇一個時段" }); return false; }
                 if (form.startDate > form.endDate) { setAnimationState({ status: 'error', message: "結束日期不能早於開始日期" }); return false; }
                 if (!form.user.trim()) { setAnimationState({ status: 'error', message: "請填寫申請人姓名" }); return false; }
                 
-                const needed = parseInt(form.quantity) + (form.needTeacherPad ? 1 : 0);
+                const studentQuantity = parseInt(form.quantity);
+                const teacherQuantity = form.needTeacherPad ? 1 : 0;
+                
+                // Sort carts based on existing bookings to prioritize filling up used carts
+                const sortedCarts = [...carts].sort((a, b) => {
+                    const scoreA = calculateCartUsageScore(a.id, form.startDate, form.endDate, form.selectedSlots);
+                    const scoreB = calculateCartUsageScore(b.id, form.startDate, form.endDate, form.selectedSlots);
+                    return scoreB - scoreA; // Descending: High usage first
+                });
+
                 let foundCartId = null;
 
-                for (const cart of carts) {
+                for (const cart of sortedCarts) {
                     let isCartValid = true;
                     let curr = new Date(form.startDate);
                     const end = new Date(form.endDate);
@@ -733,8 +767,19 @@
                         const daySlots = form.selectedSlots.filter(s => s.day === dayOfWeek);
                         
                         for (const slot of daySlots) {
-                            const availCount = getAvailabilityCount(cart.id, dateStr, slot.period, null);
-                            if (availCount < needed) {
+                            // Get specific IDs available
+                            const availIds = getAvailableDeviceIds(cart.id, dateStr, slot.period, null);
+                            
+                            // Split into Student Pool and Teacher Pool
+                            const availStudentCount = availIds.filter(id => id <= STUDENT_MAX_ID).length;
+                            const availTeacherCount = availIds.filter(id => TEACHER_DEVICE_IDS.includes(id)).length;
+
+                            // Strict Check
+                            if (availStudentCount < studentQuantity) {
+                                isCartValid = false;
+                                break;
+                            }
+                            if (form.needTeacherPad && availTeacherCount < teacherQuantity) {
                                 isCartValid = false;
                                 break;
                             }
@@ -754,7 +799,7 @@
                     setForm(prev => ({ ...prev, cartId: foundCartId }));
                     return true;
                 } else {
-                    setAnimationState({ status: 'error', message: "所有車輛在指定時段皆無足夠庫存，請減少數量或更換時段" });
+                    setAnimationState({ status: 'error', message: "所有車輛在指定時段皆無足夠的 [學生機] 或 [教師機] 庫存，請減少數量或更換時段" });
                     return false;
                 }
             };
@@ -787,9 +832,20 @@
                      return;
                 }
 
-                const needed = parseInt(form.quantity) + (form.needTeacherPad ? 1 : 0);
+                // Re-run the strict check one last time before submit (Concurrency safety)
+                const studentQuantity = parseInt(form.quantity);
+                const teacherQuantity = form.needTeacherPad ? 1 : 0;
+                
+                // Re-sort to find the best cart again (or just verify current)
+                // We use the same logic as checkConflicts to ensure consistency
+                const sortedCarts = [...carts].sort((a, b) => {
+                    const scoreA = calculateCartUsageScore(a.id, form.startDate, form.endDate, form.selectedSlots);
+                    const scoreB = calculateCartUsageScore(b.id, form.startDate, form.endDate, form.selectedSlots);
+                    return scoreB - scoreA; 
+                });
+
                 let foundCartId = null;
-                for (const cart of carts) {
+                for (const cart of sortedCarts) {
                     let isCartValid = true;
                     let curr = new Date(form.startDate);
                     const end = new Date(form.endDate);
@@ -798,8 +854,12 @@
                         const dayOfWeek = curr.getDay(); 
                         const daySlots = form.selectedSlots.filter(s => s.day === dayOfWeek);
                         for (const slot of daySlots) {
-                            const availCount = getAvailabilityCount(cart.id, dateStr, slot.period, null);
-                            if (availCount < needed) { isCartValid = false; break; }
+                            const availIds = getAvailableDeviceIds(cart.id, dateStr, slot.period, null);
+                            const availStudentCount = availIds.filter(id => id <= STUDENT_MAX_ID).length;
+                            const availTeacherCount = availIds.filter(id => TEACHER_DEVICE_IDS.includes(id)).length;
+
+                            if (availStudentCount < studentQuantity) { isCartValid = false; break; }
+                            if (form.needTeacherPad && availTeacherCount < teacherQuantity) { isCartValid = false; break; }
                         }
                         if (!isCartValid) break; 
                         curr.setDate(curr.getDate() + 1);
@@ -808,20 +868,18 @@
                 }
 
                 if (!foundCartId) {
-                    setAnimationState({ status: 'error', message: "系統錯誤：無法確認車輛" });
+                    setAnimationState({ status: 'error', message: "系統錯誤：無法確認車輛 (可能剛好被借走)" });
                     return;
                 }
 
                 const batchId = generateUUID(); 
-
                 const finalForm = { ...form, signature: signatureData, cartId: foundCartId };
                 
-                console.log("Submitting booking...", finalForm);
-
                 try {
                     let curr = new Date(finalForm.startDate);
                     const end = new Date(finalForm.endDate);
                     
+                    // Logic to find common available IDs across all requested slots
                     let globalIntersection = new Set(ALL_DEVICES); 
                     const intersectionMap = {};
                     finalForm.selectedSlots.forEach(s => intersectionMap[`${s.day}-${s.period}`] = new Set(ALL_DEVICES));
@@ -838,24 +896,44 @@
                         curr.setDate(curr.getDate() + 1);
                     }
 
-                    let useGlobal = globalIntersection.size >= needed;
-                    let assignedIdsGlobal = [];
-                    if (useGlobal) {
-                        assignedIdsGlobal = Array.from(globalIntersection).sort((a,b)=>a-b).slice(0, needed);
+                    // --- UPDATE 4: Allocation Logic ---
+                    // Try to use global intersection first (devices available for ALL requested times)
+                    // But we must separate Student vs Teacher pools
+
+                    const globalArr = Array.from(globalIntersection).sort((a,b)=>a-b);
+                    const globalStudent = globalArr.filter(id => id <= STUDENT_MAX_ID);
+                    const globalTeacher = globalArr.filter(id => TEACHER_DEVICE_IDS.includes(id));
+
+                    const canUseGlobal = globalStudent.length >= studentQuantity && (!form.needTeacherPad || globalTeacher.length >= 1);
+                    
+                    let assignedGlobal = [];
+                    if (canUseGlobal) {
+                        const sIds = globalStudent.slice(0, studentQuantity);
+                        const tIds = form.needTeacherPad ? globalTeacher.slice(0, 1) : [];
+                        assignedGlobal = [...sIds, ...tIds].sort((a,b)=>a-b);
                     }
 
                     const batch = writeBatch(db);
-                    
                     let fail = false;
                     
                     finalForm.selectedSlots.forEach(s => {
                         let assignedIds = [];
-                        if (useGlobal) {
-                            assignedIds = assignedIdsGlobal;
+                        if (canUseGlobal) {
+                            assignedIds = assignedGlobal;
                         } else {
-                            const availableSet = intersectionMap[`${s.day}-${s.period}`];
-                            if (availableSet.size < needed) { fail = true; return; }
-                            assignedIds = Array.from(availableSet).sort((a,b)=>a-b).slice(0, needed);
+                            // Fallback: Assign per slot (non-continuous IDs) but still respecting pools
+                            const slotSet = intersectionMap[`${s.day}-${s.period}`];
+                            const slotArr = Array.from(slotSet).sort((a,b)=>a-b);
+                            
+                            const slotStudent = slotArr.filter(id => id <= STUDENT_MAX_ID);
+                            const slotTeacher = slotArr.filter(id => TEACHER_DEVICE_IDS.includes(id));
+
+                            if (slotStudent.length < studentQuantity) { fail = true; return; }
+                            if (form.needTeacherPad && slotTeacher.length < 1) { fail = true; return; }
+
+                            const sIds = slotStudent.slice(0, studentQuantity);
+                            const tIds = form.needTeacherPad ? slotTeacher.slice(0, 1) : [];
+                            assignedIds = [...sIds, ...tIds].sort((a,b)=>a-b);
                         }
 
                         const ref = doc(collection(db, 'artifacts', appId, 'public', 'data', 'bookings'));
@@ -882,12 +960,10 @@
                     });
                     
                     if(fail) { 
-                        setAnimationState({ status: 'error', message: "部分時段無法分配連續相同的編號，請分開預約" });
+                        setAnimationState({ status: 'error', message: "部分時段無法取得足夠的學生機或教師機" });
                         return; 
                     }
                     
-                    // Check for urgent booking (Late logic: within 3 days)
-                    // If start date is within 3 days from today, it's urgent.
                     const todayStr = formatDate(new Date());
                     const threeDaysLaterStr = addDays(todayStr, 3);
                     const isUrgent = finalForm.startDate <= threeDaysLaterStr;
@@ -980,7 +1056,7 @@
                                         <input type="number" className="w-24 border rounded p-2 text-sm md:p-3 md:text-lg focus:ring-2 focus:ring-blue-500 outline-none" value={form.quantity} onChange={e => setForm({...form, quantity: e.target.value})} />
                                         <label className="flex items-center gap-2 text-base text-gray-700 cursor-pointer select-none">
                                             <input type="checkbox" checked={form.needTeacherPad} onChange={e => setForm({...form, needTeacherPad: e.target.checked})} className="w-5 h-5 accent-blue-600"/>
-                                            需教師機
+                                            需教師機 (No.34-36)
                                         </label>
                                     </div>
                                 </div>
@@ -1171,7 +1247,7 @@
                     <div className="bg-white p-5 rounded-lg card-shadow border-t-4 border-blue-600">
                         <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg flex items-center gap-2 text-blue-800"><i data-lucide="truck" className="w-5 h-5"></i> 車輛管理設定</h3><button onClick={() => setIsAddingCart(true)} className="bg-blue-800 text-white px-3 py-1 rounded text-sm hover:bg-blue-900 transition flex items-center gap-1"><i data-lucide="plus" className="w-4 h-4"></i> 新增車輛</button></div>
                         {isAddingCart && ( <div className="bg-blue-50 p-4 rounded mb-4 animate-fade-in"><h4 className="font-bold text-sm mb-2 text-blue-800">新增車輛</h4><div className="flex flex-wrap gap-2 items-end"><div className="w-20"><label className="text-xs text-blue-600">代號</label><input type="text" className="w-full border p-1 rounded uppercase focus:ring-1 focus:ring-blue-500" placeholder="Z" value={newCart.id} onChange={e => setNewCart({...newCart, id: e.target.value})} /></div><div className="flex-1"><label className="text-xs text-blue-600">位置</label><input type="text" className="w-full border p-1 rounded focus:ring-1 focus:ring-blue-500" placeholder="教務處" value={newCart.location} onChange={e => setNewCart({...newCart, location: e.target.value})} /></div><div className="w-20"><label className="text-xs text-blue-600">總量</label><input type="number" className="w-full border p-1 rounded focus:ring-1 focus:ring-blue-500" value={newCart.total} onChange={e => setNewCart({...newCart, total: parseInt(e.target.value)})} /></div><button onClick={handleAddCart} className="bg-green-600 text-white px-3 py-1 rounded text-sm">儲存</button><button onClick={() => setIsAddingCart(false)} className="text-gray-500 text-sm px-2">取消</button></div></div> )}
-                        <div className="overflow-x-auto"><table className="w-full text-sm text-left border-collapse"><thead className="bg-blue-50 text-blue-700"><tr><th className="p-2 border border-blue-100">ID</th><th className="p-2 border border-blue-100">位置</th><th className="p-2 border border-blue-100">首頁顯示</th><th className="p-2 border border-blue-100">長期</th><th className="p-2 border border-blue-100 text-right">操作</th></tr></thead><tbody>{carts.map(c => (<tr key={c.id} className="hover:bg-blue-50"><td className="p-2 border border-blue-100 font-bold text-blue-900">{c.id}</td><td className="p-2 border border-blue-100"><input type="text" className="bg-transparent border-b border-transparent hover:border-blue-300 focus:border-blue-500 outline-none w-full" defaultValue={c.location} onBlur={(e) => handleUpdateCart(c, 'location', e.target.value)} /></td><td className="p-2 border border-blue-100 text-center"><input type="checkbox" checked={c.enableOneTime} onChange={(e) => handleUpdateCart(c, 'enableOneTime', e.target.checked)} className="accent-blue-600 w-4 h-4" /></td><td className="p-2 border border-blue-100 text-center"><input type="checkbox" checked={c.enableLongTerm} onChange={(e) => handleUpdateCart(c, 'enableLongTerm', e.target.checked)} className="accent-blue-600 w-4 h-4" /></td><td className="p-2 border border-blue-100 text-right"><button onClick={() => handleDeleteCart(c.id)} className="text-red-400 hover:text-red-600 px-2"><i data-lucide="trash" className="w-4 h-4"></i></button></td></tr>))}</tbody></table></div>
+                        <div className="overflow-x-auto"><table className="w-full text-sm text-left border-collapse"><thead className="bg-blue-50 text-blue-700"><tr><th className="p-2 border border-blue-100">ID</th><th className="p-2 border border-blue-100">出貨位置(點擊修改)</th><th className="p-2 border border-blue-100">於首頁顯示每周租借情況</th><th className="p-2 border border-blue-100">是否可以租借</th><th className="p-2 border border-blue-100 text-right">刪除整個台車</th></tr></thead><tbody>{carts.map(c => (<tr key={c.id} className="hover:bg-blue-50"><td className="p-2 border border-blue-100 font-bold text-blue-900">{c.id}</td><td className="p-2 border border-blue-100"><input type="text" className="bg-transparent border-b border-transparent hover:border-blue-300 focus:border-blue-500 outline-none w-full" defaultValue={c.location} onBlur={(e) => handleUpdateCart(c, 'location', e.target.value)} /></td><td className="p-2 border border-blue-100 text-center"><input type="checkbox" checked={c.enableOneTime} onChange={(e) => handleUpdateCart(c, 'enableOneTime', e.target.checked)} className="accent-blue-600 w-4 h-4" /></td><td className="p-2 border border-blue-100 text-center"><input type="checkbox" checked={c.enableLongTerm} onChange={(e) => handleUpdateCart(c, 'enableLongTerm', e.target.checked)} className="accent-blue-600 w-4 h-4" /></td><td className="p-2 border border-blue-100 text-right"><button onClick={() => handleDeleteCart(c.id)} className="text-red-400 hover:text-red-600 px-2"><i data-lucide="trash" className="w-4 h-4"></i></button></td></tr>))}</tbody></table></div>
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                         <div className="lg:col-span-1 bg-white p-5 rounded-lg card-shadow h-fit border border-blue-50"><h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-blue-800"><i data-lucide="tool" className="w-5 h-5"></i> 鎖定控制管理</h3><div className="space-y-2 max-h-[600px] overflow-y-auto pr-1 custom-scrollbar">{carts.map(cart => { const status = cartStatus[cart.id] || {}; const brokenCount = status.brokenIds ? status.brokenIds.length : (status.brokenCount || 0); return (<div key={cart.id} className="border rounded p-3 bg-blue-50/50 flex justify-between items-center hover:bg-blue-100 transition"><div><div className="font-bold text-blue-900">{cart.id} 車</div><div className="text-xs text-blue-500">{cart.location}</div></div><div className="flex items-center gap-2"><span className={`text-sm font-bold ${brokenCount > 0 ? 'text-red-600' : 'text-green-600'}`}>{brokenCount > 0 ? `鎖定 ${brokenCount}` : '正常'}</span><button onClick={() => openMaintenanceModal(cart.id)} className="text-blue-300 hover:text-blue-600"><i data-lucide="settings-2" className="w-4 h-4"></i></button></div></div>) })}</div></div>
@@ -1288,5 +1364,3 @@
     </script>
 </body>
 </html>
-
-
