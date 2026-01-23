@@ -1193,14 +1193,52 @@
             );
         }
 
-        // --- Backend View ---
+        // --- Backend View (Updated) ---
         function BackendView({ carts, bookings, cartStatus, db, appId, showToast, setModalConfig }) {
             const [filter, setFilter] = React.useState('all');
             const [isAddingCart, setIsAddingCart] = React.useState(false);
             const [newCart, setNewCart] = React.useState({ id: '', location: '', total: 36, enableOneTime: true, enableLongTerm: true });
             const [editingMaintenance, setEditingMaintenance] = React.useState(null);
+            
+            // NEW: Pagination State
+            const [currentPage, setCurrentPage] = React.useState(1);
+            const itemsPerPage = 5;
 
             React.useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
+
+            // NEW: Auto Cleanup Logic (Runs once when BackendView mounts)
+            React.useEffect(() => {
+                const cleanupOldRecords = async () => {
+                    try {
+                        const today = new Date();
+                        today.setFullYear(today.getFullYear() - 1); // Get date 1 year ago
+                        const cutoffDate = formatDate(today);
+
+                        // Find expired bookings locally first to avoid complex compound queries requiring indexes
+                        // Since we already sync 'bookings' via onSnapshot in App component, we can filter locally then delete
+                        // Note: For massive datasets, you'd want a server-side query, but for this scale, this is safe.
+                        const oldBookings = bookings.filter(b => b.endDate < cutoffDate);
+
+                        if (oldBookings.length > 0) {
+                            console.log(`Cleaning up ${oldBookings.length} old records...`);
+                            const batch = writeBatch(db);
+                            oldBookings.forEach(b => {
+                                const ref = doc(db, 'artifacts', appId, 'public', 'data', 'bookings', b.id);
+                                batch.delete(ref);
+                            });
+                            await batch.commit();
+                            showToast(`已自動清理 ${oldBookings.length} 筆一年前的舊資料`);
+                        }
+                    } catch (e) {
+                        console.error("Auto cleanup failed:", e);
+                    }
+                };
+                
+                // Small delay to ensure data is ready
+                if (bookings.length > 0) {
+                    cleanupOldRecords();
+                }
+            }, [bookings.length]); // Depend on length so it runs after initial load
 
             const handleDelete = (item) => {
                 const isBatch = item.isGroup;
@@ -1233,14 +1271,25 @@
                 let dateInfo = b.date; 
                 if(b.type === 'long-term') dateInfo = `${b.startDate}~${b.endDate} (週${DAY_LABELS[b.dayOfWeek]})`; 
                 const created = b.createdAt ? new Date(b.createdAt.seconds * 1000).toLocaleString() : ''; 
-                // Exclude signature from CSV for cleaner output
                 return `${type},"${dateInfo}",${b.cartId},${b.period},${b.user},${b.ext},${b.quantity},${b.needTeacherPad?'是':'否'},"${formatDeviceList(b.deviceIds)}",${b.note || ''},${b.status},${created}`; 
             }); const link = document.createElement("a"); link.setAttribute("href", URL.createObjectURL(new Blob(["\uFEFF" + headers.concat(rows).join("\n")], { type: 'text/csv;charset=utf-8;' }))); link.setAttribute("download", `報表_${new Date().toISOString().slice(0,10)}.csv`); document.body.appendChild(link); link.click(); };
 
             const groupBookings = (list) => { const groups = {}; const singles = []; list.forEach(b => { if (b.status === 'active' && b.type === 'long-term' && b.batchId) { if (!groups[b.batchId]) groups[b.batchId] = { ...b, isGroup: true, slots: [] }; groups[b.batchId].slots.push({ day: b.dayOfWeek, period: b.period }); } else singles.push(b); }); const groupArray = Object.values(groups).map(g => { g.slots.sort((a,b) => a.day - b.day || a.period - b.period); const days = {}; g.slots.forEach(s => { if(!days[s.day]) days[s.day] = []; days[s.day].push(s.period); }); const textParts = Object.keys(days).sort().map(d => `週${DAY_LABELS[d]} / 第 ${days[d].join('、')} 節`); g.scheduleText = textParts.join(' ; '); return g; }); return [...singles, ...groupArray].sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)); };
 
+            // Logic for Display List
             const rawList = bookings.filter(b => { if (filter === 'active') return b.status === 'active'; if (filter === 'long-term') return b.type === 'long-term'; return true; });
             const displayList = groupBookings(rawList);
+
+            // NEW: Pagination Logic
+            const indexOfLastItem = currentPage * itemsPerPage;
+            const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+            const currentItems = displayList.slice(indexOfFirstItem, indexOfLastItem);
+            const totalPages = Math.ceil(displayList.length / itemsPerPage);
+
+            // Reset page if filter changes
+            React.useEffect(() => { setCurrentPage(1); }, [filter]);
+
+            const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
             return (
                 <div className="space-y-8 animate-fade-in">
@@ -1252,14 +1301,87 @@
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                         <div className="lg:col-span-1 bg-white p-5 rounded-lg card-shadow h-fit border border-blue-50"><h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-blue-800"><i data-lucide="tool" className="w-5 h-5"></i> 鎖定控制管理</h3><div className="space-y-2 max-h-[600px] overflow-y-auto pr-1 custom-scrollbar">{carts.map(cart => { const status = cartStatus[cart.id] || {}; const brokenCount = status.brokenIds ? status.brokenIds.length : (status.brokenCount || 0); return (<div key={cart.id} className="border rounded p-3 bg-blue-50/50 flex justify-between items-center hover:bg-blue-100 transition"><div><div className="font-bold text-blue-900">{cart.id} 車</div><div className="text-xs text-blue-500">{cart.location}</div></div><div className="flex items-center gap-2"><span className={`text-sm font-bold ${brokenCount > 0 ? 'text-red-600' : 'text-green-600'}`}>{brokenCount > 0 ? `鎖定 ${brokenCount}` : '正常'}</span><button onClick={() => openMaintenanceModal(cart.id)} className="text-blue-300 hover:text-blue-600"><i data-lucide="settings-2" className="w-4 h-4"></i></button></div></div>) })}</div></div>
                         <div className="lg:col-span-3 bg-white p-5 rounded-lg card-shadow border border-blue-50">
-                            <div className="flex flex-wrap justify-between items-center mb-6 gap-4"><h3 className="font-bold text-lg flex items-center gap-2 text-blue-800"><i data-lucide="list" className="w-5 h-5"></i> 預約紀錄</h3><div className="flex gap-2"><button onClick={exportCSV} className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition"><i data-lucide="download" className="w-4 h-4"></i> CSV</button><div className="bg-blue-50 rounded p-1 flex">{['all','active','long-term'].map(f => <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1 rounded text-sm transition ${filter === f ? 'bg-white shadow text-blue-600 font-bold' : 'text-blue-400 hover:text-blue-600'}`}>{f==='all'?'全部':f==='active'?'有效':'長期'}</button>)}</div></div></div>
-                            <div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-blue-50 text-blue-700 uppercase"><tr><th className="p-3">類型/時間</th><th className="p-3">車號</th><th className="p-3">借用人</th><th className="p-3">數量</th><th className="p-3">分配編號</th><th className="p-3">操作</th></tr></thead><tbody className="divide-y divide-blue-50">{displayList.map(b => {
-                                let typeLabel = '長期';
-                                if (b.startDate === b.endDate) typeLabel = '短期';
+                            <div className="flex flex-wrap justify-between items-center mb-6 gap-4"><h3 className="font-bold text-lg flex items-center gap-2 text-blue-800"><i data-lucide="list" className="w-5 h-5"></i> 預約紀錄 (共 {displayList.length} 筆)</h3><div className="flex gap-2"><button onClick={exportCSV} className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition"><i data-lucide="download" className="w-4 h-4"></i> CSV</button><div className="bg-blue-50 rounded p-1 flex">{['all','active','long-term'].map(f => <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1 rounded text-sm transition ${filter === f ? 'bg-white shadow text-blue-600 font-bold' : 'text-blue-400 hover:text-blue-600'}`}>{f==='all'?'全部':f==='active'?'有效':'長期'}</button>)}</div></div></div>
+                            
+                            <div className="overflow-x-auto min-h-[300px]">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-blue-50 text-blue-700 uppercase"><tr><th className="p-3">類型/時間</th><th className="p-3">車號</th><th className="p-3">借用人</th><th className="p-3">數量</th><th className="p-3">分配編號</th><th className="p-3">操作</th></tr></thead>
+                                    <tbody className="divide-y divide-blue-50">
+                                        {currentItems.map(b => {
+                                            let typeLabel = '長期';
+                                            if (b.startDate === b.endDate) typeLabel = '短期';
 
-                                return (
-                                <tr key={b.id || b.batchId} className="hover:bg-blue-50/50"><td className="p-3">{b.type === 'long-term' ? (<div><span className={`px-2 py-0.5 rounded text-xs font-bold mr-2 ${typeLabel === '短期' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{typeLabel}</span><br/>{b.startDate}~{b.endDate}<div className="text-purple-600 text-xs mt-1 font-bold">{b.isGroup ? b.scheduleText : `週${DAY_LABELS[b.dayOfWeek]} / 第 ${b.period} 節`}</div></div>) : (<div><span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-bold mr-2">單次</span><br/>{b.date}<div className="text-gray-500 text-xs mt-1">第 {b.period} 節</div></div>)}</td><td className="p-3 font-bold text-gray-700">{b.cartId} 車</td><td className="p-3"><div>{b.user}</div><div className="text-xs text-gray-400">分機 {b.ext}</div></td><td className="p-3">{b.quantity} 生 {b.needTeacherPad && '+ 1 師'}</td><td className="p-3 text-xs text-gray-600 max-w-[150px] truncate" title={formatDeviceList(b.deviceIds)}>{formatDeviceList(b.deviceIds)}</td><td className="p-3 flex gap-2"><button onClick={() => handleDelete(b)} className="text-red-500 hover:bg-red-50 p-2 rounded"><i data-lucide="trash-2" className="w-4 h-4"></i></button><button onClick={() => handleEdit(b)} className="text-blue-500 hover:bg-blue-50 p-2 rounded"><i data-lucide="edit" className="w-4 h-4"></i></button>{b.signature && <button onClick={() => handleViewSignature(b)} className="text-blue-600 hover:bg-blue-100 p-2 rounded" title="查看簽名"><i data-lucide="pen-tool" className="w-4 h-4"></i></button>}</td></tr>
-                            )})}</tbody></table></div>
+                                            return (
+                                            <tr key={b.id || b.batchId} className="hover:bg-blue-50/50">
+                                                <td className="p-3">
+                                                    {b.type === 'long-term' ? (
+                                                        <div>
+                                                            <span className={`px-2 py-0.5 rounded text-xs font-bold mr-2 ${typeLabel === '短期' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{typeLabel}</span><br/>
+                                                            {b.startDate}~{b.endDate}
+                                                            {/* UPDATED: Tooltip for Schedule Text */}
+                                                            <div className="mt-1">
+                                                                {b.isGroup ? (
+                                                                    <span title={b.scheduleText} className="text-purple-600 text-xs font-bold cursor-help underline decoration-dotted">
+                                                                        查看詳細時段 (Hover)
+                                                                    </span>
+                                                                ) : (
+                                                                    <div className="text-purple-600 text-xs font-bold">
+                                                                        週{DAY_LABELS[b.dayOfWeek]} / 第 {b.period} 節
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div><span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-bold mr-2">單次</span><br/>{b.date}<div className="text-gray-500 text-xs mt-1">第 {b.period} 節</div></div>
+                                                    )}
+                                                </td>
+                                                <td className="p-3 font-bold text-gray-700">{b.cartId} 車</td>
+                                                <td className="p-3"><div>{b.user}</div><div className="text-xs text-gray-400">分機 {b.ext}</div></td>
+                                                <td className="p-3">{b.quantity} 生 {b.needTeacherPad && '+ 1 師'}</td>
+                                                <td className="p-3 text-xs text-gray-600 max-w-[150px] truncate" title={formatDeviceList(b.deviceIds)}>{formatDeviceList(b.deviceIds)}</td>
+                                                <td className="p-3 flex gap-2"><button onClick={() => handleDelete(b)} className="text-red-500 hover:bg-red-50 p-2 rounded"><i data-lucide="trash-2" className="w-4 h-4"></i></button><button onClick={() => handleEdit(b)} className="text-blue-500 hover:bg-blue-50 p-2 rounded"><i data-lucide="edit" className="w-4 h-4"></i></button>{b.signature && <button onClick={() => handleViewSignature(b)} className="text-blue-600 hover:bg-blue-100 p-2 rounded" title="查看簽名"><i data-lucide="pen-tool" className="w-4 h-4"></i></button>}</td>
+                                            </tr>
+                                        )})}
+                                        {currentItems.length === 0 && <tr><td colSpan="6" className="p-8 text-center text-gray-400">目前沒有資料</td></tr>}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* NEW: Pagination Controls */}
+                            {totalPages > 1 && (
+                                <div className="flex justify-center items-center mt-6 gap-2">
+                                    <button 
+                                        onClick={() => paginate(Math.max(1, currentPage - 1))}
+                                        disabled={currentPage === 1}
+                                        className="px-3 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50 font-bold"
+                                    >
+                                        &lt;
+                                    </button>
+                                    
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(number => (
+                                        // Only show first, last, current, and surrounding pages for cleanliness if too many pages
+                                        // But for simple < 1 2 3 ... > requested, we can just list them or simplify logic
+                                        (number === 1 || number === totalPages || (number >= currentPage - 1 && number <= currentPage + 1)) ? (
+                                            <button
+                                                key={number}
+                                                onClick={() => paginate(number)}
+                                                className={`w-8 h-8 rounded-full text-sm font-bold transition ${currentPage === number ? 'bg-blue-600 text-white shadow-lg scale-110' : 'bg-white text-blue-600 border border-blue-100 hover:bg-blue-50'}`}
+                                            >
+                                                {number}
+                                            </button>
+                                        ) : (number === currentPage - 2 || number === currentPage + 2) ? <span key={number} className="text-gray-400">...</span> : null
+                                    ))}
+
+                                    <button 
+                                        onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
+                                        disabled={currentPage === totalPages}
+                                        className="px-3 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50 font-bold"
+                                    >
+                                        &gt;
+                                    </button>
+                                </div>
+                            )}
+
                         </div>
                     </div>
                 </div>
