@@ -910,12 +910,12 @@
                             <h2 className="text-2xl font-bold text-blue-800 flex items-center gap-2"><i data-lucide="calendar-plus" className="w-6 h-6 text-blue-600"></i> 平板預約</h2>
                             {/* UPDATED TEXT HERE */}
                             <p className="text-blue-500 mt-2 bg-blue-50 p-3 rounded-lg border border-blue-100 leading-relaxed">
-                                💡 建議 <b>提前一週</b> 進行預約。若為 <span className="text-red-500 font-bold underline decoration-wavy">緊急借用</span>（3天內），系統仍可預約，但請務必於送出後 <b>電話通知</b> 資訊秘書（分機：18），避免來不及準備！
+                                💡 請 <b>提前一週</b> 進行預約。若為 <span className="text-red-500 font-bold underline decoration-wavy">借用急件</span>（3天內），預約後，請務必於送出後 <b>電話或當面提醒</b> 資訊秘書（分機：18），避免來不及準備！
                             </p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                             <div>
-                                <label className="block text-xl font-bold text-gray-700 mb-2">1. 日期區間 <span className="text-red-500">*</span></label>
+                                <label className="block text-xl font-bold text-gray-700 mb-2">1. 日期區間【借出開始與結束日】 <span className="text-red-500">*</span></label>
                                 <div className="flex items-center gap-2">
                                     <input type="date" className="border rounded p-2 text-base md:p-3 md:text-lg w-full focus:ring-2 focus:ring-blue-500 outline-none" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value, checkResult: null})} />
                                     <span className="text-gray-400">至</span>
@@ -1288,3 +1288,4 @@
     </script>
 </body>
 </html>
+
