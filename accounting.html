@@ -213,7 +213,7 @@
     </div>
 
     <script>
-        const apiKey = "AIzaSyCHZCGkOXQ3VA33WsZEwYp8VdVC5eYISmk"; // 若在本地測試，請在此填入 Gemini API Key
+        const apiKey = "AIzaSyCHZCGkOXQ3VA33WsZEwYp8VdVC5eYISmk"; // 本地端測試時請貼上你的 Key
         
         let pendingRecords = []; // 存放尚未送出記帳的對話紀錄
         let currentTempText = "";
@@ -473,10 +473,10 @@
                 console.error(error);
                 aiLoading.classList.add('hidden');
                 
-                // 產生易讀的錯誤訊息 (針對 404/400 給予提示)
+                // 產生易讀的錯誤訊息
                 let errorMsg = error.message;
                 if (errorMsg.includes('404') || errorMsg.includes('400')) {
-                    errorMsg += "\n\n(可能原因：無效的 API 網址或缺少金鑰。請確保在代碼頂部的 apiKey 變數中填入有效的 Gemini API Key)";
+                    errorMsg += "\n\n(可能原因：無效的 API 網址或缺少金鑰。請確保填寫了正確的 Gemini API Key)";
                 }
                 alert("解析失敗，請再試一次！錯誤：" + errorMsg);
                 
@@ -489,13 +489,17 @@
             }
         }
 
-        // 動畫實作：將 DOM 節點轉換為飛行的實體
+        // 動畫實作 (已為手機端大幅優化座標計算方式)
         function playEatingAnimation() {
             return new Promise((resolve) => {
                 hideBubble();
                 capybaraContainer.className = 'mt-8 mb-2 relative z-0 capybara-eating shrink-0';
                 
-                const mouthRect = document.getElementById('mouth').getBoundingClientRect();
+                // 解法 2：改抓整張 SVG 的大小，然後用比例算出嘴巴的絕對位置，避免手機端 <path> 定位錯亂
+                const svgRect = document.getElementById('capybara-svg').getBoundingClientRect();
+                const targetX = svgRect.left + (svgRect.width * 0.5);  // SVG 的正中間 X
+                const targetY = svgRect.top + (svgRect.height * 0.55); // 嘴巴大約在高度 55% 的位置
+
                 const items = document.querySelectorAll('.bubble-item');
                 let completedCount = 0;
 
@@ -505,12 +509,15 @@
                     const rect = item.getBoundingClientRect();
                     const clone = item.cloneNode(true);
                     
-                    // 設定飛行元素的樣式
-                    clone.className = 'fixed z-[1000] pointer-events-none transition-all duration-[600ms] cubic-bezier(0.5, 0, 0.2, 1)';
+                    // 設定飛行元素的初始樣式與中心基準點
+                    clone.style.position = 'fixed';
+                    clone.style.zIndex = '1000';
+                    clone.style.transition = 'all 0.6s cubic-bezier(0.5, 0, 0.2, 1)';
                     clone.style.left = `${rect.left}px`;
                     clone.style.top = `${rect.top}px`;
                     clone.style.width = `${rect.width}px`;
                     clone.style.margin = '0';
+                    clone.style.transformOrigin = 'center center'; // 確保以中心點縮小
                     document.body.appendChild(clone);
 
                     // 隱藏原本列表中的氣泡
@@ -519,8 +526,9 @@
                     // 觸發移動與縮小動畫 (加上微小延遲製造接連飛入的感覺)
                     requestAnimationFrame(() => {
                         setTimeout(() => {
-                            clone.style.left = `${mouthRect.left + mouthRect.width/2 - rect.width/4}px`;
-                            clone.style.top = `${mouthRect.top}px`;
+                            // 計算目標左上角，讓元素中心對齊 targetX / targetY
+                            clone.style.left = `${targetX - (rect.width / 2)}px`;
+                            clone.style.top = `${targetY - (rect.height / 2)}px`;
                             clone.style.transform = 'scale(0.1)';
                             clone.style.opacity = '0';
                         }, index * 100);
@@ -572,12 +580,16 @@ ${recordsJson}
   }
 ]`;
 
+            // 解法 1：動態切換 API 模型。如果填了自訂 API Key，則使用 1.5-flash，避免因無預覽權限導致 404
+            const modelName = apiKey ? "gemini-1.5-flash" : "gemini-2.5-flash-preview-09-2025";
+            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
             let retries = 2;
             let delay = 1000;
             
             while (retries >= 0) {
                 try {
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    const response = await fetch(endpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
