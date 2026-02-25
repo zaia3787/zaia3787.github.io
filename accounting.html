@@ -243,6 +243,7 @@
         const apiKey = "AIzaSyCHZCGkOXQ3VA33WsZEwYp8VdVC5eYISmk"; // Gemini API Key 會由執行環境提供
         let currentText = "";
         let currentLocationStr = "";
+        let isListening = false; // 新增：用來追蹤是否正在錄音
         let expenses = JSON.parse(localStorage.getItem('capybara_expenses')) || [];
         
         // 匯率符號對照
@@ -294,14 +295,26 @@
                 recognition.lang = 'zh-TW';
                 recognition.interimResults = true; // 顯示即時結果
                 
+                const voiceIcon = btnVoice.querySelector('i');
+                const voiceSpan = btnVoice.querySelector('span');
+                
                 recognition.onstart = () => {
+                    isListening = true;
                     capybaraContainer.className = 'mt-16 mb-4 relative z-0 capybara-listening';
                     voiceRipple.classList.remove('hidden');
+                    voiceRipple.classList.replace('bg-orange-300', 'bg-red-300');
                     inputCard.classList.remove('opacity-0');
                     recognizedTextEl.textContent = '聆聽中...';
                     btnSave.disabled = true;
                     hideBubble();
                     getLocation(); // 開始說話時順便抓定位
+                    
+                    // 將按鈕切換為「結束輸入」的紅色狀態
+                    voiceIcon.className = 'fa-solid fa-stop text-xl';
+                    voiceSpan.textContent = '結束輸入';
+                    btnVoice.classList.replace('bg-orange-100', 'bg-red-100');
+                    btnVoice.classList.replace('text-orange-700', 'text-red-700');
+                    btnVoice.classList.replace('hover:bg-orange-200', 'hover:bg-red-200');
                 };
 
                 recognition.onresult = (event) => {
@@ -317,9 +330,17 @@
                 };
 
                 recognition.onend = () => {
+                    isListening = false;
                     capybaraContainer.className = 'mt-16 mb-4 relative z-0 capybara-idle';
-                    voiceRipple.classList.hidden = true;
                     voiceRipple.classList.add('hidden');
+                    
+                    // 將按鈕恢復為「語音輸入」的橘色狀態
+                    voiceIcon.className = 'fa-solid fa-microphone text-xl';
+                    voiceSpan.textContent = '語音輸入';
+                    btnVoice.classList.replace('bg-red-100', 'bg-orange-100');
+                    btnVoice.classList.replace('text-red-700', 'text-orange-700');
+                    btnVoice.classList.replace('hover:bg-red-200', 'hover:bg-orange-200');
+                    voiceRipple.classList.replace('bg-red-300', 'bg-orange-300');
                     
                     if (currentText.trim() !== "") {
                         btnSave.disabled = false;
@@ -332,13 +353,27 @@
                 recognition.onerror = (event) => {
                     console.error("Speech recognition error", event.error);
                     recognizedTextEl.textContent = '語音辨識發生錯誤，請確認麥克風權限。';
+                    
+                    isListening = false;
                     capybaraContainer.className = 'mt-16 mb-4 relative z-0 capybara-idle';
                     voiceRipple.classList.add('hidden');
+                    
+                    // 發生錯誤時也恢復按鈕狀態
+                    voiceIcon.className = 'fa-solid fa-microphone text-xl';
+                    voiceSpan.textContent = '語音輸入';
+                    btnVoice.classList.replace('bg-red-100', 'bg-orange-100');
+                    btnVoice.classList.replace('text-red-700', 'text-orange-700');
+                    btnVoice.classList.replace('hover:bg-red-200', 'hover:bg-orange-200');
+                    voiceRipple.classList.replace('bg-red-300', 'bg-orange-300');
                 };
 
                 btnVoice.addEventListener('click', () => {
-                    currentText = ""; // 重置
-                    recognition.start();
+                    if (isListening) {
+                        recognition.stop(); // 如果正在聽，點擊則手動停止並結算文字
+                    } else {
+                        currentText = ""; // 重置
+                        recognition.start();
+                    }
                 });
             } else {
                 btnVoice.innerHTML = '<i class="fa-solid fa-keyboard text-xl"></i> <span>無語音支援(點擊輸入)</span>';
