@@ -213,9 +213,9 @@
     </div>
 
     <script>
-        const apiKey = "AIzaSyCHZCGkOXQ3VA33WsZEwYp8VdVC5eYISmk"; // 本地端測試時請貼上你的 Key
+        const apiKey = "AIzaSyCHZCGkOXQ3VA33WsZEwYp8VdVC5eYISmk"; // 本地端測試時，請務必將你的 AIza... 金鑰貼在引號內
         
-        let pendingRecords = []; // 存放尚未送出記帳的對話紀錄
+        let pendingRecords = []; 
         let currentTempText = "";
         let currentLocationStr = "";
         let isListening = false;
@@ -476,7 +476,7 @@
                 // 產生易讀的錯誤訊息
                 let errorMsg = error.message;
                 if (errorMsg.includes('404') || errorMsg.includes('400')) {
-                    errorMsg += "\n\n(可能原因：無效的 API 網址或缺少金鑰。請確保填寫了正確的 Gemini API Key)";
+                    errorMsg += "\n\n(請確保代碼開頭的 apiKey 變數有填寫正確的金鑰)";
                 }
                 alert("解析失敗，請再試一次！錯誤：" + errorMsg);
                 
@@ -495,7 +495,7 @@
                 hideBubble();
                 capybaraContainer.className = 'mt-8 mb-2 relative z-0 capybara-eating shrink-0';
                 
-                // 解法 2：改抓整張 SVG 的大小，然後用比例算出嘴巴的絕對位置，避免手機端 <path> 定位錯亂
+                // 抓整張 SVG 的大小，然後用比例算出嘴巴的絕對位置，避免手機端 <path> 定位錯亂
                 const svgRect = document.getElementById('capybara-svg').getBoundingClientRect();
                 const targetX = svgRect.left + (svgRect.width * 0.5);  // SVG 的正中間 X
                 const targetY = svgRect.top + (svgRect.height * 0.55); // 嘴巴大約在高度 55% 的位置
@@ -580,15 +580,21 @@ ${recordsJson}
   }
 ]`;
 
-            // 解法 1：動態切換 API 模型。如果填了自訂 API Key，則使用 1.5-flash，避免因無預覽權限導致 404
-            const modelName = apiKey ? "gemini-1.5-flash" : "gemini-2.5-flash-preview-09-2025";
-            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+            // 預設使用 Canvas 專屬預覽模型
+            let currentModel = "gemini-2.5-flash-preview-09-2025";
+            
+            // 如果我們偵測到程式碼內有填入你的金鑰，預先切換成大家都能用的 1.5-flash
+            if (apiKey && apiKey.trim().length > 0) {
+                currentModel = "gemini-1.5-flash";
+            }
 
             let retries = 2;
             let delay = 1000;
             
             while (retries >= 0) {
                 try {
+                    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey}`;
+                    
                     const response = await fetch(endpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -597,6 +603,15 @@ ${recordsJson}
                             generationConfig: { responseMimeType: "application/json" }
                         })
                     });
+
+                    // === 【超強防呆與自動備援機制】 ===
+                    // 如果 API 報錯 404，通常代表當前金鑰無法存取預覽模型 (例如複製到了本地端)。
+                    // 我們在這裡直接捕獲錯誤，自動降級切換為通用版的 1.5-flash 並立即重新嘗試！
+                    if (response.status === 404 && currentModel === "gemini-2.5-flash-preview-09-2025") {
+                        console.warn("404 Not Found: 預覽模型不可用，自動切換至 gemini-1.5-flash 模型重試");
+                        currentModel = "gemini-1.5-flash";
+                        continue; // 不扣除 retry 額度，立即重新執行 while 迴圈
+                    }
 
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     
