@@ -28,7 +28,12 @@
             0%, 96%, 98% { transform: scaleY(1); }
             97%, 99% { transform: scaleY(0.1); }
         }
-        .capybara-idle .eye { animation: blink 4s infinite; transform-origin: center; }
+        
+        /* 修正眼睛動畫錯位：分別指定左右眼的 transform-origin 座標 */
+        #eye-left { transform-origin: 65px 85px; }
+        #eye-right { transform-origin: 135px 85px; }
+        
+        .capybara-idle .eye { animation: blink 4s infinite; }
         .capybara-listening .eye { transform: scale(1.2); fill: #1f2937; }
         .capybara-listening .mouth { d: path('M 80 110 Q 100 120 120 110'); }
         .capybara-eating .mouth { d: path('M 80 110 Q 100 140 120 110 Z'); fill: #4b1a1a; }
@@ -94,26 +99,31 @@
         </header>
 
         <!-- Main Content Area -->
-        <main class="flex-1 flex flex-col items-center justify-start pt-6 px-4 relative overflow-hidden">
+        <main class="flex-1 flex flex-col items-center justify-start pt-4 px-4 relative overflow-hidden">
             
-            <!-- Speech Bubble (水豚講話) -->
-            <div id="speech-bubble" class="absolute top-0 left-1/2 -translate-x-1/2 w-4/5 max-w-[280px] bg-white p-3 rounded-2xl shadow-md border-2 border-orange-200 opacity-0 hidden z-10">
-                <p id="capybara-text" class="text-gray-700 font-medium text-center text-sm leading-relaxed">...</p>
-                <div class="absolute -bottom-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[10px] border-l-transparent border-t-[15px] border-t-white border-r-[10px] border-r-transparent filter drop-shadow(0 2px 2px rgba(0,0,0,0.05))"></div>
-            </div>
+            <!-- 將對話框與水豚包在同一個相對定位的容器內，確保位置穩固 -->
+            <div class="relative w-full flex flex-col items-center mt-4 mb-2 shrink-0">
+                <!-- Speech Bubble (水豚講話) -->
+                <div id="speech-bubble" class="absolute -top-4 left-1/2 -translate-x-1/2 w-4/5 max-w-[280px] bg-white p-3 rounded-2xl shadow-md border-2 border-orange-200 opacity-0 hidden z-10">
+                    <p id="capybara-text" class="text-gray-700 font-medium text-center text-sm leading-relaxed">...</p>
+                    <div class="absolute -bottom-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[10px] border-l-transparent border-t-[15px] border-t-white border-r-[10px] border-r-transparent filter drop-shadow(0 2px 2px rgba(0,0,0,0.05))"></div>
+                </div>
 
-            <!-- Capybara SVG -->
-            <div id="capybara-container" class="mt-8 mb-2 relative z-0 capybara-idle shrink-0">
-                <svg width="160" height="160" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" id="capybara-svg">
-                    <ellipse cx="100" cy="120" rx="80" ry="70" fill="#A87B51" />
-                    <ellipse cx="40" cy="80" rx="15" ry="10" fill="#8B5A2B" transform="rotate(-30 40 80)" />
-                    <ellipse cx="160" cy="80" rx="15" ry="10" fill="#8B5A2B" transform="rotate(30 160 80)" />
-                    <ellipse cx="100" cy="100" rx="40" ry="30" fill="#C19A6B" />
-                    <ellipse cx="100" cy="85" rx="12" ry="6" fill="#4A3018" />
-                    <circle cx="65" cy="85" r="5" fill="#2D1A11" class="eye" />
-                    <circle cx="135" cy="85" r="5" fill="#2D1A11" class="eye" />
-                    <path d="M 80 110 Q 100 110 120 110" stroke="#4A3018" stroke-width="3" fill="none" class="mouth" id="mouth" />
-                </svg>
+                <!-- Capybara SVG -->
+                <!-- 調整 margin-top 預留氣泡空間 -->
+                <div id="capybara-container" class="mt-12 relative z-0 capybara-idle">
+                    <svg width="160" height="160" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" id="capybara-svg">
+                        <ellipse cx="100" cy="120" rx="80" ry="70" fill="#A87B51" />
+                        <ellipse cx="40" cy="80" rx="15" ry="10" fill="#8B5A2B" transform="rotate(-30 40 80)" />
+                        <ellipse cx="160" cy="80" rx="15" ry="10" fill="#8B5A2B" transform="rotate(30 160 80)" />
+                        <ellipse cx="100" cy="100" rx="40" ry="30" fill="#C19A6B" />
+                        <ellipse cx="100" cy="85" rx="12" ry="6" fill="#4A3018" />
+                        <!-- 加上 ID 方便 CSS 精準選取 -->
+                        <circle cx="65" cy="85" r="5" fill="#2D1A11" class="eye" id="eye-left" />
+                        <circle cx="135" cy="85" r="5" fill="#2D1A11" class="eye" id="eye-right" />
+                        <path d="M 80 110 Q 100 110 120 110" stroke="#4A3018" stroke-width="3" fill="none" class="mouth" id="mouth" />
+                    </svg>
+                </div>
             </div>
 
             <!-- LINE 風格對話紀錄區 (Chat History) -->
@@ -265,7 +275,7 @@
                 recognition.onstart = () => {
                     isListening = true;
                     currentTempText = "";
-                    capybaraContainer.className = 'mt-8 mb-2 relative z-0 capybara-listening shrink-0';
+                    capybaraContainer.className = 'mt-12 relative z-0 capybara-listening';
                     voiceRipple.classList.remove('hidden');
                     voiceRipple.classList.replace('bg-orange-300', 'bg-red-300');
                     
@@ -299,7 +309,7 @@
 
                 recognition.onend = () => {
                     isListening = false;
-                    capybaraContainer.className = 'mt-8 mb-2 relative z-0 capybara-idle shrink-0';
+                    capybaraContainer.className = 'mt-12 relative z-0 capybara-idle';
                     voiceRipple.classList.add('hidden');
                     
                     voiceIcon.className = 'fa-solid fa-microphone text-xl';
@@ -354,7 +364,7 @@
         function resetVoiceButton() {
             const voiceIcon = btnVoice.querySelector('i');
             const voiceSpan = btnVoice.querySelector('span');
-            capybaraContainer.className = 'mt-8 mb-2 relative z-0 capybara-idle shrink-0';
+            capybaraContainer.className = 'mt-12 relative z-0 capybara-idle';
             voiceRipple.classList.add('hidden');
             voiceIcon.className = 'fa-solid fa-microphone text-xl';
             voiceSpan.textContent = '語音輸入';
@@ -493,7 +503,7 @@
         function playEatingAnimation() {
             return new Promise((resolve) => {
                 hideBubble();
-                capybaraContainer.className = 'mt-8 mb-2 relative z-0 capybara-eating shrink-0';
+                capybaraContainer.className = 'mt-12 relative z-0 capybara-eating';
                 
                 // 抓整張 SVG 的大小，然後用比例算出嘴巴的絕對位置，避免手機端 <path> 定位錯亂
                 const svgRect = document.getElementById('capybara-svg').getBoundingClientRect();
@@ -539,7 +549,7 @@
                         clone.remove();
                         completedCount++;
                         if (completedCount === items.length) {
-                            capybaraContainer.className = 'mt-8 mb-2 relative z-0 capybara-idle shrink-0';
+                            capybaraContainer.className = 'mt-12 relative z-0 capybara-idle';
                             capybaraText.textContent = "嗝！好吃！(๑´ڡ`๑)";
                             speechBubble.classList.remove('hidden');
                             speechBubble.classList.add('bubble-enter');
