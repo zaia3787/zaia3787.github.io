@@ -1,0 +1,548 @@
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Upload, Download, Image as ImageIcon, Settings, RefreshCw, Scissors, Layers, Maximize, Crosshair } from 'lucide-react';
+
+const SpriteSplitter = () => {
+  const [sourceImage, setSourceImage] = useState(null);
+  const [processedSprites, setProcessedSprites] = useState([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const canvasRef = useRef(null);
+
+  // Settings state
+  const [settings, setSettings] = useState({
+    minWidth: 100,
+    minHeight: 100,
+    maxSize: 3000,
+    greenTolerance: 100, // Default tolerance for Green Screen
+    blackTolerance: 80,  // Grid lines
+    featherSize: 1,
+    useFloodFill: true,
+    trimTransparent: true
+  });
+
+  // Load image
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        setSourceImage(img);
+        setProcessedSprites([]);
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Helper: Check if a pixel is "Grid Black" (Empty Space/Frame)
+  const isGridBlack = (r, g, b, tolerance) => {
+    return r < tolerance && g < tolerance && b < tolerance;
+  };
+
+  // Helper: Check if a pixel is "Background Green" (Neon Green #00FF00)
+  // We use Euclidean distance to find how close the pixel is to pure green
+  const isBackGreen = (r, g, b, tolerance) => {
+    // Target is (0, 255, 0)
+    const dist = Math.sqrt(
+      Math.pow(r - 0, 2) + 
+      Math.pow(g - 255, 2) + 
+      Math.pow(b - 0, 2)
+    );
+    return dist < tolerance;
+  };
+
+  // Helper: Check if pixel is "Content" (Colorful stuff, neither black grid nor green bg)
+  const isContentPixel = (r, g, b, greenTol, blackTol) => {
+    return !isGridBlack(r, g, b, blackTol) && !isBackGreen(r, g, b, greenTol);
+  };
+
+  // Core Processing Function
+  const processImage = useCallback(async () => {
+    if (!sourceImage) return;
+    setIsProcessing(true);
+
+    // Yield to UI thread
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = sourceImage.width;
+    canvas.height = sourceImage.height;
+    ctx.drawImage(sourceImage, 0, 0);
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+
+    // --- PHASE 1: INTELLIGENT GRID & FRAME DETECTION ---
+    
+    // 1.1 Scan Columns (X-axis)
+    const colHasContent = new Array(width).fill(false);
+    for (let x = 0; x < width; x++) {
+      let contentPixelCount = 0;
+      for (let y = 0; y < height; y++) {
+        const idx = (y * width + x) * 4;
+        if (isContentPixel(data[idx], data[idx+1], data[idx+2], settings.greenTolerance, settings.blackTolerance)) {
+          contentPixelCount++;
+        }
+      }
+      if (contentPixelCount > height * 0.01) { 
+        colHasContent[x] = true;
+      }
+    }
+
+    // 1.2 Scan Rows (Y-axis)
+    const rowHasContent = new Array(height).fill(false);
+    for (let y = 0; y < height; y++) {
+      let contentPixelCount = 0;
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        if (isContentPixel(data[idx], data[idx+1], data[idx+2], settings.greenTolerance, settings.blackTolerance)) {
+          contentPixelCount++;
+        }
+      }
+      if (contentPixelCount > width * 0.01) {
+        rowHasContent[y] = true;
+      }
+    }
+
+    const getRanges = (boolArray) => {
+      const ranges = [];
+      let start = -1;
+      for (let i = 0; i < boolArray.length; i++) {
+        if (boolArray[i] && start === -1) start = i; // Start of content
+        if (!boolArray[i] && start !== -1) {         // End of content
+          ranges.push({ start, end: i });
+          start = -1;
+        }
+      }
+      if (start !== -1) ranges.push({ start, end: boolArray.length });
+      return ranges;
+    };
+
+    const xRanges = getRanges(colHasContent);
+    const yRanges = getRanges(rowHasContent);
+
+    const newSprites = [];
+
+    // --- PHASE 2: EXTRACT & PROCESS CELLS ---
+    let spriteCount = 0;
+
+    for (const yr of yRanges) {
+      for (const xr of xRanges) {
+        const cellW = xr.end - xr.start;
+        const cellH = yr.end - yr.start;
+
+        if (cellW < settings.minWidth || cellH < settings.minHeight) continue;
+        if (cellW > settings.maxSize || cellH > settings.maxSize) continue;
+
+        const cellCanvas = document.createElement('canvas');
+        cellCanvas.width = cellW;
+        cellCanvas.height = cellH;
+        const cellCtx = cellCanvas.getContext('2d');
+        cellCtx.drawImage(canvas, xr.start, yr.start, cellW, cellH, 0, 0, cellW, cellH);
+
+        const procCanvas = processCellFlooded(cellCanvas, settings);
+
+        if (procCanvas) {
+          newSprites.push({
+            id: spriteCount++,
+            width: procCanvas.width,
+            height: procCanvas.height,
+            dataUrl: procCanvas.toDataURL('image/png')
+          });
+        }
+      }
+    }
+
+    setProcessedSprites(newSprites);
+    setIsProcessing(false);
+  }, [sourceImage, settings]);
+
+  /**
+   * Advanced Processing using Flood Fill (Green Screen Edition)
+   */
+  const processCellFlooded = (inputCanvas, config) => {
+    const w = inputCanvas.width;
+    const h = inputCanvas.height;
+    const ctx = inputCanvas.getContext('2d');
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const d = imageData.data;
+
+    const mask = new Int8Array(w * h).fill(0);
+    const queue = [];
+    const idx = (x, y) => (y * w + x);
+
+    const isRemovable = (r, g, b) => {
+      // Is it Green? (Background)
+      const isGreen = isBackGreen(r, g, b, config.greenTolerance);
+      // Is it Black? (Grid/Frame)
+      const isBlack = isGridBlack(r, g, b, config.blackTolerance);
+      return isGreen || isBlack;
+    };
+
+    // Initialize Flood Fill from edges
+    for (let x = 0; x < w; x++) {
+      let i = idx(x, 0) * 4;
+      if (mask[idx(x, 0)] === 0 && isRemovable(d[i], d[i+1], d[i+2])) {
+        mask[idx(x, 0)] = 1;
+        queue.push(x, 0);
+      }
+      i = idx(x, h - 1) * 4;
+      if (mask[idx(x, h - 1)] === 0 && isRemovable(d[i], d[i+1], d[i+2])) {
+        mask[idx(x, h - 1)] = 1;
+        queue.push(x, h - 1);
+      }
+    }
+    for (let y = 0; y < h; y++) {
+      let i = idx(0, y) * 4;
+      if (mask[idx(0, y)] === 0 && isRemovable(d[i], d[i+1], d[i+2])) {
+        mask[idx(0, y)] = 1;
+        queue.push(0, y);
+      }
+      i = idx(w - 1, y) * 4;
+      if (mask[idx(w - 1, y)] === 0 && isRemovable(d[i], d[i+1], d[i+2])) {
+        mask[idx(w - 1, y)] = 1;
+        queue.push(w - 1, y);
+      }
+    }
+
+    const dx = [0, 0, -1, 1];
+    const dy = [-1, 1, 0, 0];
+
+    while (queue.length > 0) {
+      const cy = queue.pop();
+      const cx = queue.pop();
+
+      for (let i = 0; i < 4; i++) {
+        const nx = cx + dx[i];
+        const ny = cy + dy[i];
+
+        if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+          const nIdx = idx(nx, ny);
+          if (mask[nIdx] === 0) {
+            const pIdx = nIdx * 4;
+            if (isRemovable(d[pIdx], d[pIdx+1], d[pIdx+2])) {
+              mask[nIdx] = 1;
+              queue.push(nx, ny);
+            } else {
+              mask[nIdx] = 2; // Character
+            }
+          }
+        }
+      }
+    }
+
+    let minX = w, minY = h, maxX = 0, maxY = 0;
+    let hasContent = false;
+    const newD = new Uint8ClampedArray(d);
+
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = idx(x, y);
+        const p = i * 4;
+
+        if (mask[i] === 1) {
+          newD[p+3] = 0; // Transparent
+        } else {
+          // Anti-aliasing logic for edges
+          let isEdge = false;
+          if (config.featherSize > 0) {
+             for (let ky = -1; ky <= 1; ky++) {
+               for (let kx = -1; kx <= 1; kx++) {
+                 const ny = y + ky;
+                 const nx = x + kx;
+                 if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                   if (mask[idx(nx, ny)] === 1) isEdge = true;
+                 }
+               }
+             }
+          }
+          if (isEdge) {
+            newD[p+3] = 180;
+          } else {
+            newD[p+3] = 255;
+          }
+
+          if (newD[p+3] > 0) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+            hasContent = true;
+          }
+        }
+      }
+    }
+
+    if (!hasContent) return null;
+
+    ctx.putImageData(new ImageData(newD, w, h), 0, 0);
+
+    if (config.trimTransparent) {
+      const trimW = maxX - minX + 1;
+      const trimH = maxY - minY + 1;
+      if (trimW <= 0 || trimH <= 0) return null;
+      
+      const trimmedCanvas = document.createElement('canvas');
+      trimmedCanvas.width = trimW;
+      trimmedCanvas.height = trimH;
+      const tCtx = trimmedCanvas.getContext('2d');
+      tCtx.drawImage(inputCanvas, minX, minY, trimW, trimH, 0, 0, trimW, trimH);
+      return trimmedCanvas;
+    }
+
+    return inputCanvas;
+  };
+
+  useEffect(() => {
+    if (sourceImage) {
+      processImage();
+    }
+  }, [sourceImage, settings, processImage]);
+
+  const downloadAll = async () => {
+    for (let i = 0; i < processedSprites.length; i++) {
+      const sprite = processedSprites[i];
+      const link = document.createElement('a');
+      link.href = sprite.dataUrl;
+      link.download = `sprite_${i + 1}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 text-gray-800 font-sans p-4 md:p-8">
+      <div className="max-w-6xl mx-auto space-y-8">
+        
+        {/* Header */}
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-6 border-gray-200">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+              <Scissors className="w-8 h-8 text-blue-600" />
+              精靈圖分割去背神器 v3.1 (綠幕版)
+            </h1>
+            <p className="text-gray-500 mt-2">
+              針對 螢光綠(#00FF00) 去背優化，保留角色內部細節，自動去除黑框。
+            </p>
+          </div>
+          <div className="mt-4 md:mt-0">
+             <label className="inline-flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg cursor-pointer transition-colors shadow-sm">
+                <Upload className="w-5 h-5 mr-2" />
+                上傳圖片 (.jpg, .png)
+                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+             </label>
+          </div>
+        </header>
+
+        {/* Main Workspace */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* Left Sidebar: Controls */}
+          <div className="lg:col-span-3 space-y-6">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                <Settings className="w-5 h-5" /> 處理參數
+              </h3>
+              
+              {/* Green Tolerance */}
+              <div className="space-y-2 mb-4">
+                <div className="flex justify-between text-sm">
+                  <label className="font-medium text-green-700">綠色容許值 (#00FF00)</label>
+                  <span className="text-blue-600 font-mono">{settings.greenTolerance}</span>
+                </div>
+                <input 
+                  type="range" min="0" max="250" 
+                  value={settings.greenTolerance}
+                  onChange={(e) => setSettings({...settings, greenTolerance: parseInt(e.target.value)})}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600"
+                />
+                <p className="text-xs text-gray-400">如果綠色沒去乾淨，請調高此數值。</p>
+              </div>
+
+              {/* Black Tolerance */}
+              <div className="space-y-2 mb-4">
+                <div className="flex justify-between text-sm">
+                  <label className="font-medium text-gray-700">黑框判定值</label>
+                  <span className="text-blue-600 font-mono">{settings.blackTolerance}</span>
+                </div>
+                <input 
+                  type="range" min="0" max="200" 
+                  value={settings.blackTolerance}
+                  onChange={(e) => setSettings({...settings, blackTolerance: parseInt(e.target.value)})}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-600"
+                />
+                <p className="text-xs text-gray-400">
+                   負責切開黑色網格。
+                </p>
+              </div>
+
+              {/* Min Size */}
+              <div className="space-y-2 mb-4">
+                <div className="flex justify-between text-sm">
+                  <label className="font-medium text-gray-700">最小尺寸限制</label>
+                  <span className="text-blue-600 font-mono">{settings.minWidth}px</span>
+                </div>
+                <input 
+                  type="range" min="50" max="500" step="10"
+                  value={settings.minWidth}
+                  onChange={(e) => setSettings({
+                    ...settings, 
+                    minWidth: parseInt(e.target.value),
+                    minHeight: parseInt(e.target.value)
+                  })}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+              </div>
+
+              {/* Toggles */}
+              <div className="space-y-3 pt-2 border-t border-gray-100">
+                <label className="flex items-center gap-3 text-sm cursor-pointer hover:bg-gray-50 p-2 rounded -mx-2">
+                  <input 
+                    type="checkbox" 
+                    checked={settings.trimTransparent}
+                    onChange={(e) => setSettings({...settings, trimTransparent: e.target.checked})}
+                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                  <span>自動裁切空白區域 (Trim)</span>
+                </label>
+
+                <label className="flex items-center gap-3 text-sm cursor-pointer hover:bg-gray-50 p-2 rounded -mx-2">
+                  <input 
+                    type="checkbox" 
+                    checked={settings.featherSize > 0}
+                    onChange={(e) => setSettings({...settings, featherSize: e.target.checked ? 1 : 0})}
+                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                  <span>邊緣柔化 (消除綠邊)</span>
+                </label>
+              </div>
+
+              {/* Status */}
+              <div className="mt-6 pt-4 border-t border-gray-100">
+                {isProcessing ? (
+                  <div className="flex items-center justify-center text-blue-600 gap-2">
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    <span className="text-sm font-medium">處理中...</span>
+                  </div>
+                ) : (
+                   <div className="text-center text-sm text-gray-500">
+                     {processedSprites.length > 0 ? `成功分割 ${processedSprites.length} 個區塊` : '等待圖片'}
+                   </div>
+                )}
+              </div>
+            </div>
+
+            {/* Instruction Tip */}
+            <div className="bg-green-50 p-4 rounded-xl text-sm text-green-800 border border-green-100">
+              <div className="flex gap-2 items-start">
+                <Crosshair className="w-4 h-4 mt-1 flex-shrink-0" />
+                <p>
+                  <strong>綠幕去背提示：</strong>
+                  如果邊緣還有一圈綠色的光暈，請調高「綠色容許值」。<br/>
+                  如果角色內的綠色衣服不小心被去掉了，程式的保護機制通常會擋住，除非該區域與外部綠色相連。
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Panel: Results */}
+          <div className="lg:col-span-9">
+            {!sourceImage ? (
+              <div className="h-96 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-gray-400 bg-white">
+                <ImageIcon className="w-16 h-16 mb-4 opacity-50" />
+                <p className="text-lg font-medium">請上傳綠底(#00FF00)圖片</p>
+                <p className="text-sm mt-2 text-gray-400">程式會自動去除綠色背景與黑色邊框</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                
+                {/* Results Grid */}
+                {processedSprites.length > 0 ? (
+                  <>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                       <div>
+                         <h2 className="text-xl font-bold text-gray-800">分割結果</h2>
+                       </div>
+                       <button 
+                        onClick={downloadAll}
+                        className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm transition-colors shadow-sm w-full sm:w-auto justify-center"
+                       >
+                         <Download className="w-4 h-4 mr-2" />
+                         下載全部 (.png)
+                       </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {processedSprites.map((sprite) => (
+                        <div key={sprite.id} className="group relative bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden transition-all hover:shadow-md hover:border-blue-300">
+                          {/* Checkerboard background */}
+                          <div 
+                            className="w-full h-48 flex items-center justify-center p-4 bg-gray-100"
+                            style={{
+                              backgroundImage: 'linear-gradient(45deg, #e5e7eb 25%, transparent 25%), linear-gradient(-45deg, #e5e7eb 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5e7eb 75%), linear-gradient(-45deg, transparent 75%, #e5e7eb 75%)',
+                              backgroundSize: '20px 20px',
+                              backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
+                            }}
+                          >
+                            <img 
+                              src={sprite.dataUrl} 
+                              alt={`Sprite ${sprite.id}`} 
+                              className="max-w-full max-h-full object-contain filter drop-shadow-sm" 
+                            />
+                          </div>
+                          <div className="p-3 bg-white border-t border-gray-100 flex justify-between items-center">
+                            <span className="text-xs text-gray-500 font-mono">{sprite.width}x{sprite.height}</span>
+                            <a 
+                              href={sprite.dataUrl} 
+                              download={`sprite_${sprite.id}.png`}
+                              className="text-blue-600 hover:bg-blue-50 p-2 rounded-full transition-colors"
+                              title="單獨下載"
+                            >
+                              <Download className="w-4 h-4" />
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="p-12 text-center text-gray-500 bg-white rounded-xl border border-gray-200">
+                    <p className="text-lg font-medium text-gray-700">沒有符合條件的圖片</p>
+                    <p className="text-sm mt-2">
+                       可能被尺寸篩選器過濾掉了，或綠色不夠「純」。<br/>
+                       試著調高「綠色容許值」或「黑框判定值」。
+                    </p>
+                  </div>
+                )}
+
+                {/* Original Preview */}
+                <div className="mt-8 pt-8 border-t border-gray-200">
+                   <details className="cursor-pointer group">
+                      <summary className="text-gray-500 text-sm font-medium hover:text-gray-800 select-none list-none flex items-center gap-2">
+                        <span className="border px-2 py-1 rounded bg-gray-100 group-open:bg-gray-200 transition-colors">查看原始圖片</span>
+                      </summary>
+                      <div className="mt-4 p-4 bg-white rounded-lg border shadow-inner overflow-auto max-h-96">
+                        <img src={sourceImage.src} alt="Original" className="max-w-full opacity-75" />
+                      </div>
+                   </details>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Hidden Canvas */}
+      <canvas ref={canvasRef} className="hidden" />
+    </div>
+  );
+};
+
+export default SpriteSplitter;
