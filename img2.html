@@ -3,38 +3,156 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 圖像九宮格自動分割器</title>
+    <title>AI 智能九宮格切圖器 2.0</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e2f; color: #fff; margin: 0; padding: 20px; }
-        .container { max-width: 900px; margin: 0 auto; background: #2a2a40; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-        h1 { margin-top: 0; color: #4ade80; }
-        p { color: #a1a1aa; line-height: 1.6; }
-        .control-panel { background: #32324e; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-        input[type="file"] { display: block; margin-bottom: 15px; }
-        button { background: #4ade80; color: #111; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        button:hover { background: #22c55e; }
-        button:disabled { background: #555; color: #888; cursor: not-allowed; }
-        .grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 20px; }
-        .grid-item { background: #111; border-radius: 8px; padding: 10px; text-align: center; }
-        .grid-item img { max-width: 100%; border-radius: 4px; display: block; margin: 0 auto 10px auto; }
-        .download-btn { background: #3b82f6; width: 100%; font-size: 14px; }
+        :root {
+            --primary: #4ade80;
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f8fafc;
+        }
+        body { 
+            font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+            background-color: var(--bg); 
+            color: var(--text); 
+            margin: 0; 
+            padding: 20px; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container { 
+            max-width: 1000px; 
+            width: 100%;
+            background: var(--card); 
+            padding: 30px; 
+            border-radius: 16px; 
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.4); 
+        }
+        header { text-align: center; margin-bottom: 30px; }
+        h1 { margin: 0; color: var(--primary); font-size: 2rem; }
+        p { color: #94a3b8; margin-top: 8px; }
+
+        .control-panel { 
+            background: #334155; 
+            padding: 20px; 
+            border-radius: 12px; 
+            margin-bottom: 25px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+        }
+        input[type="file"] { 
+            background: #1e293b;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px dashed #64748b;
+            cursor: pointer;
+        }
+        button { 
+            background: var(--primary); 
+            color: #064e3b; 
+            border: none; 
+            padding: 12px 24px; 
+            border-radius: 8px; 
+            font-weight: 700; 
+            cursor: pointer; 
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        button:hover { transform: translateY(-1px); background: #22c55e; }
+        button:active { transform: translateY(0); }
+        button:disabled { background: #475569; color: #94a3b8; cursor: not-allowed; }
+
+        .grid-container { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 20px; 
+            margin-top: 20px; 
+        }
+        .grid-item { 
+            background: #020617; 
+            border-radius: 12px; 
+            padding: 15px; 
+            text-align: center; 
+            border: 2px solid transparent;
+            transition: 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        .grid-item:hover {
+            border-color: var(--primary);
+            background: #0f172a;
+        }
+        .grid-item img { 
+            max-width: 100%; 
+            height: auto;
+            border-radius: 6px; 
+            display: block; 
+            margin: 0 auto 12px auto; 
+            cursor: crosshair;
+            background-image: linear-gradient(45deg, #111 25%, transparent 25%), 
+                              linear-gradient(-45deg, #111 25%, transparent 25%), 
+                              linear-gradient(45deg, transparent 75%, #111 75%), 
+                              linear-gradient(-45deg, transparent 75%, #111 75%);
+            background-size: 10px 10px;
+            background-position: 0 0, 0 5px, 5px -5px, -5px 0px;
+        }
+        .status-badge {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 10px;
+            background: #059669;
+            padding: 2px 6px;
+            border-radius: 4px;
+            opacity: 0.8;
+        }
+        .download-btn { 
+            background: #3b82f6; 
+            width: 100%; 
+            font-size: 13px; 
+            color: white;
+            padding: 8px;
+        }
         .download-btn:hover { background: #2563eb; }
+        
+        #previewArea {
+            margin-top: 20px;
+            text-align: center;
+            border-top: 1px solid #334155;
+            padding-top: 20px;
+        }
+
+        .hint {
+            font-size: 0.85rem;
+            color: #fbbf24;
+            margin-bottom: 10px;
+        }
+
         canvas { display: none; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>圖像九宮格自動分割器</h1>
-    <p>針對 AI 生成的 3x3 網格圖設計。會<b>自動偵測並避開黑色格線</b>，切出完美的九宮格並移除周圍黑邊，方便後續丟進 remove.bg 去背。</p>
+    <header>
+        <h1>AI 智能九宮格切圖器 2.0</h1>
+        <p>上傳圖片自動分割，點擊小圖可「自動識別黑框」並精準去邊</p>
+    </header>
 
     <div class="control-panel">
         <input type="file" id="imageInput" accept="image/png, image/jpeg, image/webp">
-        <button id="downloadAllBtn" disabled>一鍵下載全部 9 張圖</button>
+        <button id="downloadAllBtn" disabled>一鍵下載全部</button>
     </div>
 
+    <div id="hintText" class="hint" style="display:none;">💡 提示：如果切得不夠準，點擊下方小圖，電腦會再次偵測黑框邊界重新裁切。</div>
+
     <div class="grid-container" id="outputGrid">
-        </div>
+        <!-- 內容由 JS 動態生成 -->
+    </div>
 </div>
 
 <canvas id="hiddenCanvas"></canvas>
@@ -45,8 +163,10 @@
     const hiddenCanvas = document.getElementById('hiddenCanvas');
     const ctx = hiddenCanvas.getContext('2d', { willReadFrequently: true });
     const downloadAllBtn = document.getElementById('downloadAllBtn');
-    
-    let generatedImages = [];
+    const hintText = document.getElementById('hintText');
+
+    let originalImage = null;
+    let spriteData = []; // 儲存九個區塊的原始範圍資料
 
     imageInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
@@ -56,7 +176,9 @@
         reader.onload = function(event) {
             const img = new Image();
             img.onload = function() {
+                originalImage = img;
                 processImage(img);
+                hintText.style.display = 'block';
             };
             img.src = event.target.result;
         };
@@ -67,118 +189,137 @@
         hiddenCanvas.width = img.width;
         hiddenCanvas.height = img.height;
         ctx.drawImage(img, 0, 0);
-        
         const imgData = ctx.getImageData(0, 0, img.width, img.height);
-        
-        // 1. 動態偵測網格線位置 (處理框線不固定的問題)
+
+        // 1. 偵測格線
         const xRanges = findGridLines(img.width, img.height, false, imgData);
         const yRanges = findGridLines(img.height, img.width, true, imgData);
 
         outputGrid.innerHTML = '';
-        generatedImages = [];
+        spriteData = [];
 
-        // 2. 裁切 9 個區塊
+        // 2. 初始分割
         for (let row = 0; row < yRanges.length; row++) {
             for (let col = 0; col < xRanges.length; col++) {
-                const x1 = xRanges[col].start;
-                const x2 = xRanges[col].end;
-                const y1 = yRanges[row].start;
-                const y2 = yRanges[row].end;
-
-                // 3. 在每個小區塊內，找出非黑色像素的精確邊界 (完美去黑邊)
-                const tightBox = getTightBox(imgData, x1, x2, y1, y2);
-
-                // 建立新的 Canvas 來裝裁切好的圖
-                const pieceCanvas = document.createElement('canvas');
-                pieceCanvas.width = tightBox.w;
-                pieceCanvas.height = tightBox.h;
-                const pieceCtx = pieceCanvas.getContext('2d');
+                const range = {
+                    x: xRanges[col].start,
+                    y: yRanges[row].start,
+                    w: xRanges[col].end - xRanges[col].start + 1,
+                    h: yRanges[row].end - yRanges[row].start + 1,
+                    row, col
+                };
                 
-                // 將精確的範圍畫到新 canvas 上
-                pieceCtx.drawImage(
-                    img, 
-                    tightBox.x, tightBox.y, tightBox.w, tightBox.h, 
-                    0, 0, tightBox.w, tightBox.h
-                );
-
-                const dataURL = pieceCanvas.toDataURL('image/png');
-                generatedImages.push({ url: dataURL, name: `sprite_${row}_${col}.png` });
-                createOutputElement(dataURL, `sprite_${row}_${col}.png`);
+                // 每個區塊先做一次初步的自動去黑邊
+                const tightBox = getTightBox(imgData, range.x, xRanges[col].end, range.y, yRanges[row].end);
+                
+                const dataURL = cropToDataURL(img, tightBox);
+                const id = `sprite-${row}-${col}`;
+                spriteData.push({ id, originalRange: range, currentBox: tightBox, url: dataURL });
+                
+                createOutputElement(id, dataURL, `sprite_${row}_${col}.png`);
             }
         }
-        
-        if (generatedImages.length > 0) {
-            downloadAllBtn.disabled = false;
+
+        downloadAllBtn.disabled = false;
+    }
+
+    // 點擊事件：識別黑框並切掉
+    function handleRefineCrop(id) {
+        const sprite = spriteData.find(s => s.id === id);
+        if (!sprite || !originalImage) return;
+
+        // 重新獲取該區域的像素資料來進行更深度的黑框識別
+        hiddenCanvas.width = originalImage.width;
+        hiddenCanvas.height = originalImage.height;
+        ctx.drawImage(originalImage, 0, 0);
+        const imgData = ctx.getImageData(0, 0, originalImage.width, originalImage.height);
+
+        // 使用更嚴格的邊界算法 (識別黑框)
+        const refinedBox = getTightBox(imgData, 
+            sprite.originalRange.x, 
+            sprite.originalRange.x + sprite.originalRange.w - 1, 
+            sprite.originalRange.y, 
+            sprite.originalRange.y + sprite.originalRange.h - 1, 
+            true // 開啟深度偵測模式
+        );
+
+        sprite.currentBox = refinedBox;
+        sprite.url = cropToDataURL(originalImage, refinedBox);
+
+        // 更新 UI
+        const imgElement = document.querySelector(`#${id} img`);
+        if (imgElement) {
+            imgElement.src = sprite.url;
+            // 加上一個視覺反饋閃爍
+            imgElement.parentElement.style.borderColor = '#4ade80';
+            setTimeout(() => { imgElement.parentElement.style.borderColor = 'transparent'; }, 500);
         }
     }
 
-    // 核心演算法 1：找尋全圖的格線
+    // 核心：偵測格線位置
     function findGridLines(size, crossSize, isRow, imgData) {
         const lines = [];
-        // 掃描每一行/列，計算黑色像素的比例
+        const threshold = 45; // 認定為黑色的亮度
+
         for (let i = 0; i < size; i++) {
             let blackCount = 0;
             for (let j = 0; j < crossSize; j++) {
                 const x = isRow ? j : i;
                 const y = isRow ? i : j;
                 const idx = (y * imgData.width + x) * 4;
-                // 定義黑色的閾值 (RGB都小於40)
-                if (imgData.data[idx] < 40 && imgData.data[idx+1] < 40 && imgData.data[idx+2] < 40) {
+                if (imgData.data[idx] < threshold && imgData.data[idx+1] < threshold && imgData.data[idx+2] < threshold) {
                     blackCount++;
                 }
             }
-            // 如果這條線超過 50% 是黑色的，判定為網格分隔線
-            if (blackCount / crossSize > 0.5) {
+            if (blackCount / crossSize > 0.4) {
                 lines.push(i);
             }
         }
 
-        // 將非格線的部分結合成範圍 (找出內容區塊)
         const ranges = [];
         let contentStart = 0;
         let inContent = true;
-        
         for (let i = 0; i < size; i++) {
             const isLine = lines.includes(i);
             if (isLine && inContent) {
-                if (i - contentStart > 20) { // 忽略太小的雜訊區塊
-                    ranges.push({start: contentStart, end: i - 1});
-                }
+                if (i - contentStart > 30) ranges.push({start: contentStart, end: i - 1});
                 inContent = false;
             } else if (!isLine && !inContent) {
                 contentStart = i;
                 inContent = true;
             }
         }
-        if (inContent && size - contentStart > 20) {
-            ranges.push({start: contentStart, end: size - 1});
-        }
-        
-        // 防呆機制：如果圖形太怪異導致找不到 3 個區塊，強制等分成 3 份
+        if (inContent && size - contentStart > 30) ranges.push({start: contentStart, end: size - 1});
+
+        // 如果偵測失敗，平均分配
         if (ranges.length !== 3) {
             return [
-                {start: 0, end: Math.floor(size/3) - 1},
-                {start: Math.floor(size/3), end: Math.floor(size*2/3) - 1},
-                {start: Math.floor(size*2/3), end: size - 1}
+                {start: 0, end: Math.floor(size/3) - 5},
+                {start: Math.floor(size/3) + 5, end: Math.floor(size*2/3) - 5},
+                {start: Math.floor(size*2/3) + 5, end: size - 1}
             ];
         }
         return ranges;
     }
 
-    // 核心演算法 2：逼近法找尋非黑邊的實際內容區塊 (Tight Bounding Box)
-    function getTightBox(imgData, startX, endX, startY, endY) {
+    // 核心：偵測內容邊界 (識別黑框並切掉)
+    function getTightBox(imgData, startX, endX, startY, endY, deepMode = false) {
         let minX = endX, maxX = startX, minY = endY, maxY = startY;
         let hasContent = false;
         
-        for(let y = startY; y <= endY; y++){
-            for(let x = startX; x <= endX; x++){
+        // 判定為「非黑色內容」的門檻
+        // 如果是 deepMode，我們對「黑」的要求更嚴格，確保切乾淨
+        const colorThreshold = deepMode ? 50 : 35;
+
+        for (let y = startY; y <= endY; y++) {
+            for (let x = startX; x <= endX; x++) {
                 const idx = (y * imgData.width + x) * 4;
                 const r = imgData.data[idx];
                 const g = imgData.data[idx+1];
                 const b = imgData.data[idx+2];
-                
-                // 如果不是黑色 (RGB有任一 > 30)，就視為內容
-                if (r > 30 || g > 30 || b > 30) {
+
+                // 只要不是純黑色，就視為我們要的內容
+                if (r > colorThreshold || g > colorThreshold || b > colorThreshold) {
                     if (x < minX) minX = x;
                     if (x > maxX) maxX = x;
                     if (y < minY) minY = y;
@@ -187,49 +328,70 @@
                 }
             }
         }
-        
+
+        // 稍微往內縮 1 像素，確保黑邊完全消失
+        if (deepMode && hasContent) {
+            minX += 1; minY += 1; maxX -= 1; maxY -= 1;
+        }
+
         if (!hasContent) return {x: startX, y: startY, w: endX - startX, h: endY - startY};
+        
         return {
-            x: minX,
-            y: minY,
-            w: maxX - minX + 1,
-            h: maxY - minY + 1
+            x: Math.max(0, minX),
+            y: Math.max(0, minY),
+            w: Math.max(1, maxX - minX + 1),
+            h: Math.max(1, maxY - minY + 1)
         };
     }
 
-    // UI：建立顯示與下載按鈕
-    function createOutputElement(dataURL, filename) {
+    function cropToDataURL(img, box) {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = box.w;
+        tempCanvas.height = box.h;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(img, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+        return tempCanvas.toDataURL('image/png');
+    }
+
+    function createOutputElement(id, dataURL, filename) {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'grid-item';
+        itemDiv.id = id;
         
+        const badge = document.createElement('div');
+        badge.className = 'status-badge';
+        badge.innerText = '可點擊識別';
+
         const img = document.createElement('img');
         img.src = dataURL;
-        
+        img.title = "點擊此處讓電腦識別黑框並重新裁切";
+        img.onclick = () => handleRefineCrop(id);
+
         const btn = document.createElement('button');
         btn.className = 'download-btn';
-        btn.innerText = '單張下載';
-        btn.onclick = () => downloadFile(dataURL, filename);
-        
+        btn.innerText = '下載此張';
+        btn.onclick = () => downloadFile(spriteData.find(s=>s.id === id).url, filename);
+
+        itemDiv.appendChild(badge);
         itemDiv.appendChild(img);
         itemDiv.appendChild(btn);
         outputGrid.appendChild(itemDiv);
     }
 
-    function downloadFile(dataURL, filename) {
+    function downloadFile(url, filename) {
         const link = document.createElement('a');
-        link.href = dataURL;
+        link.href = url;
         link.download = filename;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     }
 
-    // 一鍵下載全部功能 (稍微設定延遲避免被瀏覽器當作廣告彈出阻擋)
     downloadAllBtn.addEventListener('click', () => {
-        generatedImages.forEach((img, index) => {
+        spriteData.forEach((sprite, index) => {
             setTimeout(() => {
-                downloadFile(img.url, img.name);
-            }, index * 200);
+                downloadFile(sprite.url, `sprite_${index}.png`);
+            }, index * 250);
         });
     });
 
