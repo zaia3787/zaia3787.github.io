@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 智能九宮格切圖器 2.0</title>
+    <title>AI 智能九宮格切圖器 3.0</title>
     <style>
         :root {
             --primary: #4ade80;
@@ -28,6 +28,7 @@
             padding: 30px; 
             border-radius: 16px; 
             box-shadow: 0 10px 25px -5px rgba(0,0,0,0.4); 
+            box-sizing: border-box;
         }
         header { text-align: center; margin-bottom: 30px; }
         h1 { margin: 0; color: var(--primary); font-size: 2rem; }
@@ -50,6 +51,7 @@
             border-radius: 6px;
             border: 1px dashed #64748b;
             cursor: pointer;
+            color: white;
         }
         button { 
             background: var(--primary); 
@@ -72,6 +74,9 @@
             gap: 20px; 
             margin-top: 20px; 
         }
+        @media (max-width: 600px) {
+            .grid-container { grid-template-columns: repeat(2, 1fr); }
+        }
         .grid-item { 
             background: #020617; 
             border-radius: 12px; 
@@ -83,7 +88,7 @@
             overflow: hidden;
         }
         .grid-item:hover {
-            border-color: var(--primary);
+            border-color: #3b82f6;
             background: #0f172a;
         }
         .grid-item img { 
@@ -92,7 +97,7 @@
             border-radius: 6px; 
             display: block; 
             margin: 0 auto 12px auto; 
-            cursor: crosshair;
+            cursor: pointer;
             background-image: linear-gradient(45deg, #111 25%, transparent 25%), 
                               linear-gradient(-45deg, #111 25%, transparent 25%), 
                               linear-gradient(45deg, transparent 75%, #111 75%), 
@@ -104,11 +109,13 @@
             position: absolute;
             top: 5px;
             right: 5px;
-            font-size: 10px;
-            background: #059669;
-            padding: 2px 6px;
+            font-size: 11px;
+            background: #3b82f6;
+            color: white;
+            padding: 3px 8px;
             border-radius: 4px;
-            opacity: 0.8;
+            opacity: 0.9;
+            pointer-events: none;
         }
         .download-btn { 
             background: #3b82f6; 
@@ -118,29 +125,78 @@
             padding: 8px;
         }
         .download-btn:hover { background: #2563eb; }
-        
-        #previewArea {
-            margin-top: 20px;
-            text-align: center;
-            border-top: 1px solid #334155;
-            padding-top: 20px;
-        }
 
         .hint {
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             color: #fbbf24;
             margin-bottom: 10px;
+            text-align: center;
         }
 
-        canvas { display: none; }
+        /* 裁切 Modal 樣式 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 12px;
+            max-width: 90vw;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .modal-header h3 { margin: 0; color: white; }
+        .canvas-container {
+            flex-grow: 1;
+            overflow: auto;
+            position: relative;
+            background: #000;
+            border-radius: 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #cropCanvas {
+            max-width: 100%;
+            max-height: 60vh;
+            cursor: crosshair;
+            display: block;
+        }
+        .modal-actions {
+            margin-top: 20px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+        }
+        .btn-cancel { background: #475569; color: white; }
+        .btn-cancel:hover { background: #64748b; }
+
+        canvas.hidden-tool { display: none; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <header>
-        <h1>AI 智能九宮格切圖器 2.0</h1>
-        <p>上傳圖片自動分割，點擊小圖可「自動識別黑框」並精準去邊</p>
+        <h1>AI 智能九宮格切圖器 3.0</h1>
+        <p>上傳圖片自動分割，點擊小圖可「手動拖拉邊框」完美避開粗黑線</p>
     </header>
 
     <div class="control-panel">
@@ -148,14 +204,30 @@
         <button id="downloadAllBtn" disabled>一鍵下載全部</button>
     </div>
 
-    <div id="hintText" class="hint" style="display:none;">💡 提示：如果切得不夠準，點擊下方小圖，電腦會再次偵測黑框邊界重新裁切。</div>
+    <div id="hintText" class="hint" style="display:none;">💡 提示：點擊下方任何一張小圖，即可開啟手動裁切工具精調邊界。</div>
 
     <div class="grid-container" id="outputGrid">
         <!-- 內容由 JS 動態生成 -->
     </div>
 </div>
 
-<canvas id="hiddenCanvas"></canvas>
+<!-- 手動裁切的彈窗 -->
+<div id="cropperModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>手動調整裁切範圍</h3>
+        </div>
+        <div class="canvas-container">
+            <canvas id="cropCanvas"></canvas>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeCropper()">取消</button>
+            <button onclick="saveCrop()">確認裁切</button>
+        </div>
+    </div>
+</div>
+
+<canvas id="hiddenCanvas" class="hidden-tool"></canvas>
 
 <script>
     const imageInput = document.getElementById('imageInput');
@@ -164,9 +236,24 @@
     const ctx = hiddenCanvas.getContext('2d', { willReadFrequently: true });
     const downloadAllBtn = document.getElementById('downloadAllBtn');
     const hintText = document.getElementById('hintText');
+    const cropperModal = document.getElementById('cropperModal');
+    const cropCanvas = document.getElementById('cropCanvas');
+    const cropCtx = cropCanvas.getContext('2d', { willReadFrequently: true });
 
     let originalImage = null;
-    let spriteData = []; // 儲存九個區塊的原始範圍資料
+    let spriteData = []; 
+
+    // 手動裁切器狀態
+    let cropState = {
+        id: null,
+        rawCanvas: null,
+        box: { x: 0, y: 0, w: 0, h: 0 },
+        isDragging: false,
+        dragHandle: null,
+        startX: 0,
+        startY: 0,
+        initialBox: { x: 0, y: 0, w: 0, h: 0 }
+    };
 
     imageInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
@@ -198,7 +285,7 @@
         outputGrid.innerHTML = '';
         spriteData = [];
 
-        // 2. 初始分割
+        // 2. 初始分割並產生暫存的 Raw Canvas
         for (let row = 0; row < yRanges.length; row++) {
             for (let col = 0; col < xRanges.length; col++) {
                 const range = {
@@ -209,12 +296,20 @@
                     row, col
                 };
                 
-                // 每個區塊先做一次初步的自動去黑邊
-                const tightBox = getTightBox(imgData, range.x, xRanges[col].end, range.y, yRanges[row].end);
+                // 產生該區塊未裁切的原始畫面
+                const rawCanvas = document.createElement('canvas');
+                rawCanvas.width = range.w;
+                rawCanvas.height = range.h;
+                const rawCtx = rawCanvas.getContext('2d');
+                rawCtx.drawImage(img, range.x, range.y, range.w, range.h, 0, 0, range.w, range.h);
                 
-                const dataURL = cropToDataURL(img, tightBox);
+                // 依然做一次初步的自動去黑邊作為預設框
+                const rawImgData = rawCtx.getImageData(0, 0, range.w, range.h);
+                const tightBox = getTightBox(rawImgData, 0, range.w - 1, 0, range.h - 1);
+                
+                const dataURL = cropToDataURL(rawCanvas, tightBox);
                 const id = `sprite-${row}-${col}`;
-                spriteData.push({ id, originalRange: range, currentBox: tightBox, url: dataURL });
+                spriteData.push({ id, originalRange: range, rawCanvas: rawCanvas, currentBox: tightBox, url: dataURL });
                 
                 createOutputElement(id, dataURL, `sprite_${row}_${col}.png`);
             }
@@ -223,136 +318,7 @@
         downloadAllBtn.disabled = false;
     }
 
-    // 點擊事件：識別黑框並切掉
-    function handleRefineCrop(id) {
-        const sprite = spriteData.find(s => s.id === id);
-        if (!sprite || !originalImage) return;
-
-        // 重新獲取該區域的像素資料來進行更深度的黑框識別
-        hiddenCanvas.width = originalImage.width;
-        hiddenCanvas.height = originalImage.height;
-        ctx.drawImage(originalImage, 0, 0);
-        const imgData = ctx.getImageData(0, 0, originalImage.width, originalImage.height);
-
-        // 使用更嚴格的邊界算法 (識別黑框)
-        const refinedBox = getTightBox(imgData, 
-            sprite.originalRange.x, 
-            sprite.originalRange.x + sprite.originalRange.w - 1, 
-            sprite.originalRange.y, 
-            sprite.originalRange.y + sprite.originalRange.h - 1, 
-            true // 開啟深度偵測模式
-        );
-
-        sprite.currentBox = refinedBox;
-        sprite.url = cropToDataURL(originalImage, refinedBox);
-
-        // 更新 UI
-        const imgElement = document.querySelector(`#${id} img`);
-        if (imgElement) {
-            imgElement.src = sprite.url;
-            // 加上一個視覺反饋閃爍
-            imgElement.parentElement.style.borderColor = '#4ade80';
-            setTimeout(() => { imgElement.parentElement.style.borderColor = 'transparent'; }, 500);
-        }
-    }
-
-    // 核心：偵測格線位置
-    function findGridLines(size, crossSize, isRow, imgData) {
-        const lines = [];
-        const threshold = 45; // 認定為黑色的亮度
-
-        for (let i = 0; i < size; i++) {
-            let blackCount = 0;
-            for (let j = 0; j < crossSize; j++) {
-                const x = isRow ? j : i;
-                const y = isRow ? i : j;
-                const idx = (y * imgData.width + x) * 4;
-                if (imgData.data[idx] < threshold && imgData.data[idx+1] < threshold && imgData.data[idx+2] < threshold) {
-                    blackCount++;
-                }
-            }
-            if (blackCount / crossSize > 0.4) {
-                lines.push(i);
-            }
-        }
-
-        const ranges = [];
-        let contentStart = 0;
-        let inContent = true;
-        for (let i = 0; i < size; i++) {
-            const isLine = lines.includes(i);
-            if (isLine && inContent) {
-                if (i - contentStart > 30) ranges.push({start: contentStart, end: i - 1});
-                inContent = false;
-            } else if (!isLine && !inContent) {
-                contentStart = i;
-                inContent = true;
-            }
-        }
-        if (inContent && size - contentStart > 30) ranges.push({start: contentStart, end: size - 1});
-
-        // 如果偵測失敗，平均分配
-        if (ranges.length !== 3) {
-            return [
-                {start: 0, end: Math.floor(size/3) - 5},
-                {start: Math.floor(size/3) + 5, end: Math.floor(size*2/3) - 5},
-                {start: Math.floor(size*2/3) + 5, end: size - 1}
-            ];
-        }
-        return ranges;
-    }
-
-    // 核心：偵測內容邊界 (識別黑框並切掉)
-    function getTightBox(imgData, startX, endX, startY, endY, deepMode = false) {
-        let minX = endX, maxX = startX, minY = endY, maxY = startY;
-        let hasContent = false;
-        
-        // 判定為「非黑色內容」的門檻
-        // 如果是 deepMode，我們對「黑」的要求更嚴格，確保切乾淨
-        const colorThreshold = deepMode ? 50 : 35;
-
-        for (let y = startY; y <= endY; y++) {
-            for (let x = startX; x <= endX; x++) {
-                const idx = (y * imgData.width + x) * 4;
-                const r = imgData.data[idx];
-                const g = imgData.data[idx+1];
-                const b = imgData.data[idx+2];
-
-                // 只要不是純黑色，就視為我們要的內容
-                if (r > colorThreshold || g > colorThreshold || b > colorThreshold) {
-                    if (x < minX) minX = x;
-                    if (x > maxX) maxX = x;
-                    if (y < minY) minY = y;
-                    if (y > maxY) maxY = y;
-                    hasContent = true;
-                }
-            }
-        }
-
-        // 稍微往內縮 1 像素，確保黑邊完全消失
-        if (deepMode && hasContent) {
-            minX += 1; minY += 1; maxX -= 1; maxY -= 1;
-        }
-
-        if (!hasContent) return {x: startX, y: startY, w: endX - startX, h: endY - startY};
-        
-        return {
-            x: Math.max(0, minX),
-            y: Math.max(0, minY),
-            w: Math.max(1, maxX - minX + 1),
-            h: Math.max(1, maxY - minY + 1)
-        };
-    }
-
-    function cropToDataURL(img, box) {
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = box.w;
-        tempCanvas.height = box.h;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(img, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
-        return tempCanvas.toDataURL('image/png');
-    }
-
+    // --- 以下為 UI 生成與下載 ---
     function createOutputElement(id, dataURL, filename) {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'grid-item';
@@ -360,12 +326,12 @@
         
         const badge = document.createElement('div');
         badge.className = 'status-badge';
-        badge.innerText = '可點擊識別';
+        badge.innerText = '點擊手動裁切';
 
         const img = document.createElement('img');
         img.src = dataURL;
-        img.title = "點擊此處讓電腦識別黑框並重新裁切";
-        img.onclick = () => handleRefineCrop(id);
+        img.title = "點擊開啟手動裁切工具";
+        img.onclick = () => openCropper(id);
 
         const btn = document.createElement('button');
         btn.className = 'download-btn';
@@ -389,11 +355,264 @@
 
     downloadAllBtn.addEventListener('click', () => {
         spriteData.forEach((sprite, index) => {
-            setTimeout(() => {
-                downloadFile(sprite.url, `sprite_${index}.png`);
-            }, index * 250);
+            setTimeout(() => { downloadFile(sprite.url, `sprite_${index}.png`); }, index * 250);
         });
     });
+
+    // --- 以下為手動裁切器 (Cropper) 邏輯 ---
+    function openCropper(id) {
+        const sprite = spriteData.find(s => s.id === id);
+        if (!sprite) return;
+
+        cropState.id = id;
+        cropState.rawCanvas = sprite.rawCanvas;
+        cropState.box = { ...sprite.currentBox };
+        
+        cropCanvas.width = sprite.rawCanvas.width;
+        cropCanvas.height = sprite.rawCanvas.height;
+        
+        drawCropper();
+        cropperModal.classList.add('active');
+        document.body.style.overflow = 'hidden'; // 防止背景滾動
+    }
+
+    function closeCropper() {
+        cropperModal.classList.remove('active');
+        document.body.style.overflow = '';
+        cropState.id = null;
+    }
+
+    function saveCrop() {
+        const sprite = spriteData.find(s => s.id === cropState.id);
+        if (!sprite) return;
+
+        // 更新資料
+        sprite.currentBox = { ...cropState.box };
+        sprite.url = cropToDataURL(sprite.rawCanvas, sprite.currentBox);
+
+        // 更新 UI
+        const imgElement = document.querySelector(`#${sprite.id} img`);
+        if (imgElement) {
+            imgElement.src = sprite.url;
+        }
+
+        closeCropper();
+    }
+
+    function drawCropper() {
+        const w = cropCanvas.width;
+        const h = cropCanvas.height;
+        const box = cropState.box;
+
+        // 畫底圖
+        cropCtx.clearRect(0, 0, w, h);
+        cropCtx.drawImage(cropState.rawCanvas, 0, 0);
+
+        // 畫半透明遮罩 (四塊：上、左、右、下)
+        cropCtx.fillStyle = 'rgba(0,0,0,0.6)';
+        cropCtx.fillRect(0, 0, w, box.y); 
+        cropCtx.fillRect(0, box.y, box.x, box.h); 
+        cropCtx.fillRect(box.x + box.w, box.y, w - (box.x + box.w), box.h); 
+        cropCtx.fillRect(0, box.y + box.h, w, h - (box.y + box.h)); 
+
+        // 畫裁切框邊界
+        cropCtx.strokeStyle = '#4ade80';
+        cropCtx.lineWidth = Math.max(2, w / 200);
+        cropCtx.strokeRect(box.x, box.y, box.w, box.h);
+
+        // 畫控制點 (四個角與四個邊中點)
+        const handleSize = Math.max(8, w / 40);
+        cropCtx.fillStyle = '#fff';
+        const drawHandle = (x, y) => {
+            cropCtx.fillRect(x - handleSize/2, y - handleSize/2, handleSize, handleSize);
+            cropCtx.strokeRect(x - handleSize/2, y - handleSize/2, handleSize, handleSize);
+        };
+
+        drawHandle(box.x, box.y); // tl
+        drawHandle(box.x + box.w/2, box.y); // tm
+        drawHandle(box.x + box.w, box.y); // tr
+        drawHandle(box.x + box.w, box.y + box.h/2); // rm
+        drawHandle(box.x + box.w, box.y + box.h); // br
+        drawHandle(box.x + box.w/2, box.y + box.h); // bm
+        drawHandle(box.x, box.y + box.h); // bl
+        drawHandle(box.x, box.y + box.h/2); // lm
+    }
+
+    // 事件監聽 (滑鼠 & 觸控)
+    function getEventPos(e) {
+        const rect = cropCanvas.getBoundingClientRect();
+        const scaleX = cropCanvas.width / rect.width;
+        const scaleY = cropCanvas.height / rect.height;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+            x: (clientX - rect.left) * scaleX,
+            y: (clientY - rect.top) * scaleY
+        };
+    }
+
+    function checkHit(x, y) {
+        const box = cropState.box;
+        const t = Math.max(10, cropCanvas.width / 30); // 容錯範圍
+
+        // 檢查順序：角 -> 邊 -> 內部
+        if (Math.abs(x - box.x) < t && Math.abs(y - box.y) < t) return 'tl';
+        if (Math.abs(x - (box.x + box.w)) < t && Math.abs(y - box.y) < t) return 'tr';
+        if (Math.abs(x - box.x) < t && Math.abs(y - (box.y + box.h)) < t) return 'bl';
+        if (Math.abs(x - (box.x + box.w)) < t && Math.abs(y - (box.y + box.h)) < t) return 'br';
+        
+        if (Math.abs(y - box.y) < t && x > box.x && x < box.x + box.w) return 'tm';
+        if (Math.abs(y - (box.y + box.h)) < t && x > box.x && x < box.x + box.w) return 'bm';
+        if (Math.abs(x - box.x) < t && y > box.y && y < box.y + box.h) return 'lm';
+        if (Math.abs(x - (box.x + box.w)) < t && y > box.y && y < box.y + box.h) return 'rm';
+
+        if (x > box.x && x < box.x + box.w && y > box.y && y < box.y + box.h) return 'move';
+        return null;
+    }
+
+    function handleInputStart(e) {
+        if (!cropState.id) return;
+        const pos = getEventPos(e);
+        const hit = checkHit(pos.x, pos.y);
+        
+        if (hit) {
+            if (!e.touches) e.preventDefault();
+            cropState.isDragging = true;
+            cropState.dragHandle = hit;
+            cropState.startX = pos.x;
+            cropState.startY = pos.y;
+            cropState.initialBox = { ...cropState.box };
+        }
+    }
+
+    function handleInputMove(e) {
+        if (!cropState.isDragging) {
+            // 變更滑鼠游標圖示
+            if (cropState.id && !e.touches) {
+                const pos = getEventPos(e);
+                const hit = checkHit(pos.x, pos.y);
+                if (['tl', 'br'].includes(hit)) cropCanvas.style.cursor = 'nwse-resize';
+                else if (['tr', 'bl'].includes(hit)) cropCanvas.style.cursor = 'nesw-resize';
+                else if (['tm', 'bm'].includes(hit)) cropCanvas.style.cursor = 'ns-resize';
+                else if (['lm', 'rm'].includes(hit)) cropCanvas.style.cursor = 'ew-resize';
+                else if (hit === 'move') cropCanvas.style.cursor = 'move';
+                else cropCanvas.style.cursor = 'crosshair';
+            }
+            return;
+        }
+        
+        if (!e.touches) e.preventDefault();
+        const pos = getEventPos(e);
+        const dx = pos.x - cropState.startX;
+        const dy = pos.y - cropState.startY;
+        let b = cropState.box;
+        let i = cropState.initialBox;
+        const minSize = 20;
+        const maxW = cropCanvas.width;
+        const maxH = cropCanvas.height;
+
+        if (cropState.dragHandle === 'move') {
+            b.x = Math.max(0, Math.min(maxW - b.w, i.x + dx));
+            b.y = Math.max(0, Math.min(maxH - b.h, i.y + dy));
+        } else {
+            if (cropState.dragHandle.includes('l')) { b.x = Math.max(0, Math.min(i.x + dx, i.x + i.w - minSize)); b.w = i.w + (i.x - b.x); }
+            if (cropState.dragHandle.includes('r')) { b.w = Math.max(minSize, Math.min(maxW - b.x, i.w + dx)); }
+            if (cropState.dragHandle.includes('t')) { b.y = Math.max(0, Math.min(i.y + dy, i.y + i.h - minSize)); b.h = i.h + (i.y - b.y); }
+            if (cropState.dragHandle.includes('b')) { b.h = Math.max(minSize, Math.min(maxH - b.y, i.h + dy)); }
+        }
+        drawCropper();
+    }
+
+    function handleInputEnd() {
+        cropState.isDragging = false;
+        cropState.dragHandle = null;
+    }
+
+    cropCanvas.addEventListener('mousedown', handleInputStart);
+    cropCanvas.addEventListener('mousemove', handleInputMove);
+    window.addEventListener('mouseup', handleInputEnd);
+    cropCanvas.addEventListener('touchstart', handleInputStart, {passive: false});
+    cropCanvas.addEventListener('touchmove', handleInputMove, {passive: false});
+    window.addEventListener('touchend', handleInputEnd);
+
+    // --- 核心共用算法 ---
+
+    function findGridLines(size, crossSize, isRow, imgData) {
+        const lines = [];
+        const threshold = 45; 
+
+        for (let i = 0; i < size; i++) {
+            let blackCount = 0;
+            for (let j = 0; j < crossSize; j++) {
+                const x = isRow ? j : i;
+                const y = isRow ? i : j;
+                const idx = (y * imgData.width + x) * 4;
+                if (imgData.data[idx] < threshold && imgData.data[idx+1] < threshold && imgData.data[idx+2] < threshold) {
+                    blackCount++;
+                }
+            }
+            if (blackCount / crossSize > 0.4) lines.push(i);
+        }
+
+        const ranges = [];
+        let contentStart = 0;
+        let inContent = true;
+        for (let i = 0; i < size; i++) {
+            const isLine = lines.includes(i);
+            if (isLine && inContent) {
+                if (i - contentStart > 30) ranges.push({start: contentStart, end: i - 1});
+                inContent = false;
+            } else if (!isLine && !inContent) {
+                contentStart = i;
+                inContent = true;
+            }
+        }
+        if (inContent && size - contentStart > 30) ranges.push({start: contentStart, end: size - 1});
+
+        if (ranges.length !== 3) {
+            return [
+                {start: 0, end: Math.floor(size/3) - 5},
+                {start: Math.floor(size/3) + 5, end: Math.floor(size*2/3) - 5},
+                {start: Math.floor(size*2/3) + 5, end: size - 1}
+            ];
+        }
+        return ranges;
+    }
+
+    // 初步自動框 (只當作手動調整的預設值)
+    function getTightBox(imgData, startX, endX, startY, endY) {
+        let minX = endX, maxX = startX, minY = endY, maxY = startY;
+        let hasContent = false;
+        const colorThreshold = 35; 
+
+        for (let y = startY; y <= endY; y++) {
+            for (let x = startX; x <= endX; x++) {
+                const idx = (y * imgData.width + x) * 4;
+                const r = imgData.data[idx];
+                const g = imgData.data[idx+1];
+                const b = imgData.data[idx+2];
+
+                if (r > colorThreshold || g > colorThreshold || b > colorThreshold) {
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                    hasContent = true;
+                }
+            }
+        }
+        if (!hasContent) return {x: startX, y: startY, w: endX - startX, h: endY - startY};
+        return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+    }
+
+    function cropToDataURL(sourceCanvas, box) {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = box.w;
+        tempCanvas.height = box.h;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(sourceCanvas, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+        return tempCanvas.toDataURL('image/png');
+    }
 
 </script>
 </body>
