@@ -346,7 +346,7 @@
                 // 轉換規則：將每個字元的 ASCII 碼平移，轉為 16 進位字串
                 if (!input) return false;
                 const encoded = Array.from(input).map(c => (c.charCodeAt(0) + 13).toString(16)).join('');
-                return encoded === "3e4646423d3e3e3d"; // "19950110" 混淆後的值
+                return encoded === "3e4646423d3e3e3d";
             };
 
             const handleJoin = async (e) => {
