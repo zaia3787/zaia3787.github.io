@@ -30,7 +30,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, onSnapshot, getDocs, writeBatch, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, getDocs, writeBatch, deleteDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Your web app's Firebase configuration
         const firebaseConfig = {
@@ -53,12 +53,12 @@
         const playersColRef = collection(db, basePath, 'players');
         const votesColRef = collection(db, basePath, 'votes');
 
-        window.firebaseAPI = { auth, db, gameDocRef, playersColRef, votesColRef, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setDoc, doc, onSnapshot, getDocs, writeBatch, deleteDoc, updateDoc };
+        window.firebaseAPI = { auth, db, gameDocRef, playersColRef, votesColRef, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setDoc, doc, onSnapshot, getDocs, writeBatch, deleteDoc, updateDoc, getDoc };
     </script>
 
     <script type="text/babel" data-type="module">
         const { useState, useEffect, useMemo } = React;
-        const { auth, db, gameDocRef, playersColRef, votesColRef, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setDoc, doc, onSnapshot, getDocs, writeBatch, deleteDoc, updateDoc } = window.firebaseAPI;
+        const { auth, db, gameDocRef, playersColRef, votesColRef, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setDoc, doc, onSnapshot, getDocs, writeBatch, deleteDoc, updateDoc, getDoc } = window.firebaseAPI;
 
         // --- Game Content Data ---
         const SCENARIOS = [
@@ -214,7 +214,7 @@
             const [myVote, setMyVote] = useState(null);
             const [errorMsg, setErrorMsg] = useState('');
 
-            // 1. Initialize Firebase Auth
+            // 1. Initialize Firebase Auth & 斷線重連機制
             useEffect(() => {
                 const initAuth = async () => {
                     try {
@@ -226,7 +226,23 @@
                 };
                 initAuth();
 
-                const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+                const unsubscribe = onAuthStateChanged(auth, async (u) => {
+                    setUser(u);
+                    if (u) {
+                        // 檢查是否為曾經登入過的玩家 (資料延續)
+                        try {
+                            const playerSnap = await getDoc(doc(playersColRef, u.uid));
+                            if (playerSnap.exists()) {
+                                const data = playerSnap.data();
+                                setLocalProfile({ name: data.name, isHost: data.isHost });
+                                // 重新連線時，重新標記為上線
+                                updateDoc(doc(playersColRef, u.uid), { isOnline: true }).catch(e=>console.log(e));
+                            }
+                        } catch (err) {
+                            console.error("Reconnection error", err);
+                        }
+                    }
+                });
                 return () => unsubscribe();
             }, []);
 
@@ -278,6 +294,41 @@
                 return () => { unsubGame(); unsubPlayers(); unsubVotes(); };
             }, [user, localProfile]);
 
+            // 3. 防呆與離線偵測 (關閉網頁確認 & 狀態切換)
+            useEffect(() => {
+                const handleBeforeUnload = (e) => {
+                    if (localProfile) {
+                        e.preventDefault();
+                        e.returnValue = '遊戲進行中，確定要離開嗎？'; // 瀏覽器會跳出預設警告
+                    }
+                };
+
+                const handleVisibilityChange = () => {
+                    if (!user || !localProfile) return;
+                    if (document.visibilityState === 'hidden') {
+                        updateDoc(doc(playersColRef, user.uid), { isOnline: false }).catch(() => {});
+                    } else if (document.visibilityState === 'visible') {
+                        updateDoc(doc(playersColRef, user.uid), { isOnline: true }).catch(() => {});
+                    }
+                };
+
+                const handlePageHide = () => {
+                    if (user && localProfile) {
+                        updateDoc(doc(playersColRef, user.uid), { isOnline: false }).catch(() => {});
+                    }
+                };
+
+                window.addEventListener('beforeunload', handleBeforeUnload);
+                window.addEventListener('visibilitychange', handleVisibilityChange);
+                window.addEventListener('pagehide', handlePageHide);
+
+                return () => {
+                    window.removeEventListener('beforeunload', handleBeforeUnload);
+                    window.removeEventListener('visibilitychange', handleVisibilityChange);
+                    window.removeEventListener('pagehide', handlePageHide);
+                };
+            }, [user, localProfile]);
+
             // Actions
             const handleJoin = async (e) => {
                 e.preventDefault();
@@ -286,11 +337,21 @@
                 if (!user) return setErrorMsg("系統連線中，請稍候...");
                 
                 try {
+                    // 中途加入防呆檢查：遊戲是否已經開始
+                    const gameSnap = await getDoc(gameDocRef);
+                    if (gameSnap.exists()) {
+                        const gameStatus = gameSnap.data().status;
+                        if (!isHostCheckbox && gameStatus !== 'waiting') {
+                            return setErrorMsg("遊戲進行中，無法加入！");
+                        }
+                    }
+
                     await setDoc(doc(playersColRef, user.uid), {
                         name: inputName.trim(),
                         isHost: isHostCheckbox,
                         joinedAt: new Date().toISOString(),
-                        cumulatedHarm: 0
+                        cumulatedHarm: 0,
+                        isOnline: true // 預設上線
                     });
                     setLocalProfile({ name: inputName.trim(), isHost: isHostCheckbox });
                     setErrorMsg('');
@@ -340,9 +401,9 @@
                 });
                 await batch.commit();
                 
-                // 計算平均傷害時，只計算非主持人的人數
-                const nonHostCount = Math.max(1, players.filter(p => !p.isHost).length);
-                const adjustedHarm = Math.round(netHarm / nonHostCount) * 1.5; 
+                // 計算平均傷害時，只計算「在線」的非主持人人數
+                const onlineNonHostCountForCalc = Math.max(1, players.filter(p => !p.isHost && p.isOnline !== false).length);
+                const adjustedHarm = Math.round(netHarm / onlineNonHostCountForCalc) * 1.5; 
 
                 let newTotalHarm = gameState.totalHarm + adjustedHarm;
                 if (newTotalHarm > 100) newTotalHarm = 100;
@@ -407,11 +468,11 @@
                 return '嚴重網路霸凌發生！受害者受到極大創傷。';
             };
 
-            // 統計人數時扣除主持人
-            const nonHostPlayers = players.filter(p => !p.isHost);
+            // 統計人數時扣除主持人，且只計算「在線」的玩家
+            const onlineNonHostPlayers = players.filter(p => !p.isHost && p.isOnline !== false);
             const nonHostVotesCount = Object.keys(votes).filter(uid => {
                 const p = players.find(x => x.id === uid);
-                return p && !p.isHost;
+                return p && !p.isHost && p.isOnline !== false;
             }).length;
 
             // ---- UI SCREENS ----
@@ -485,7 +546,7 @@
                                 <div className="bg-slate-800 p-2 rounded-full"><IconUser /></div>
                                 <div>
                                     <h2 className="font-bold text-lg">{localProfile.name} {isHost && <span className="text-xs bg-purple-600 px-2 py-1 rounded text-white ml-2">主持人</span>}</h2>
-                                    <p className="text-sm text-slate-400">學生人數：{nonHostPlayers.length} 人</p>
+                                    <p className="text-sm text-slate-400">在線學生：{onlineNonHostPlayers.length} 人</p>
                                 </div>
                             </div>
                             
@@ -564,7 +625,7 @@
 
                                     <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-900/50 p-4 rounded-lg">
                                         <div className="text-slate-300 mb-4 sm:mb-0">
-                                            已投票人數： <span className="text-2xl font-bold text-white">{nonHostVotesCount}</span> / {nonHostPlayers.length}
+                                            已投票人數： <span className="text-2xl font-bold text-white">{nonHostVotesCount}</span> / {onlineNonHostPlayers.length}
                                         </div>
                                         {isHost ? (
                                             <button onClick={showResults} className="py-2 px-8 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold">
@@ -646,13 +707,13 @@
                                                 <IconShield className="w-6 h-6" /> 鍵盤守護者 (傷害最低)
                                             </h3>
                                             <ul className="space-y-2 relative z-10 text-left">
-                                                {nonHostPlayers.sort((a, b) => (a.cumulatedHarm || 0) - (b.cumulatedHarm || 0)).slice(0, 3).map((p, i) => (
+                                                {players.filter(p => !p.isHost).sort((a, b) => (a.cumulatedHarm || 0) - (b.cumulatedHarm || 0)).slice(0, 3).map((p, i) => (
                                                     <li key={p.id} className="flex justify-between items-center bg-green-800/40 p-2 rounded-lg">
-                                                        <span>{i+1}. {p.name}</span>
+                                                        <span>{i+1}. {p.name} {p.isOnline === false && <span className="text-xs text-slate-400">(已離線)</span>}</span>
                                                         <span className="font-bold text-green-300">{p.cumulatedHarm || 0}</span>
                                                     </li>
                                                 ))}
-                                                {nonHostPlayers.length === 0 && <li className="text-slate-400">尚無玩家數據</li>}
+                                                {players.filter(p => !p.isHost).length === 0 && <li className="text-slate-400">尚無玩家數據</li>}
                                             </ul>
                                         </div>
 
@@ -665,13 +726,13 @@
                                                 <IconAlert className="w-6 h-6" /> 鍵盤酸民 (傷害最高)
                                             </h3>
                                             <ul className="space-y-2 relative z-10 text-left">
-                                                {nonHostPlayers.sort((a, b) => (b.cumulatedHarm || 0) - (a.cumulatedHarm || 0)).slice(0, 3).map((p, i) => (
+                                                {players.filter(p => !p.isHost).sort((a, b) => (b.cumulatedHarm || 0) - (a.cumulatedHarm || 0)).slice(0, 3).map((p, i) => (
                                                     <li key={p.id} className="flex justify-between items-center bg-red-800/40 p-2 rounded-lg">
-                                                        <span>{i+1}. {p.name}</span>
+                                                        <span>{i+1}. {p.name} {p.isOnline === false && <span className="text-xs text-slate-400">(已離線)</span>}</span>
                                                         <span className="font-bold text-red-300">{p.cumulatedHarm || 0}</span>
                                                     </li>
                                                 ))}
-                                                {nonHostPlayers.length === 0 && <li className="text-slate-400">尚無玩家數據</li>}
+                                                {players.filter(p => !p.isHost).length === 0 && <li className="text-slate-400">尚無玩家數據</li>}
                                             </ul>
                                         </div>
                                     </div>
@@ -693,26 +754,30 @@
                                     <IconUser /> 參與名單 ({players.length})
                                 </h3>
                                 <div className="overflow-y-auto pr-2 space-y-2 flex-grow">
-                                    {players.map(p => (
-                                        <div key={p.id} className="flex items-center justify-between bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
-                                            <div className="flex items-center gap-2">
-                                                <div className={`w-2 h-2 rounded-full ${gameState.status === 'playing' && votes[p.id] !== undefined ? 'bg-green-400' : 'bg-slate-500'}`}></div>
-                                                <span className={p.id === user?.uid ? 'text-blue-400 font-bold' : 'text-slate-200'}>
-                                                    {p.name} {p.isHost && <span className="text-xs bg-purple-600 px-1 py-0.5 rounded text-white ml-1">主持</span>}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                {isHost && !p.isHost && p.cumulatedHarm !== undefined && (
-                                                    <span className={`text-xs font-bold px-2 py-1 rounded ${p.cumulatedHarm > 0 ? 'text-red-300 bg-red-900/30' : 'text-green-300 bg-green-900/30'}`}>
-                                                        {p.cumulatedHarm > 0 ? `+${p.cumulatedHarm}` : p.cumulatedHarm}
+                                    {players.map(p => {
+                                        const isOffline = p.isOnline === false;
+                                        return (
+                                            <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg border border-slate-700/50 transition ${isOffline ? 'bg-slate-800/30 opacity-50' : 'bg-slate-800/50'}`}>
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`w-2 h-2 rounded-full ${isOffline ? 'bg-slate-600' : (gameState.status === 'playing' && votes[p.id] !== undefined ? 'bg-green-400' : 'bg-blue-400')}`}></div>
+                                                    <span className={p.id === user?.uid ? 'text-blue-400 font-bold' : (isOffline ? 'text-slate-400 line-through' : 'text-slate-200')}>
+                                                        {p.name} {p.isHost && <span className="text-xs bg-purple-600 px-1 py-0.5 rounded text-white ml-1">主持</span>}
+                                                        {isOffline && <span className="text-xs text-slate-400 ml-1">(離線)</span>}
                                                     </span>
-                                                )}
-                                                {gameState.status === 'playing' && votes[p.id] !== undefined && !p.isHost && (
-                                                    <span className="text-xs text-green-400 bg-green-900/30 px-2 py-1 rounded">已投票</span>
-                                                )}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {isHost && !p.isHost && p.cumulatedHarm !== undefined && (
+                                                        <span className={`text-xs font-bold px-2 py-1 rounded ${p.cumulatedHarm > 0 ? 'text-red-300 bg-red-900/30' : 'text-green-300 bg-green-900/30'}`}>
+                                                            {p.cumulatedHarm > 0 ? `+${p.cumulatedHarm}` : p.cumulatedHarm}
+                                                        </span>
+                                                    )}
+                                                    {gameState.status === 'playing' && votes[p.id] !== undefined && !p.isHost && !isOffline && (
+                                                        <span className="text-xs text-green-400 bg-green-900/30 px-2 py-1 rounded">已投票</span>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                     {players.length === 0 && <div className="text-slate-500 text-center mt-4">尚無人加入</div>}
                                 </div>
                             </div>
