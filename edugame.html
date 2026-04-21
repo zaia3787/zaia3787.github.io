@@ -126,7 +126,7 @@
                     { id: 2, text: "檢舉罵人的玩家，並退出房間", harm: -15, label: "善用機制" },
                     { id: 3, text: "私訊安慰小安「只是遊戲，別太在意」", harm: -20, label: "給予支持" }
                 ],
-                knowledge: "【核心知識：公然侮辱罪】許多人以為在遊戲裡使用虛擬ID罵人不會有事。事實上，只要在「多數人可見」的公開頻道用貶損人格的字眼罵人，同樣會觸犯刑法『公然侮辱罪』。遊戲勝負是一時的，但網路上的謾罵會留下永久紀錄。"
+                knowledge: "【核心知識：公然侮辱罪】許多人以為在遊戲裡使用虛擬ID罵人不會有事。事實上，只要在「多數人可見」的公開頻道用貶損人格的字眼罵人，同樣會觸犯刑法『公然侮辱罪』。遊戲勝負是一時的，隨意辱罵隊友會留下永久紀錄並可能觸法。"
             },
             {
                 title: "第七關：假帳號的惡意",
@@ -174,11 +174,22 @@
             }
         ];
 
+        // --- Random Nickname Generator Data ---
+        const ADJECTIVES = ["快樂的", "悲傷的", "憤怒的", "開心的", "聰明的", "笨笨的", "勇敢的", "膽小的", "神秘的", "普通的", "傳說中的", "迷路的", "睡不飽的", "愛吃的", "隱形的", "暴走的", "佛系的", "邊緣的", "潛水的", "熱血的", "腹黑的", "天真的", "機智的", "傲嬌的", "呆萌的", "中二的", "路過的", "認真的", "偷懶的", "瘋狂的", "安靜的", "吵鬧的", "害羞的", "熱情的", "冷酷的", "善良的", "邪惡的", "幸運的", "倒楣的", "閃亮的"];
+        const NOUNS = ["水豚", "企鵝", "海豹", "貓咪", "狗狗", "恐龍", "外星人", "勇者", "魔法師", "村民", "史萊姆", "精靈", "騎士", "鍵盤俠", "鄉民", "群眾", "大佬", "萌新", "班長", "學霸", "學渣", "魯蛇", "溫拿", "幽靈", "忍者", "機器人", "柴犬", "橘貓", "鴿子", "烏鴉", "狐狸", "熊貓", "樹懶", "倉鼠", "兔兔", "刺蝟", "鯊魚", "章魚", "水母", "海鷗"];
+
+        const generateRandomName = () => {
+            const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+            const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+            return `${adj}${noun}`;
+        };
+
         // --- Icons ---
         const IconUser = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>;
         const IconShield = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>;
         const IconAlert = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>;
         const IconTrash = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>;
+        const IconRefresh = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>;
 
         // Victim Character Illustrations
         const VICTIM_EMOJIS = { happy: "😊", worried: "😟", sad: "😭", traumatized: "😱" };
@@ -208,7 +219,7 @@
             const [votes, setVotes] = useState({}); // uid -> choice
 
             // Local UI States
-            const [inputName, setInputName] = useState('');
+            const [inputName, setInputName] = useState(() => generateRandomName());
             const [isHostCheckbox, setIsHostCheckbox] = useState(false);
             const [hostPassword, setHostPassword] = useState('');
             const [myVote, setMyVote] = useState(null);
@@ -332,7 +343,7 @@
             // Actions
             const handleJoin = async (e) => {
                 e.preventDefault();
-                if (!inputName.trim()) return setErrorMsg("請輸入暱稱");
+                if (!inputName.trim()) return setErrorMsg("請重新抽取暱稱");
                 if (isHostCheckbox && hostPassword !== "19950110") return setErrorMsg("主持人密碼錯誤！");
                 if (!user) return setErrorMsg("系統連線中，請稍候...");
                 
@@ -489,28 +500,41 @@
                             </div>
                             <form onSubmit={handleJoin} className="space-y-6">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-2">請輸入您的暱稱</label>
-                                    <input 
-                                        type="text" 
-                                        value={inputName}
-                                        onChange={(e)=>setInputName(e.target.value)}
-                                        className="w-full px-4 py-3 bg-slate-800/50 border border-slate-600 rounded-lg focus:outline-none focus:border-blue-400 text-white placeholder-slate-500"
-                                        placeholder="例如：小明…別亂取名我會下去看。"
-                                        maxLength="10"
-                                    />
+                                    <label className="block text-sm font-medium text-slate-300 mb-2">您的遊戲暱稱</label>
+                                    <div className="flex gap-3">
+                                        <div className="flex-grow px-4 py-3 bg-slate-800 border border-slate-600 rounded-lg text-white font-bold text-center text-lg tracking-wider flex items-center justify-center shadow-inner">
+                                            {inputName}
+                                        </div>
+                                        {!isHostCheckbox && (
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setInputName(generateRandomName())}
+                                                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-blue-300 border border-slate-600 rounded-lg transition flex items-center justify-center gap-1 font-medium whitespace-nowrap"
+                                            >
+                                                <IconRefresh />
+                                                重抽
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="flex items-center">
+                                <div className="flex items-center pt-2">
                                     <input 
                                         type="checkbox" 
                                         id="isHost"
                                         checked={isHostCheckbox}
                                         onChange={(e)=>{
-                                            setIsHostCheckbox(e.target.checked);
-                                            if(!e.target.checked) setHostPassword('');
+                                            const checked = e.target.checked;
+                                            setIsHostCheckbox(checked);
+                                            if(!checked) {
+                                                setHostPassword('');
+                                                setInputName(generateRandomName()); // 取消勾選時重新產生隨機名稱
+                                            } else {
+                                                setInputName('主持人'); // 勾選時強制變為主持人
+                                            }
                                         }}
                                         className="w-4 h-4 text-blue-500 rounded border-slate-600 bg-slate-800 focus:ring-blue-500 focus:ring-offset-slate-900"
                                     />
-                                    <label htmlFor="isHost" className="ml-2 text-sm text-slate-400">我是老師/主持人</label>
+                                    <label htmlFor="isHost" className="ml-2 text-sm text-slate-400 cursor-pointer">我是老師/主持人</label>
                                 </div>
                                 {isHostCheckbox && (
                                     <div className="fade-in">
@@ -525,7 +549,7 @@
                                     </div>
                                 )}
                                 {errorMsg && <p className="text-red-400 text-sm">{errorMsg}</p>}
-                                <button type="submit" className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-lg font-bold shadow-lg transform transition hover:-translate-y-0.5">
+                                <button type="submit" className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-lg font-bold shadow-lg transform transition hover:-translate-y-0.5 mt-2">
                                     進入教室
                                 </button>
                             </form>
@@ -545,7 +569,7 @@
                             <div className="flex items-center gap-3">
                                 <div className="bg-slate-800 p-2 rounded-full"><IconUser /></div>
                                 <div>
-                                    <h2 className="font-bold text-lg">{localProfile.name} {isHost && <span className="text-xs bg-purple-600 px-2 py-1 rounded text-white ml-2">主持人</span>}</h2>
+                                    <h2 className="font-bold text-lg">{localProfile.name} {isHost && <span className="text-xs bg-purple-600 px-2 py-1 rounded text-white ml-2">權限已驗證</span>}</h2>
                                     <p className="text-sm text-slate-400">在線學生：{onlineNonHostPlayers.length} 人</p>
                                 </div>
                             </div>
