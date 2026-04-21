@@ -90,7 +90,7 @@
                 options: [
                     { id: 0, text: "跟著大家一起在群組裡嘲笑他", harm: 20, label: "參與霸凌" },
                     { id: 1, text: "截圖對話紀錄傳給小智看", harm: 10, label: "引發衝突" },
-                    { id: 2, text: "主動把小智拉進這個群組", harm: -10, label: "打破排擠" },
+                    { id: 2, text: "主推把小智拉進這個群組", harm: -10, label: "打破排擠" },
                     { id: 3, text: "在群組發言：「這樣排擠別人不太好吧？」", harm: -20, label: "勇敢發聲" }
                 ],
                 knowledge: "【核心知識：關係型霸凌】故意排擠、孤立他人，或建立排他性的群組，屬於『關係型霸凌』。這種心理傷害往往比肢體衝突更深。截圖傳給受害者(選項2)雖然可能出於好意，但往往會對受害者造成直接且巨大的心理衝擊。最勇敢的做法是打破沉默，或直接邀請被排擠者加入。"
@@ -341,10 +341,18 @@
             }, [user, localProfile]);
 
             // Actions
+            const checkHostPassword = (input) => {
+                // 簡單的字串混淆函數 (將輸入轉換，避免明文寫在程式碼中)
+                // 轉換規則：將每個字元的 ASCII 碼平移，轉為 16 進位字串
+                if (!input) return false;
+                const encoded = Array.from(input).map(c => (c.charCodeAt(0) + 13).toString(16)).join('');
+                return encoded === "3e4646423d3e3e3d"; // "19950110" 混淆後的值
+            };
+
             const handleJoin = async (e) => {
                 e.preventDefault();
                 if (!inputName.trim()) return setErrorMsg("請重新抽取暱稱");
-                if (isHostCheckbox && hostPassword !== "19950110") return setErrorMsg("主持人密碼錯誤！");
+                if (isHostCheckbox && !checkHostPassword(hostPassword)) return setErrorMsg("主持人密碼錯誤！");
                 if (!user) return setErrorMsg("系統連線中，請稍候...");
                 
                 try {
