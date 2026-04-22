@@ -57,7 +57,7 @@
     </script>
 
     <script type="text/babel" data-type="module">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useRef } = React;
         const { auth, db, gameDocRef, playersColRef, votesColRef, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setDoc, doc, onSnapshot, getDocs, writeBatch, deleteDoc, updateDoc, getDoc } = window.firebaseAPI;
 
         // --- Game Content Data ---
@@ -176,7 +176,7 @@
 
         // --- Random Nickname Generator Data ---
         const ADJECTIVES = ["快樂的", "悲傷的", "憤怒的", "開心的", "聰明的", "笨笨的", "勇敢的", "膽小的", "神秘的", "普通的", "傳說中的", "迷路的", "睡不飽的", "愛吃的", "隱形的", "暴走的", "佛系的", "邊緣的", "潛水的", "熱血的", "腹黑的", "天真的", "機智的", "傲嬌的", "呆萌的", "中二的", "路過的", "認真的", "偷懶的", "瘋狂的", "安靜的", "吵鬧的", "害羞的", "熱情的", "冷酷的", "善良的", "邪惡的", "幸運的", "倒楣的", "閃亮的"];
-        const NOUNS = ["水豚", "企鵝", "海豹", "貓咪", "狗狗", "恐龍", "外星人", "勇者", "魔法師", "村民", "史萊姆", "精靈", "騎士", "鍵盤俠", "鄉民", "群眾", "大佬", "萌新", "班長", "學霸", "學長", "學姊", "溫拿", "幽靈", "忍者", "機器人", "柴犬", "橘貓", "鴿子", "烏鴉", "狐狸", "熊貓", "樹懶", "倉鼠", "兔兔", "刺蝟", "鯊魚", "章魚", "水母", "海鷗"];
+        const NOUNS = ["水豚", "企鵝", "海豹", "貓咪", "狗狗", "恐龍", "外星人", "勇者", "魔法師", "村民", "史萊姆", "精靈", "騎士", "鍵盤俠", "鄉民", "群眾", "大佬", "萌新", "班長", "學霸", "學渣", "魯蛇", "溫拿", "幽靈", "忍者", "機器人", "柴犬", "橘貓", "鴿子", "烏鴉", "狐狸", "熊貓", "樹懶", "倉鼠", "兔兔", "刺蝟", "鯊魚", "章魚", "水母", "海鷗"];
 
         const generateRandomName = () => {
             const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
@@ -212,6 +212,7 @@
         const App = () => {
             const [user, setUser] = useState(null);
             const [localProfile, setLocalProfile] = useState(null); // { name, isHost }
+            const offlineTimeoutRef = useRef(null); // 新增：用於追蹤離線倒數計時器
             
             // Firebase States
             const [gameState, setGameState] = useState({ status: 'waiting', currentScenario: 0, totalHarm: 50 });
@@ -317,15 +318,28 @@
                 const handleVisibilityChange = () => {
                     if (!user || !localProfile) return;
                     if (document.visibilityState === 'hidden') {
-                        updateDoc(doc(playersColRef, user.uid), { isOnline: false }).catch(() => {});
+                        // 延遲 10 分鐘 (600,000 毫秒) 才判定為離線
+                        offlineTimeoutRef.current = setTimeout(() => {
+                            updateDoc(doc(playersColRef, user.uid), { isOnline: false }).catch(() => {});
+                        }, 600000);
                     } else if (document.visibilityState === 'visible') {
+                        // 若在 10 分鐘內回到畫面，清除倒數計時並維持上線狀態
+                        if (offlineTimeoutRef.current) {
+                            clearTimeout(offlineTimeoutRef.current);
+                            offlineTimeoutRef.current = null;
+                        }
                         updateDoc(doc(playersColRef, user.uid), { isOnline: true }).catch(() => {});
                     }
                 };
 
                 const handlePageHide = () => {
                     if (user && localProfile) {
-                        updateDoc(doc(playersColRef, user.uid), { isOnline: false }).catch(() => {});
+                        // 手機瀏覽器切換 APP 有時會觸發 pagehide，同樣給予 10 分鐘緩衝
+                        if (!offlineTimeoutRef.current) {
+                            offlineTimeoutRef.current = setTimeout(() => {
+                                updateDoc(doc(playersColRef, user.uid), { isOnline: false }).catch(() => {});
+                            }, 600000);
+                        }
                     }
                 };
 
@@ -337,6 +351,9 @@
                     window.removeEventListener('beforeunload', handleBeforeUnload);
                     window.removeEventListener('visibilitychange', handleVisibilityChange);
                     window.removeEventListener('pagehide', handlePageHide);
+                    if (offlineTimeoutRef.current) {
+                        clearTimeout(offlineTimeoutRef.current);
+                    }
                 };
             }, [user, localProfile]);
 
@@ -346,7 +363,7 @@
                 // 轉換規則：將每個字元的 ASCII 碼平移，轉為 16 進位字串
                 if (!input) return false;
                 const encoded = Array.from(input).map(c => (c.charCodeAt(0) + 13).toString(16)).join('');
-                return encoded === "3e4646423d3e3e3d";
+                return encoded === "3e4646423d3e3e3d"; // "19950110" 混淆後的值
             };
 
             const handleJoin = async (e) => {
