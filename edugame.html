@@ -348,13 +348,18 @@
                 };
             }, [user, localProfile]);
 
-            // 👑 決定誰是目前的榮耀守護者 (第四關/Index 3 開始)
-            // 條件：在線、非主持人、累積傷害最低（且至少為唯一排序第一的）
+            // 👑 決定誰是目前的榮耀守護者 (僅限第四關 Index 3、第八關 Index 7)
+            // 條件：在線、非主持人、累積傷害最低（且保證穩定選出唯一一人）
             const currentKing = useMemo(() => {
-                if (gameState.currentScenario < 3) return null;
+                if (gameState.currentScenario !== 3 && gameState.currentScenario !== 7) return null;
+                
                 const sortedPlayers = [...players].filter(p => !p.isHost && p.isOnline !== false).sort((a, b) => {
+                    // 1. 比較累積傷害
                     if (a.cumulatedHarm !== b.cumulatedHarm) return (a.cumulatedHarm || 0) - (b.cumulatedHarm || 0);
-                    return (a.joinedAt || '').localeCompare(b.joinedAt || ''); // 同分的話比加入時間
+                    // 2. 比較加入時間
+                    if (a.joinedAt !== b.joinedAt) return (a.joinedAt || '').localeCompare(b.joinedAt || ''); 
+                    // 3. 絕對防呆，確保就算以上皆同，也會選出固定的一人
+                    return a.id.localeCompare(b.id); 
                 });
                 return sortedPlayers.length > 0 ? sortedPlayers[0] : null;
             }, [players, gameState.currentScenario]);
