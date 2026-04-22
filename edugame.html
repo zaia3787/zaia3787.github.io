@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>風向大作戰：鍵盤背後的真相</title>
+    <title>微縮網路環境：鍵盤底下的那幾種人</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -359,11 +359,9 @@
 
             // Actions
             const checkHostPassword = (input) => {
-                // 簡單的字串混淆函數 (將輸入轉換，避免明文寫在程式碼中)
-                // 轉換規則：將每個字元的 ASCII 碼平移，轉為 16 進位字串
                 if (!input) return false;
                 const encoded = Array.from(input).map(c => (c.charCodeAt(0) + 13).toString(16)).join('');
-                return encoded === "3e4646423d3e3e3d"; // "19950110" 混淆後的值
+                return encoded === "3e4646423d3e3e3d";
             };
 
             const handleJoin = async (e) => {
@@ -499,8 +497,8 @@
             };
 
             const getHarmStatusText = (val) => {
-                if (val < 30) return '班級風氣良好，大家能互相尊重。';
-                if (val < 70) return '出現危機，部分行為正在造成傷害。';
+                if (val < 30) return '人性算是本善的！班級風氣良好，大家能互相尊重。';
+                if (val < 70) return '哇！人性本惡！好人請明則保身…';
                 return '嚴重網路霸凌發生！受害者受到極大創傷。';
             };
 
@@ -632,7 +630,7 @@
                                     <div className="absolute -right-4 -bottom-4 text-[12rem] opacity-5 pointer-events-none select-none">⏳</div>
                                     <IconShield className="w-20 h-20 text-slate-500 mb-6 relative z-10" />
                                     <h2 className="text-3xl font-bold mb-4 relative z-10">等待主持人開始遊戲...</h2>
-                                    <p className="text-slate-400 mb-8 max-w-lg relative z-10">這是一個全班共同參與的生存遊戲。你們的每一次選擇，都會影響「受害者」的心理創傷指數。請謹慎選擇，將傷害降到最低！</p>
+                                    <p className="text-slate-400 mb-8 max-w-lg relative z-10">這是一個全班共同參與的生存遊戲。你們身處在一個匿名可以隨意發言的環境，你們的每一次選擇，都會影響「受害者」的心理創傷指數。請謹慎選擇，將傷害降到最低！</p>
                                     
                                     {isHost && (
                                         <button onClick={startGame} className="py-4 px-12 text-xl bg-blue-600 hover:bg-blue-500 text-white rounded-full font-bold shadow-[0_0_20px_rgba(37,99,235,0.4)] transition transform hover:scale-105 relative z-10">
@@ -753,7 +751,7 @@
                                                 <div className="text-[8rem] leading-none">👼</div>
                                             </div>
                                             <h3 className="text-xl font-bold text-green-300 mb-4 flex items-center gap-2 relative z-10">
-                                                <IconShield className="w-6 h-6" /> 鍵盤守護者 (傷害最低)
+                                                <IconShield className="w-6 h-6" /> 網路守護者
                                             </h3>
                                             <ul className="space-y-2 relative z-10 text-left">
                                                 {players.filter(p => !p.isHost).sort((a, b) => (a.cumulatedHarm || 0) - (b.cumulatedHarm || 0)).slice(0, 3).map((p, i) => (
@@ -772,7 +770,7 @@
                                                 <div className="text-[8rem] leading-none">😈</div>
                                             </div>
                                             <h3 className="text-xl font-bold text-red-300 mb-4 flex items-center gap-2 relative z-10">
-                                                <IconAlert className="w-6 h-6" /> 鍵盤酸民 (傷害最高)
+                                                <IconAlert className="w-6 h-6" /> 網路鍵盤俠
                                             </h3>
                                             <ul className="space-y-2 relative z-10 text-left">
                                                 {players.filter(p => !p.isHost).sort((a, b) => (b.cumulatedHarm || 0) - (a.cumulatedHarm || 0)).slice(0, 3).map((p, i) => (
