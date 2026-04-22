@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>風向大作戰：鍵盤背後的真相</title>
+    <title>微縮網路環境：鍵盤底下的那幾種人</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -90,7 +90,7 @@
                 options: [
                     { id: 0, text: "跟著大家一起在群組裡嘲笑他", harm: 20, label: "參與霸凌" },
                     { id: 1, text: "截圖對話紀錄傳給小智看", harm: 10, label: "引發衝突" },
-                    { id: 2, text: "主動把小智拉進這個群組", harm: -10, label: "打破排擠" },
+                    { id: 2, text: "主推把小智拉進這個群組", harm: -10, label: "打破排擠" },
                     { id: 3, text: "在群組發言：「這樣排擠別人不太好吧？」", harm: -20, label: "勇敢發聲" }
                 ],
                 knowledge: "【核心知識：關係型霸凌】故意排擠、孤立他人，或建立排他性的群組，屬於『關係型霸凌』。這種心理傷害往往比肢體衝突更深。截圖傳給受害者(選項2)雖然可能出於好意，但往往會對受害者造成直接且巨大的心理衝擊。最勇敢的做法是打破沉默，或直接邀請被排擠者加入。"
@@ -175,7 +175,7 @@
         ];
 
         // --- Random Nickname Generator Data ---
-        const ADJECTIVES = ["快樂的", "悲傷的", "憤怒的", "開心的", "聰明的", "笨笨的", "勇敢的", "膽小的", "神秘的", "普通的", "傳說中的", "迷路的", "睡不飽的", "愛吃的", "隱形的", "暴走的", "佛系的", "邊緣的", "潛水的", "熱血的", "腹黑的", "天真的", "機智的", "傲嬌的", "呆萌的", "中二的", "路過的", "認定的", "偷懶的", "瘋狂的", "安靜的", "吵鬧的", "害羞的", "熱情的", "冷酷的", "善良的", "邪惡的", "幸運的", "倒楣的", "閃亮的"];
+        const ADJECTIVES = ["快樂的", "悲傷的", "憤怒的", "開心的", "聰明的", "笨笨的", "勇敢的", "膽小的", "神秘的", "普通的", "傳說中的", "迷路的", "睡不飽的", "愛吃的", "隱形的", "暴走的", "佛系的", "邊緣的", "潛水的", "熱血的", "腹黑的", "天真的", "機智的", "傲嬌的", "呆萌的", "中二的", "路過的", "認真的", "偷懶的", "瘋狂的", "安靜的", "吵鬧的", "害羞的", "熱情的", "冷酷的", "善良的", "邪惡的", "幸運的", "倒楣的", "閃亮的"];
         const NOUNS = ["水豚", "企鵝", "海豹", "貓咪", "狗狗", "恐龍", "外星人", "勇者", "魔法師", "村民", "史萊姆", "精靈", "騎士", "鍵盤俠", "鄉民", "群眾", "大佬", "萌新", "班長", "學霸", "學渣", "魯蛇", "溫拿", "幽靈", "忍者", "機器人", "柴犬", "橘貓", "鴿子", "烏鴉", "狐狸", "熊貓", "樹懶", "倉鼠", "兔兔", "刺蝟", "鯊魚", "章魚", "水母", "海鷗"];
 
         const generateRandomName = () => {
@@ -212,10 +212,10 @@
         const App = () => {
             const [user, setUser] = useState(null);
             const [localProfile, setLocalProfile] = useState(null); // { name, isHost }
-            const offlineTimeoutRef = useRef(null); // 用於追蹤離線倒數計時器
+            const offlineTimeoutRef = useRef(null); // 新增：用於追蹤離線倒數計時器
             
             // Firebase States
-            const [gameState, setGameState] = useState({ status: 'waiting', currentScenario: 0, totalHarm: 50, reportedPlayers: [] });
+            const [gameState, setGameState] = useState({ status: 'waiting', currentScenario: 0, totalHarm: 50 });
             const [players, setPlayers] = useState([]);
             const [votes, setVotes] = useState({}); // uid -> choice
 
@@ -225,7 +225,6 @@
             const [hostPassword, setHostPassword] = useState('');
             const [myVote, setMyVote] = useState(null);
             const [errorMsg, setErrorMsg] = useState('');
-            const [selectedTargets, setSelectedTargets] = useState([]); // 榮耀守護者選取的檢舉目標
 
             // 1. Initialize Firebase Auth & 斷線重連機制
             useEffect(() => {
@@ -242,11 +241,13 @@
                 const unsubscribe = onAuthStateChanged(auth, async (u) => {
                     setUser(u);
                     if (u) {
+                        // 檢查是否為曾經登入過的玩家 (資料延續)
                         try {
                             const playerSnap = await getDoc(doc(playersColRef, u.uid));
                             if (playerSnap.exists()) {
                                 const data = playerSnap.data();
                                 setLocalProfile({ name: data.name, isHost: data.isHost });
+                                // 重新連線時，重新標記為上線
                                 updateDoc(doc(playersColRef, u.uid), { isOnline: true }).catch(e=>console.log(e));
                             }
                         } catch (err) {
@@ -261,21 +262,22 @@
             useEffect(() => {
                 if (!user || !localProfile) return;
 
+                // Listen to Game State
                 const unsubGame = onSnapshot(gameDocRef, (docSnap) => {
                     if (docSnap.exists()) {
-                        const data = docSnap.data();
-                        setGameState(data);
-                        if (data.status === 'playing') {
-                            setMyVote(null); 
-                            setSelectedTargets([]); // 換回合時清空檢舉選擇
+                        setGameState(docSnap.data());
+                        if (docSnap.data().status === 'playing') {
+                            setMyVote(null); // Reset vote on new round start
                         }
                     } else {
+                        // Init game state if not exists
                         if (localProfile.isHost) {
-                            setDoc(gameDocRef, { status: 'waiting', currentScenario: 0, totalHarm: 50, reportedPlayers: [] }, { merge: true });
+                            setDoc(gameDocRef, { status: 'waiting', currentScenario: 0, totalHarm: 50 }, { merge: true });
                         }
                     }
                 }, (err) => console.error(err));
 
+                // Listen to Players
                 const unsubPlayers = onSnapshot(playersColRef, (snapshot) => {
                     const pList = [];
                     let meFound = false;
@@ -285,6 +287,7 @@
                     });
                     setPlayers(pList);
 
+                    // 若被清除資料 (在名單找不到自己)，強制踢回首頁
                     if (!meFound) {
                         setLocalProfile(null);
                         setMyVote(null);
@@ -293,6 +296,7 @@
                     }
                 }, (err) => console.error(err));
 
+                // Listen to Votes
                 const unsubVotes = onSnapshot(votesColRef, (snapshot) => {
                     const vMap = {};
                     snapshot.forEach(doc => { vMap[doc.id] = doc.data().choice; });
@@ -302,22 +306,24 @@
                 return () => { unsubGame(); unsubPlayers(); unsubVotes(); };
             }, [user, localProfile]);
 
-            // 3. 防呆與離線偵測
+            // 3. 防呆與離線偵測 (關閉網頁確認 & 狀態切換)
             useEffect(() => {
                 const handleBeforeUnload = (e) => {
                     if (localProfile) {
                         e.preventDefault();
-                        e.returnValue = '遊戲進行中，確定要離開嗎？'; 
+                        e.returnValue = '遊戲進行中，確定要離開嗎？'; // 瀏覽器會跳出預設警告
                     }
                 };
 
                 const handleVisibilityChange = () => {
                     if (!user || !localProfile) return;
                     if (document.visibilityState === 'hidden') {
+                        // 延遲 10 分鐘 (600,000 毫秒) 才判定為離線
                         offlineTimeoutRef.current = setTimeout(() => {
                             updateDoc(doc(playersColRef, user.uid), { isOnline: false }).catch(() => {});
-                        }, 600000); // 10分鐘
+                        }, 600000);
                     } else if (document.visibilityState === 'visible') {
+                        // 若在 10 分鐘內回到畫面，清除倒數計時並維持上線狀態
                         if (offlineTimeoutRef.current) {
                             clearTimeout(offlineTimeoutRef.current);
                             offlineTimeoutRef.current = null;
@@ -328,6 +334,7 @@
 
                 const handlePageHide = () => {
                     if (user && localProfile) {
+                        // 手機瀏覽器切換 APP 有時會觸發 pagehide，同樣給予 10 分鐘緩衝
                         if (!offlineTimeoutRef.current) {
                             offlineTimeoutRef.current = setTimeout(() => {
                                 updateDoc(doc(playersColRef, user.uid), { isOnline: false }).catch(() => {});
@@ -344,34 +351,17 @@
                     window.removeEventListener('beforeunload', handleBeforeUnload);
                     window.removeEventListener('visibilitychange', handleVisibilityChange);
                     window.removeEventListener('pagehide', handlePageHide);
-                    if (offlineTimeoutRef.current) clearTimeout(offlineTimeoutRef.current);
+                    if (offlineTimeoutRef.current) {
+                        clearTimeout(offlineTimeoutRef.current);
+                    }
                 };
             }, [user, localProfile]);
-
-            // 👑 決定誰是目前的榮耀守護者 (僅限第四關 Index 3、第八關 Index 7)
-            // 條件：在線、非主持人、累積傷害最低（且保證穩定選出唯一一人）
-            const currentKing = useMemo(() => {
-                if (gameState.currentScenario !== 3 && gameState.currentScenario !== 7) return null;
-                
-                const sortedPlayers = [...players].filter(p => !p.isHost && p.isOnline !== false).sort((a, b) => {
-                    // 1. 比較累積傷害
-                    if (a.cumulatedHarm !== b.cumulatedHarm) return (a.cumulatedHarm || 0) - (b.cumulatedHarm || 0);
-                    // 2. 比較加入時間
-                    if (a.joinedAt !== b.joinedAt) return (a.joinedAt || '').localeCompare(b.joinedAt || ''); 
-                    // 3. 絕對防呆，確保就算以上皆同，也會選出固定的一人
-                    return a.id.localeCompare(b.id); 
-                });
-                return sortedPlayers.length > 0 ? sortedPlayers[0] : null;
-            }, [players, gameState.currentScenario]);
-
-            const iAmKing = currentKing && currentKing.id === user?.uid;
-            const amIReported = (gameState.reportedPlayers || []).includes(user?.uid);
 
             // Actions
             const checkHostPassword = (input) => {
                 if (!input) return false;
                 const encoded = Array.from(input).map(c => (c.charCodeAt(0) + 13).toString(16)).join('');
-                return encoded === "3e4646423d3e3e3d"; 
+                return encoded === "3e4646423d3e3e3d";
             };
 
             const handleJoin = async (e) => {
@@ -381,6 +371,7 @@
                 if (!user) return setErrorMsg("系統連線中，請稍候...");
                 
                 try {
+                    // 中途加入防呆檢查：遊戲是否已經開始
                     const gameSnap = await getDoc(gameDocRef);
                     if (gameSnap.exists()) {
                         const gameStatus = gameSnap.data().status;
@@ -394,7 +385,7 @@
                         isHost: isHostCheckbox,
                         joinedAt: new Date().toISOString(),
                         cumulatedHarm: 0,
-                        isOnline: true
+                        isOnline: true // 預設上線
                     });
                     setLocalProfile({ name: inputName.trim(), isHost: isHostCheckbox });
                     setErrorMsg('');
@@ -411,31 +402,13 @@
                 votesSnap.forEach(d => batch.delete(d.ref));
                 await batch.commit();
 
-                await setDoc(gameDocRef, { status: 'playing', currentScenario: 0, totalHarm: 50, reportedPlayers: [] });
+                await setDoc(gameDocRef, { status: 'playing', currentScenario: 0, totalHarm: 50 });
             };
 
             const submitVote = async (choiceId) => {
                 if (gameState.status !== 'playing' || myVote !== null) return;
-                if (amIReported) return; // 被檢舉者無法投票
                 setMyVote(choiceId);
                 await setDoc(doc(votesColRef, user.uid), { choice: choiceId, scenario: gameState.currentScenario });
-            };
-
-            const handleSubmitReport = async () => {
-                if (!iAmKing || selectedTargets.length === 0) return;
-                const newReported = [...new Set([...(gameState.reportedPlayers || []), ...selectedTargets])];
-                
-                // 1. 更新遊戲狀態（加入黑名單）
-                await setDoc(gameDocRef, { reportedPlayers: newReported }, { merge: true });
-                
-                // 2. 如果這些酸民已經偷投票了，強制刪除他們的票！
-                const batch = writeBatch(db);
-                selectedTargets.forEach(uid => {
-                    batch.delete(doc(votesColRef, uid));
-                });
-                await batch.commit();
-                
-                setSelectedTargets([]); // 執行完畢清空選擇
             };
 
             const showResults = async () => {
@@ -462,9 +435,8 @@
                 });
                 await batch.commit();
                 
-                // 計算平均傷害時，扣除主持人與被禁言的人
-                const eligiblePlayers = players.filter(p => !p.isHost && p.isOnline !== false && !(gameState.reportedPlayers || []).includes(p.id));
-                const onlineNonHostCountForCalc = Math.max(1, eligiblePlayers.length);
+                // 計算平均傷害時，只計算「在線」的非主持人人數
+                const onlineNonHostCountForCalc = Math.max(1, players.filter(p => !p.isHost && p.isOnline !== false).length);
                 const adjustedHarm = Math.round(netHarm / onlineNonHostCountForCalc) * 1.5; 
 
                 let newTotalHarm = gameState.totalHarm + adjustedHarm;
@@ -491,24 +463,30 @@
 
                     await setDoc(gameDocRef, { 
                         status: 'playing', 
-                        currentScenario: gameState.currentScenario + 1,
-                        reportedPlayers: [] // 換關卡時重置檢舉名單
+                        currentScenario: gameState.currentScenario + 1 
                     }, { merge: true });
                 }
             };
 
+            // 全新功能：強制清除所有資料，把全班踢回首頁
             const hardResetGame = async () => {
                 if (!localProfile?.isHost) return;
                 if (!window.confirm("⚠️ 警告：這將會清除所有資料，並強制將全班踢回登入首頁。確定要執行嗎？")) return;
                 
                 const batch = writeBatch(db);
+                
+                // 1. 清除所有投票
                 const votesSnap = await getDocs(votesColRef);
                 votesSnap.forEach(d => batch.delete(d.ref));
+                
+                // 2. 清除所有玩家 (這會觸發客戶端 listener 把大家踢回首頁)
                 const playersSnap = await getDocs(playersColRef);
                 playersSnap.forEach(d => batch.delete(d.ref));
+                
                 await batch.commit();
                 
-                await setDoc(gameDocRef, { status: 'waiting', currentScenario: 0, totalHarm: 50, reportedPlayers: [] });
+                // 3. 遊戲狀態回歸原點
+                await setDoc(gameDocRef, { status: 'waiting', currentScenario: 0, totalHarm: 50 });
             };
 
             // 輔助函式與變數
@@ -519,17 +497,16 @@
             };
 
             const getHarmStatusText = (val) => {
-                if (val < 30) return '班級風氣良好，大家能互相尊重。';
-                if (val < 70) return '出現危機，部分行為正在造成傷害。';
+                if (val < 30) return '人性算是本善的！班級風氣良好，大家能互相尊重。';
+                if (val < 70) return '哇！人性本惡！好人請明則保身…';
                 return '嚴重網路霸凌發生！受害者受到極大創傷。';
             };
 
-            // 統計人數時扣除主持人，並排除已離線的玩家
+            // 統計人數時扣除主持人，且只計算「在線」的玩家
             const onlineNonHostPlayers = players.filter(p => !p.isHost && p.isOnline !== false);
-            const expectedVotersCount = onlineNonHostPlayers.filter(p => !(gameState.reportedPlayers || []).includes(p.id)).length;
             const nonHostVotesCount = Object.keys(votes).filter(uid => {
                 const p = players.find(x => x.id === uid);
-                return p && !p.isHost && p.isOnline !== false && !(gameState.reportedPlayers || []).includes(uid);
+                return p && !p.isHost && p.isOnline !== false;
             }).length;
 
             // ---- UI SCREENS ----
@@ -541,8 +518,8 @@
                         <div className="glass-panel p-8 rounded-2xl w-full max-w-md relative z-10 fade-in">
                             <div className="text-center mb-8">
                                 <IconShield className="w-16 h-16 mx-auto text-blue-400 mb-4" />
-                                <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">風向大作戰</h1>
-                                <p className="text-slate-300 mt-2">鍵盤背後的真相</p>
+                                <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">微縮網路環境</h1>
+                                <p className="text-slate-300 mt-2">鍵盤底下的那幾種人</p>
                             </div>
                             <form onSubmit={handleJoin} className="space-y-6">
                                 <div>
@@ -573,9 +550,9 @@
                                             setIsHostCheckbox(checked);
                                             if(!checked) {
                                                 setHostPassword('');
-                                                setInputName(generateRandomName());
+                                                setInputName(generateRandomName()); // 取消勾選時重新產生隨機名稱
                                             } else {
-                                                setInputName('主持人');
+                                                setInputName('主持人'); // 勾選時強制變為主持人
                                             }
                                         }}
                                         className="w-4 h-4 text-blue-500 rounded border-slate-600 bg-slate-800 focus:ring-blue-500 focus:ring-offset-slate-900"
@@ -613,23 +590,17 @@
                     <div className="glass-panel rounded-xl p-4 md:p-6 mb-6 flex flex-col md:flex-row items-center justify-between gap-4 z-10">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between w-full md:w-auto gap-4">
                             <div className="flex items-center gap-3">
-                                <div className="bg-slate-800 p-2 rounded-full flex-shrink-0">
-                                    {iAmKing ? <span className="text-xl leading-none px-1">👑</span> : <IconUser />}
-                                </div>
+                                <div className="bg-slate-800 p-2 rounded-full"><IconUser /></div>
                                 <div>
-                                    <h2 className="font-bold text-lg flex items-center flex-wrap gap-2">
-                                        <span className={iAmKing ? "text-yellow-400" : ""}>{localProfile.name}</span>
-                                        {isHost && <span className="text-xs bg-purple-600 px-2 py-1 rounded text-white whitespace-nowrap">權限已驗證</span>}
-                                        {iAmKing && <span className="text-xs bg-yellow-600 px-2 py-1 rounded text-white whitespace-nowrap animate-pulse">榮耀守護者</span>}
-                                    </h2>
+                                    <h2 className="font-bold text-lg">{localProfile.name} {isHost && <span className="text-xs bg-purple-600 px-2 py-1 rounded text-white ml-2">權限已驗證</span>}</h2>
                                     <p className="text-sm text-slate-400">在線學生：{onlineNonHostPlayers.length} 人</p>
                                 </div>
                             </div>
                             
                             {/* 主持人專屬：強制重置按鈕 */}
                             {isHost && (
-                                <button onClick={hardResetGame} className="flex items-center gap-1 text-sm bg-red-900/50 hover:bg-red-600 text-red-200 border border-red-700/50 py-2 px-3 rounded-lg transition shadow-sm whitespace-nowrap">
-                                    <IconTrash /> 清除資料
+                                <button onClick={hardResetGame} className="flex items-center gap-1 text-sm bg-red-900/50 hover:bg-red-600 text-red-200 border border-red-700/50 py-2 px-3 rounded-lg transition shadow-sm">
+                                    <IconTrash /> 清除資料(全班回首頁)
                                 </button>
                             )}
                         </div>
@@ -659,7 +630,7 @@
                                     <div className="absolute -right-4 -bottom-4 text-[12rem] opacity-5 pointer-events-none select-none">⏳</div>
                                     <IconShield className="w-20 h-20 text-slate-500 mb-6 relative z-10" />
                                     <h2 className="text-3xl font-bold mb-4 relative z-10">等待主持人開始遊戲...</h2>
-                                    <p className="text-slate-400 mb-8 max-w-lg relative z-10">這是一個全班共同參與的生存遊戲。你們的每一次選擇，都會影響「受害者」的心理創傷指數。請謹慎選擇，將傷害降到最低！</p>
+                                    <p className="text-slate-400 mb-8 max-w-lg relative z-10">這是一個全班共同參與的生存遊戲。你們身處在一個匿名可以隨意發言的環境，你們的每一次選擇，都會影響「受害者」的心理創傷指數。請謹慎選擇，將傷害降到最低！</p>
                                     
                                     {isHost && (
                                         <button onClick={startGame} className="py-4 px-12 text-xl bg-blue-600 hover:bg-blue-500 text-white rounded-full font-bold shadow-[0_0_20px_rgba(37,99,235,0.4)] transition transform hover:scale-105 relative z-10">
@@ -671,104 +642,44 @@
 
                             {/* State: Playing (Voting Phase) */}
                             {gameState.status === 'playing' && currentScenarioData && (
-                                <div className="glass-panel rounded-2xl p-6 md:p-8 flex-grow flex flex-col fade-in border-t-4 border-blue-500 relative overflow-hidden">
-                                    
-                                    {/* --- 判斷是否為被檢舉禁言者 --- */}
-                                    {amIReported ? (
-                                        <div className="flex-grow flex flex-col items-center justify-center fade-in z-20">
-                                            <div className="absolute inset-0 bg-red-900/40 border-4 border-red-600 rounded-xl pointer-events-none animate-pulse"></div>
-                                            <div className="text-[6rem] mb-2 leading-none relative z-10 drop-shadow-[0_0_20px_rgba(220,38,38,0.8)]">🚫</div>
-                                            <h2 className="text-3xl md:text-5xl font-black text-red-500 mb-4 text-center tracking-widest relative z-10 drop-shadow-lg">你被檢舉了！</h2>
-                                            <p className="text-2xl text-red-200 text-center font-bold relative z-10 bg-red-900/60 px-6 py-2 rounded-full border border-red-500">這回合禁止發言</p>
-                                            <p className="text-slate-300 mt-8 text-center text-lg max-w-md relative z-10">
-                                                因為你之前的選擇造成了過多的傷害，這回合被「榮耀守護者」剝奪了發言權。請在場邊好好反省。
-                                            </p>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            {/* 👑 榮耀守護者專屬檢舉面板 */}
-                                            {iAmKing && (
-                                                <div className="bg-yellow-900/30 border-2 border-yellow-500 rounded-xl p-5 mb-6 fade-in shadow-[0_0_20px_rgba(234,179,8,0.2)]">
-                                                    <h3 className="text-xl font-bold text-yellow-400 mb-2 flex items-center gap-2">
-                                                        👑 榮耀守護者特權
-                                                    </h3>
-                                                    <p className="text-sm text-yellow-200 mb-4 leading-relaxed">
-                                                        你是目前表現最好的守護者！你可以選擇最多 3 名累積傷害為正分的「酸民」，按下確認檢舉後，他們這回合將被禁言（無法投票）。
-                                                    </p>
-                                                    <div className="flex flex-wrap gap-2 mb-4">
-                                                        {players.filter(p => !p.isHost && (p.cumulatedHarm || 0) > 0 && p.isOnline !== false && !(gameState.reportedPlayers || []).includes(p.id)).map(p => (
-                                                            <button
-                                                                key={p.id}
-                                                                onClick={() => {
-                                                                    if (selectedTargets.includes(p.id)) {
-                                                                        setSelectedTargets(prev => prev.filter(id => id !== p.id));
-                                                                    } else if (selectedTargets.length < 3) {
-                                                                        setSelectedTargets(prev => [...prev, p.id]);
-                                                                    }
-                                                                }}
-                                                                className={`px-4 py-2 rounded-full border transition-all duration-200 ${selectedTargets.includes(p.id) ? 'bg-yellow-500 text-yellow-900 border-yellow-500 font-bold shadow-md transform scale-105' : 'bg-slate-800/80 text-slate-300 border-slate-600 hover:border-yellow-500 hover:text-yellow-400'}`}
-                                                            >
-                                                                {p.name} (傷害: +{p.cumulatedHarm})
-                                                            </button>
-                                                        ))}
-                                                        {players.filter(p => !p.isHost && (p.cumulatedHarm || 0) > 0 && p.isOnline !== false && !(gameState.reportedPlayers || []).includes(p.id)).length === 0 && (
-                                                            <span className="text-slate-400 text-sm bg-slate-800/50 px-4 py-2 rounded-full">目前沒有可以檢舉的對象，大家都表現得很好！</span>
-                                                        )}
-                                                    </div>
-                                                    {selectedTargets.length > 0 && (
-                                                        <button 
-                                                            onClick={handleSubmitReport} 
-                                                            className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold py-2 px-8 rounded-lg transition-all shadow-lg transform hover:-translate-y-0.5 border border-red-400"
-                                                        >
-                                                            確認檢舉 ({selectedTargets.length}/3)
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )}
+                                <div className="glass-panel rounded-2xl p-6 md:p-8 flex-grow flex flex-col fade-in border-t-4 border-blue-500">
+                                    <div className="mb-6">
+                                        <span className="text-blue-400 font-bold tracking-wider text-sm">{currentScenarioData.title}</span>
+                                        <h2 className="text-2xl md:text-3xl font-bold mt-2 leading-tight">{currentScenarioData.description}</h2>
+                                    </div>
 
-                                            <div className="mb-6 relative z-10">
-                                                <span className="text-blue-400 font-bold tracking-wider text-sm">{currentScenarioData.title}</span>
-                                                <h2 className="text-2xl md:text-3xl font-bold mt-2 leading-tight">{currentScenarioData.description}</h2>
-                                            </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 flex-grow">
+                                        {currentScenarioData.options.map((opt) => {
+                                            const isSelected = myVote === opt.id;
+                                            return (
+                                                <button 
+                                                    key={opt.id}
+                                                    onClick={() => submitVote(opt.id)}
+                                                    disabled={myVote !== null || isHost}
+                                                    className={`p-4 md:p-6 rounded-xl text-left border-2 transition-all duration-300 flex flex-col justify-between
+                                                        ${isHost ? 'opacity-50 cursor-not-allowed bg-slate-800 border-slate-700' : 
+                                                          isSelected ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : 
+                                                          myVote !== null ? 'opacity-40 border-slate-800 bg-slate-800/50' : 
+                                                          'border-slate-700 bg-slate-800/50 hover:border-slate-500 hover:bg-slate-800'}
+                                                    `}
+                                                >
+                                                    <span className="text-lg font-medium">{opt.text}</span>
+                                                    {isSelected && <span className="text-blue-400 text-sm mt-4 font-bold flex items-center gap-1">✓ 已選擇</span>}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
 
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 flex-grow relative z-10">
-                                                {currentScenarioData.options.map((opt) => {
-                                                    const isSelected = myVote === opt.id;
-                                                    return (
-                                                        <button 
-                                                            key={opt.id}
-                                                            onClick={() => submitVote(opt.id)}
-                                                            disabled={myVote !== null || isHost}
-                                                            className={`p-4 md:p-6 rounded-xl text-left border-2 transition-all duration-300 flex flex-col justify-between
-                                                                ${isHost ? 'opacity-50 cursor-not-allowed bg-slate-800 border-slate-700' : 
-                                                                  isSelected ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : 
-                                                                  myVote !== null ? 'opacity-40 border-slate-800 bg-slate-800/50' : 
-                                                                  'border-slate-700 bg-slate-800/50 hover:border-slate-500 hover:bg-slate-800'}
-                                                            `}
-                                                        >
-                                                            <span className="text-lg font-medium">{opt.text}</span>
-                                                            {isSelected && <span className="text-blue-400 text-sm mt-4 font-bold flex items-center gap-1">✓ 已選擇</span>}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        </>
-                                    )}
-
-                                    {/* 底部狀態列 */}
-                                    <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-900/80 p-4 rounded-lg relative z-10 border border-slate-700">
+                                    <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-900/50 p-4 rounded-lg">
                                         <div className="text-slate-300 mb-4 sm:mb-0">
-                                            已投票人數： <span className="text-2xl font-bold text-white">{nonHostVotesCount}</span> / {expectedVotersCount}
-                                            {(gameState.reportedPlayers || []).length > 0 && (
-                                                <span className="text-red-400 text-sm ml-2 font-medium">({(gameState.reportedPlayers || []).length}人被禁言)</span>
-                                            )}
+                                            已投票人數： <span className="text-2xl font-bold text-white">{nonHostVotesCount}</span> / {onlineNonHostPlayers.length}
                                         </div>
                                         {isHost ? (
-                                            <button onClick={showResults} className="py-2 px-8 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold shadow-lg transition">
+                                            <button onClick={showResults} className="py-2 px-8 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold">
                                                 停止投票並公佈結果
                                             </button>
                                         ) : (
-                                            <div className="text-sm text-slate-400 animate-pulse font-medium tracking-wide">等待主持人公佈結果...</div>
+                                            <div className="text-sm text-slate-400 animate-pulse">等待主持人公佈結果...</div>
                                         )}
                                     </div>
                                 </div>
@@ -783,7 +694,7 @@
                                         {currentScenarioData.options.map((opt) => {
                                             const count = Object.keys(votes).filter(uid => {
                                                 const p = players.find(x => x.id === uid);
-                                                return votes[uid] === opt.id && p && !p.isHost && !(gameState.reportedPlayers || []).includes(uid);
+                                                return votes[uid] === opt.id && p && !p.isHost;
                                             }).length;
                                             const percentage = nonHostVotesCount === 0 ? 0 : Math.round((count / nonHostVotesCount) * 100);
                                             const barColor = opt.harm > 0 ? 'bg-red-500' : 'bg-green-500';
@@ -811,7 +722,7 @@
 
                                     {isHost && (
                                         <div className="text-center mt-auto">
-                                            <button onClick={nextRound} className="py-3 px-10 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-full font-bold shadow-lg transform transition hover:scale-105">
+                                            <button onClick={nextRound} className="py-3 px-10 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-full font-bold shadow-lg">
                                                 {gameState.currentScenario >= SCENARIOS.length - 1 ? '查看最終評價' : '進入下一關'}
                                             </button>
                                         </div>
@@ -835,12 +746,12 @@
                                     {/* Player Stats Section */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl mb-10">
                                         {/* Guardians */}
-                                        <div className="bg-green-900/30 border border-green-700/50 rounded-xl p-6 relative overflow-hidden shadow-lg">
+                                        <div className="bg-green-900/30 border border-green-700/50 rounded-xl p-6 relative overflow-hidden">
                                             <div className="absolute top-0 right-0 opacity-20 -mr-2 -mt-2 select-none">
                                                 <div className="text-[8rem] leading-none">👼</div>
                                             </div>
                                             <h3 className="text-xl font-bold text-green-300 mb-4 flex items-center gap-2 relative z-10">
-                                                <IconShield className="w-6 h-6" /> 鍵盤守護者 (傷害最低)
+                                                <IconShield className="w-6 h-6" /> 網路守護者
                                             </h3>
                                             <ul className="space-y-2 relative z-10 text-left">
                                                 {players.filter(p => !p.isHost).sort((a, b) => (a.cumulatedHarm || 0) - (b.cumulatedHarm || 0)).slice(0, 3).map((p, i) => (
@@ -854,12 +765,12 @@
                                         </div>
 
                                         {/* Troublemakers */}
-                                        <div className="bg-red-900/30 border border-red-700/50 rounded-xl p-6 relative overflow-hidden shadow-lg">
+                                        <div className="bg-red-900/30 border border-red-700/50 rounded-xl p-6 relative overflow-hidden">
                                             <div className="absolute top-0 right-0 opacity-20 -mr-2 -mt-2 select-none">
                                                 <div className="text-[8rem] leading-none">😈</div>
                                             </div>
                                             <h3 className="text-xl font-bold text-red-300 mb-4 flex items-center gap-2 relative z-10">
-                                                <IconAlert className="w-6 h-6" /> 鍵盤酸民 (傷害最高)
+                                                <IconAlert className="w-6 h-6" /> 網路鍵盤俠
                                             </h3>
                                             <ul className="space-y-2 relative z-10 text-left">
                                                 {players.filter(p => !p.isHost).sort((a, b) => (b.cumulatedHarm || 0) - (a.cumulatedHarm || 0)).slice(0, 3).map((p, i) => (
@@ -892,37 +803,23 @@
                                 <div className="overflow-y-auto pr-2 space-y-2 flex-grow">
                                     {players.map(p => {
                                         const isOffline = p.isOnline === false;
-                                        const isReported = (gameState.reportedPlayers || []).includes(p.id);
-                                        const isThisPlayerKing = currentKing && currentKing.id === p.id;
-                                        
                                         return (
-                                            <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg border border-slate-700/50 transition 
-                                                ${isOffline ? 'bg-slate-800/30 opacity-50' : (isReported ? 'bg-red-900/20 border-red-800/50' : 'bg-slate-800/50')}
-                                                ${isThisPlayerKing ? 'shadow-[0_0_8px_rgba(234,179,8,0.3)] border-yellow-600/50' : ''}
-                                            `}>
-                                                <div className="flex items-center gap-2 overflow-hidden">
-                                                    {!isOffline && !isReported && <div className={`w-2 h-2 rounded-full flex-shrink-0 ${gameState.status === 'playing' && votes[p.id] !== undefined ? 'bg-green-400 shadow-[0_0_5px_#4ade80]' : 'bg-blue-400'}`}></div>}
-                                                    {isOffline && <div className="w-2 h-2 rounded-full flex-shrink-0 bg-slate-600"></div>}
-                                                    {isReported && <span className="text-[10px] leading-none drop-shadow-md">🚫</span>}
-                                                    
-                                                    <span className={`truncate ${p.id === user?.uid ? 'text-blue-400 font-bold' : (isOffline ? 'text-slate-400 line-through' : (isReported ? 'text-red-400' : 'text-slate-200'))}`}>
-                                                        {isThisPlayerKing && <span className="mr-1" title="本回合榮耀守護者">👑</span>}
-                                                        {p.name}
-                                                        {p.isHost && <span className="text-xs bg-purple-600 px-1 py-0.5 rounded text-white ml-1">主持</span>}
-                                                        {isOffline && <span className="text-[10px] text-slate-400 ml-1">(離線)</span>}
+                                            <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg border border-slate-700/50 transition ${isOffline ? 'bg-slate-800/30 opacity-50' : 'bg-slate-800/50'}`}>
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`w-2 h-2 rounded-full ${isOffline ? 'bg-slate-600' : (gameState.status === 'playing' && votes[p.id] !== undefined ? 'bg-green-400' : 'bg-blue-400')}`}></div>
+                                                    <span className={p.id === user?.uid ? 'text-blue-400 font-bold' : (isOffline ? 'text-slate-400 line-through' : 'text-slate-200')}>
+                                                        {p.name} {p.isHost && <span className="text-xs bg-purple-600 px-1 py-0.5 rounded text-white ml-1">主持</span>}
+                                                        {isOffline && <span className="text-xs text-slate-400 ml-1">(離線)</span>}
                                                     </span>
                                                 </div>
-                                                <div className="flex items-center gap-2 flex-shrink-0">
+                                                <div className="flex items-center gap-2">
                                                     {isHost && !p.isHost && p.cumulatedHarm !== undefined && (
                                                         <span className={`text-xs font-bold px-2 py-1 rounded ${p.cumulatedHarm > 0 ? 'text-red-300 bg-red-900/30' : 'text-green-300 bg-green-900/30'}`}>
                                                             {p.cumulatedHarm > 0 ? `+${p.cumulatedHarm}` : p.cumulatedHarm}
                                                         </span>
                                                     )}
-                                                    {isReported && gameState.status === 'playing' && (
-                                                        <span className="text-xs text-red-200 bg-red-800/80 px-2 py-1 rounded font-bold border border-red-500">被禁言</span>
-                                                    )}
-                                                    {!isReported && gameState.status === 'playing' && votes[p.id] !== undefined && !p.isHost && !isOffline && (
-                                                        <span className="text-xs text-green-400 bg-green-900/30 px-2 py-1 rounded border border-green-800/50">已投票</span>
+                                                    {gameState.status === 'playing' && votes[p.id] !== undefined && !p.isHost && !isOffline && (
+                                                        <span className="text-xs text-green-400 bg-green-900/30 px-2 py-1 rounded">已投票</span>
                                                     )}
                                                 </div>
                                             </div>
