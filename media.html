@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>媒體識讀三層次 挑戰站</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Phosphor Icons (圖示庫) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* 隱藏捲動條但保留功能 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12">
+
+    <!-- 頁首 -->
+    <header class="bg-indigo-600 text-white shadow-md relative overflow-hidden">
+        <div class="max-w-4xl mx-auto px-4 py-8 flex flex-col md:flex-row items-center gap-4 relative z-10">
+            <i class="ph-fill ph-shield-check text-6xl"></i>
+            <div>
+                <h1 class="text-3xl font-bold mb-2">媒體識讀三層次 挑戰站</h1>
+                <p class="text-indigo-100">本測驗共分三關，需逐關破解並閱讀解析，最終才能獲取成績。</p>
+            </div>
+            <!-- 切換視角按鈕 -->
+            <button onclick="toggleTeacherView()" id="toggleViewBtn" class="ml-auto mt-4 md:mt-0 bg-indigo-800 hover:bg-indigo-900 px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 transition-colors">
+                <i class="ph-bold ph-chalkboard-teacher text-lg"></i> 教師專區
+            </button>
+        </div>
+    </header>
+
+    <!-- 主要學生作答區 -->
+    <main id="student-view" class="max-w-4xl mx-auto px-4 mt-8 space-y-6">
+        <!-- 學生基本資料區 -->
+        <div id="student-info-section" class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex items-center gap-2 text-xl font-bold text-indigo-900">
+                    <i class="ph-bold ph-user text-2xl"></i>
+                    <h3>學生基本資料</h3>
+                </div>
+                <div id="progress-badge" class="text-sm font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
+                    進度：1 / 3 關
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">班級 (例: 701)</label>
+                    <input type="text" id="studentClass" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none disabled:bg-slate-100 disabled:text-slate-500" placeholder="請輸入班級" onchange="updateStudent()">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">座號 (例: 05)</label>
+                    <input type="number" id="studentSeat" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none disabled:bg-slate-100 disabled:text-slate-500" placeholder="請輸入座號" onchange="updateStudent()">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">姓名</label>
+                    <input type="text" id="studentName" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none disabled:bg-slate-100 disabled:text-slate-500" placeholder="請輸入姓名" onchange="updateStudent()">
+                </div>
+            </div>
+        </div>
+
+        <!-- 題目與動態內容渲染區 -->
+        <div id="content-container"></div>
+    </main>
+
+    <!-- 教師成績查看區 (預設隱藏) -->
+    <main id="teacher-view" class="max-w-4xl mx-auto px-4 mt-8 hidden">
+        <div class="bg-white rounded-xl shadow-lg p-6 border border-slate-200">
+            <div class="flex justify-between items-center mb-6 border-b pb-4">
+                <h2 class="text-2xl font-bold flex items-center gap-2 text-indigo-900">
+                    <i class="ph-bold ph-database text-3xl"></i> 學生作答成績紀錄
+                </h2>
+                <button onclick="fetchScores()" class="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-4 py-2 rounded-lg font-bold flex items-center gap-2">
+                    <i class="ph-bold ph-arrows-clockwise"></i> 重新整理
+                </button>
+            </div>
+            
+            <div class="overflow-x-auto rounded-lg border border-slate-200">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-700">
+                            <th class="p-3 border-b">繳交時間</th>
+                            <th class="p-3 border-b">班級</th>
+                            <th class="p-3 border-b">座號</th>
+                            <th class="p-3 border-b">姓名</th>
+                            <th class="p-3 border-b text-center">總分</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scores-table-body" class="divide-y divide-slate-200">
+                        <tr><td colspan="5" class="p-4 text-center text-slate-500">載入中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="mt-4 text-sm text-slate-500"><i class="ph-bold ph-info"></i> 此資料庫免註冊，關閉瀏覽器後依然會保存在此環境中。</p>
+        </div>
+    </main>
+
+    <!-- Firebase SDK 與 程式邏輯 -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- 題目資料庫 ---
+        const questionsData = [
+            {
+                id: 1,
+                title: "第一關：網傳影片「你見過這樣的水果嗎、泡了變色」？",
+                imageUrl: "https://tfc-taiwan.org.tw/wp-content/uploads/2025/11/3904-1.jpg",
+                content: "社群平台流傳一段短影音，畫面中有人將草莓、奇異果等正常顏色的水果，放進一盆不明液體中「洗」過後，水果瞬間變成鮮豔的藍色、螢光綠色。貼文寫道：「太可怕了！現在的無良果農都在用水果染色劑，你還敢吃嗎？」",
+                subQuestions: [
+                    {
+                        qId: "q1_fact", type: "事實", icon: "ph-magnifying-glass text-blue-500",
+                        question: "【事實層次】前往「台灣事實查核中心」查詢此影片，你會發現這段驚人畫面的真相為何？",
+                        options: [
+                            { id: "A", text: "真實事件，這是不肖商人為了增加水果賣相所研發的新型化學染色技術。" },
+                            { id: "B", text: "錯誤。這是利用生成式AI工具製作的假影片，畫面中有手指與水果融合、光影不自然等破綻。" },
+                            { id: "C", text: "部分錯誤。雖然有染色，但使用的是天然植物色素，對人體無害，並非化學毒物。" },
+                            { id: "D", text: "真實事件，但這其實是國外大學化學系的實驗影片，被網友惡意扭曲解讀為食安問題。" }
+                        ],
+                        answer: "B",
+                        explanation: "【高誘答解析】A選項利用了民眾對「食安」的恐懼；C、D選項提供看似合理的物理/化學解釋。事實上，查核中心利用AI檢測工具與畫面細節分析（如手指形狀變異、不符合物理法則的變色），證實此為AI生成的深偽（Deepfake）造假影片。"
+                    },
+                    {
+                        qId: "q1_stance", type: "立場", icon: "ph-file-text text-green-500",
+                        question: "【立場層次】製作並散播這類「AI生成的假食安影片」，其背後最常見的「產製動機」是什麼？",
+                        options: [
+                            { id: "A", text: "進口水果商為了打擊本土農業，故意製造的負面公關操作。" },
+                            { id: "B", text: "內容農場利用AI大量且低成本地生成獵奇、恐懼畫面，藉由民眾的恐慌轉發來賺取流量變現。" },
+                            { id: "C", text: "AI軟體公司為了展示他們最新的影像生成技術有多麼逼真。" },
+                            { id: "D", text: "政府衛生局為了測試民眾對食品安全的警覺性所發布的模擬演練。" }
+                        ],
+                        answer: "B",
+                        explanation: "【高誘答解析】A、C 選項屬於過度推論的陰謀論。現今網路有大量毫無來源的獵奇影片，其核心立場與動機幾乎都是「流量經濟」。他們利用AI極低的成本，生產能觸發「恐懼」、「憤怒」的情緒誘餌來騙取點閱率。"
+                    },
+                    {
+                        qId: "q1_think", type: "思辨", icon: "ph-brain text-purple-500",
+                        question: "【思辨層次】這則新聞告訴我們，在AI時代面對網路影音，我們必須打破哪一種過時的思辨盲點？",
+                        options: [
+                            { id: "A", text: "「有圖有真相，影片不能P圖」：看到逼真的影片就直接相信其真實性。" },
+                            { id: "B", text: "「國外的月亮比較圓」：只要影片裡的人是外國人，可信度就比較高。" },
+                            { id: "C", text: "「無風不起浪」：就算影片是假的，水果一定也常常被染色，所以還是不要吃水果了。" },
+                            { id: "D", text: "「專家說的都對」：只要貼文宣稱自己是農業專家，就完全不用懷疑。" }
+                        ],
+                        answer: "A",
+                        explanation: "【高誘答解析】過去我們常認為影片難以造假，但生成式AI打破了這個常理。C選項是典型的「認知失調」防衛機制（就算假的我也要相信我的直覺）。面對新科技，我們必須建立「眼見不一定為憑」的識讀警覺心。"
+                    }
+                ]
+            },
+            {
+                id: 2,
+                title: "第二關：網傳文章「高血壓有救了！每天吃它血壓直直降」",
+                imageUrl: "https://tfc-taiwan.org.tw/wp-content/uploads/original/files/imce/images/804_01.png",
+                content: "LINE群組瘋傳一篇文章：「高血壓有救了！高血壓最怕的水果就是『它』（番茄、蘋果、西瓜、奇異果），每天吃一個，血壓直直往下降！趕緊把西藥都丟了吧，這才是大自然的恩賜！」",
+                subQuestions: [
+                    {
+                        qId: "q2_fact", type: "事實", icon: "ph-magnifying-glass text-blue-500",
+                        question: "【事實層次】這是一篇典型的「健康偏方」文章。根據查核報告，下列哪一個查證結果最符合事實？",
+                        options: [
+                            { id: "A", text: "完全正確。這四種水果含有特殊的降壓酵素，醫學上已經證實可以100%取代降血壓藥物。" },
+                            { id: "B", text: "完全錯誤。水果中的糖分極高，吃水果只會讓血壓瞬間飆升，高血壓患者絕對不能吃水果。" },
+                            { id: "C", text: "部分錯誤（半真半假）。水果中的「鉀」確實有助血壓控制，但「無法取代藥物」，且西瓜等糖分高，吃多反而危險。" },
+                            { id: "D", text: "正確。但因為這種自然療法會阻礙藥廠賺錢，所以醫生都不會告訴你。" }
+                        ],
+                        answer: "C",
+                        explanation: "【高誘答解析】A選項是假訊息原文；B選項過度極端；D選項是常見的「反醫療陰謀論」。最高明的假訊息往往是「半真半假」，水果確實健康，但被誇大為「直直降」、「能停藥」，就會對患者造成生命危險。"
+                    },
+                    {
+                        qId: "q2_stance", type: "立場", icon: "ph-file-text text-green-500",
+                        question: "【立場層次】從「新聞生產者」的角度來看，這篇文章缺乏了哪一項「最關鍵的產製要素」，導致它不具備醫學可信度？",
+                        options: [
+                            { id: "A", text: "沒有列出番茄、蘋果等水果的市場時價與購買連結。" },
+                            { id: "B", text: "沒有具名任何有執照的專科醫師、營養師，或引述具公信力的醫學期刊論文。" },
+                            { id: "C", text: "沒有拍攝吃完水果後，血壓計數字立刻下降的實測對比影片。" },
+                            { id: "D", text: "沒有加上「衛福部核准」的官方浮水印。" }
+                        ],
+                        answer: "B",
+                        explanation: "【高誘答解析】C選項看似合理，但單一實測影片在醫學上不具統計意義。真實的醫藥新聞，其立場必須建立在「專業背書」上，必須明確交代是哪家醫院、哪位醫師的見解，而非匿名的「農場文」。"
+                    },
+                    {
+                        qId: "q2_think", type: "思辨", icon: "ph-brain text-purple-500",
+                        question: "【思辨層次】為何這類「神奇食物能治慢性病」的假訊息，總是能輕易讓長輩深信不疑並大量轉傳？",
+                        options: [
+                            { id: "A", text: "因為長輩通常都很討厭看醫生，所以只要有不用看醫生的方法就會盲目相信。" },
+                            { id: "B", text: "利用了患者渴望「簡單、無痛、快速治癒」的心理捷徑，逃避慢性病需要長期吃藥與控制的現實。" },
+                            { id: "C", text: "因為現在的水果真的越種越好，營養價值比以前高出幾百倍。" },
+                            { id: "D", text: "因為這類文章通常字體都比較大，長輩閱讀起來沒有負擔就會直接按分享。" }
+                        ],
+                        answer: "B",
+                        explanation: "【高誘答解析】A、D 選項是刻板印象。真正的思辨要探討「心理機制」。這類謠言精準打中了人們的「捷徑思維（Heuristics）」，吃特定水果比長期服藥與運動簡單太多了，這種「一勞永逸」的承諾是最強的心理誘餌。"
+                    }
+                ]
+            },
+            {
+                id: 3,
+                title: "第三關：突發快訊「金門海漂死豬證實感染非洲豬瘟」",
+                imageUrl: "https://tfc-taiwan.org.tw/wp-content/uploads/original/files/upload/node/field_blog_images/49203247_294512257870572_200443778652176384_o.jpg",
+                content: "LINE群組傳來一則新聞截圖：「【突發快訊】金門沙灘發現一頭海漂死豬，經農業部防檢署採樣檢驗，今日確認其感染『非洲豬瘟』病毒！目前已針對周邊半徑3公里內豬場進行移動管制，並全面消毒。」",
+                subQuestions: [
+                    {
+                        qId: "q3_fact", type: "事實", icon: "ph-magnifying-glass text-blue-500",
+                        question: "【事實層次】看到這種引發恐慌的重大災情訊息，若去查核中心或政府官網確認，結果為何？",
+                        options: [
+                            { id: "A", text: "錯誤。這是為了打擊豬肉銷量而捏造的假訊息，豬瘟不會透過海水傳染。" },
+                            { id: "B", text: "部分錯誤。確實有死豬，但只是普通的感冒死掉，並非非洲豬瘟。" },
+                            { id: "C", text: "正確。這是一則真實的官方通報新聞，農業部確實發布了該檢驗結果與防疫措施。" },
+                            { id: "D", text: "錯誤。這是利用生成式AI合成的死豬照片，金門沙灘根本沒有這件事。" }
+                        ],
+                        answer: "C",
+                        explanation: "【高誘答解析】A、B、D 選項會讓慣於否定一切的學生選錯。媒體識讀不是「懷疑一切都是假的」，而是「透過查證找出真相」。這是一則【正確】的真實新聞，可於農業部防檢署官網查到對應的新聞稿與實驗室報告。"
+                    },
+                    {
+                        qId: "q3_stance", type: "立場", icon: "ph-file-text text-green-500",
+                        question: "【立場層次】即使是「正確」的新聞，我們仍要看新聞生產貼紙。這則新聞之所以「可信度高」，是因為它具備了何種來源特徵？",
+                        options: [
+                            { id: "A", text: "它的標題使用了【突發快訊】和驚嘆號，看起來非常緊急且重要。" },
+                            { id: "B", text: "它在LINE群組被轉發了超過一萬次，大家都說是真的。" },
+                            { id: "C", text: "新聞中明確指出消息來源是「農業部防檢署」，且結論基於客觀的「採樣檢驗」結果。" },
+                            { id: "D", text: "因為照片中的海灘背景看起來真的很像金門的風景。" }
+                        ],
+                        answer: "C",
+                        explanation: "【高誘答解析】A、B、D 皆為錯誤的判斷標準。客觀的新聞報導，其立場必須建立在「權威、具責的主管機關（防檢署）」以及「科學證據（檢驗報告）」上，這是辨別真實疫調新聞與網路造謠的關鍵。"
+                    },
+                    {
+                        qId: "q3_think", type: "思辨", icon: "ph-brain text-purple-500",
+                        question: "【思辨層次】當我們確認這是一則「令人恐慌但真實」的新聞後，閱聽人最「成熟且中立」的思辨反應應該是什麼？",
+                        options: [
+                            { id: "A", text: "為了避免大家恐慌，我應該在群組裡宣稱這是假新聞，安撫大家的情緒。" },
+                            { id: "B", text: "立刻衝去超市囤積大量豬肉，以免之後豬肉價格暴漲或買不到。" },
+                            { id: "C", text: "在網路上瘋狂謾罵對岸的防疫漏洞，藉此發洩不安的情緒。" },
+                            { id: "D", text: "認知到威脅真實存在，轉化為實際防疫行動，不攜帶國外肉品，並遵從官方的防疫指引。" }
+                        ],
+                        answer: "D",
+                        explanation: "【高誘答解析】A是鴕鳥心態；B是盲目的恐慌行為；C是無濟於事的情緒發洩。確認事實後的高階思辨，是保持冷靜與客觀，不讓自己成為製造二次恐慌的源頭，並依據科學指引採取正確的行動。"
+                    }
+                ]
+            }
+        ];
+
+        // --- 狀態管理 ---
+        let studentInfo = { className: '', seatNo: '', name: '' };
+        let answers = {};
+        let currentStep = 0; // 0, 1, 2
+        let stepStatus = 'answering'; // 'answering' 或 'reviewed'
+        let isFinished = false;
+        let finalScore = 0;
+        let isTeacherView = false;
+
+        // --- Firebase 設定 ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        let db, auth, currentUser;
+
+        if (firebaseConfig) {
+            const app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+
+            const initAuth = async () => {
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch(e) {
+                    console.error("Firebase Auth Error:", e);
+                }
+            };
+            initAuth();
+            onAuthStateChanged(auth, (user) => { currentUser = user; });
+        }
+
+        // --- 視圖切換 ---
+        // 預先計算好的 'admin' SHA-256 雜湊值，避免明文寫在前端程式碼中
+        const ADMIN_HASH = "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"; 
+
+        async function hashPassword(password) {
+            const msgUint8 = new TextEncoder().encode(password);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        window.toggleTeacherView = async () => {
+            // 如果要從「學生視角」切換進「教師專區」，需要驗證密碼
+            if (!isTeacherView) {
+                const pwd = prompt("請輸入教師專區密碼：");
+                if (pwd === null) return; // 使用者按下取消
+
+                const hashedInput = await hashPassword(pwd);
+                if (hashedInput !== ADMIN_HASH) {
+                    alert("密碼錯誤，拒絕存取！");
+                    return;
+                }
+            }
+
+            isTeacherView = !isTeacherView;
+            document.getElementById('student-view').classList.toggle('hidden', isTeacherView);
+            document.getElementById('teacher-view').classList.toggle('hidden', !isTeacherView);
+            
+            const btn = document.getElementById('toggleViewBtn');
+            if (isTeacherView) {
+                btn.innerHTML = `<i class="ph-bold ph-student text-lg"></i> 返回測驗`;
+                btn.classList.replace('bg-indigo-800', 'bg-rose-600');
+                btn.classList.replace('hover:bg-indigo-900', 'hover:bg-rose-700');
+                if(currentUser) window.fetchScores();
+            } else {
+                btn.innerHTML = `<i class="ph-bold ph-chalkboard-teacher text-lg"></i> 教師專區`;
+                btn.classList.replace('bg-rose-600', 'bg-indigo-800');
+                btn.classList.replace('hover:bg-rose-700', 'hover:bg-indigo-900');
+            }
+        }
+
+        // --- 資料綁定 ---
+        window.updateStudent = () => {
+            studentInfo.className = document.getElementById('studentClass').value;
+            studentInfo.seatNo = document.getElementById('studentSeat').value;
+            studentInfo.name = document.getElementById('studentName').value;
+        };
+
+        window.handleOptionSelect = (qId, optionId) => {
+            if (stepStatus === 'reviewed' || isFinished) return;
+            answers[qId] = optionId;
+            render();
+        };
+
+        window.handleStageSubmit = () => {
+            if (!studentInfo.className || !studentInfo.seatNo || !studentInfo.name) {
+                alert("⚠️ 請先至上方將「班級、座號、姓名」填寫完整喔！");
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                return;
+            }
+
+            const currentQ = questionsData[currentStep];
+            const unanswered = currentQ.subQuestions.filter(sq => !answers[sq.qId]);
+            
+            if (unanswered.length > 0) {
+                alert(`⚠️ 本關還有 ${unanswered.length} 題未作答，請確實選擇完畢後再送出看解析！`);
+                return;
+            }
+
+            stepStatus = 'reviewed';
+            render();
+            // 滑動到解析位置
+            setTimeout(() => window.scrollBy({ top: 300, behavior: 'smooth' }), 50);
+        };
+
+        window.handleNextStage = () => {
+            currentStep++;
+            stepStatus = 'answering';
+            render();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        window.handleFinalSubmit = async () => {
+            // 計算分數
+            let correctCount = 0;
+            const totalQuestions = 9;
+            questionsData.forEach(q => {
+                q.subQuestions.forEach(sq => {
+                    if (answers[sq.qId] === sq.answer) correctCount++;
+                });
+            });
+            finalScore = correctCount === totalQuestions ? 100 : Math.round((correctCount / totalQuestions) * 100);
+
+            // 更新 UI 狀態為上傳中
+            document.getElementById('finalSubmitBtn').innerHTML = `<i class="ph-bold ph-spinner animate-spin text-xl"></i> 上傳成績中...`;
+            document.getElementById('finalSubmitBtn').disabled = true;
+            document.getElementById('finalSubmitBtn').classList.add('opacity-75');
+
+            // 存入 Firebase
+            if (currentUser && db) {
+                try {
+                    const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'student_scores');
+                    await addDoc(collectionRef, {
+                        timestamp: new Date().toISOString(),
+                        displayTime: new Date().toLocaleString('zh-TW', {hour12: false}),
+                        className: studentInfo.className,
+                        seatNo: studentInfo.seatNo,
+                        name: studentInfo.name,
+                        score: finalScore,
+                        uid: currentUser.uid // 作為識別
+                    });
+                } catch (error) {
+                    console.error("儲存失敗:", error);
+                    alert("儲存時發生錯誤，但仍會顯示您的成績！");
+                }
+            } else {
+                // 如果在本地測試無 Firebase 環境
+                await new Promise(r => setTimeout(r, 1000));
+            }
+
+            isFinished = true;
+            render();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        // --- 教師專區讀取資料 ---
+        window.fetchScores = async () => {
+            if (!currentUser || !db) return;
+            const tbody = document.getElementById('scores-table-body');
+            tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500"><i class="ph-bold ph-spinner animate-spin text-xl inline-block mr-2"></i> 正在載入成績...</td></tr>`;
+            
+            try {
+                const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'student_scores');
+                const querySnapshot = await getDocs(collectionRef);
+                
+                let records = [];
+                querySnapshot.forEach((doc) => records.push(doc.data()));
+                
+                // 本地排序 (依據時間最新)
+                records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                if (records.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500">目前還沒有學生送出成績喔！</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = records.map(r => `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="p-3 text-sm text-slate-600">${r.displayTime || '-'}</td>
+                        <td class="p-3 font-medium">${r.className}</td>
+                        <td class="p-3">${r.seatNo}</td>
+                        <td class="p-3 font-medium text-indigo-700">${r.name}</td>
+                        <td class="p-3 text-center font-bold ${r.score >= 70 ? 'text-green-600' : 'text-orange-600'}">${r.score}</td>
+                    </tr>
+                `).join('');
+
+            } catch (error) {
+                console.error("讀取失敗:", error);
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500">讀取失敗，請重新整理頁面。</td></tr>`;
+            }
+        };
+
+
+        // --- 渲染畫面核心邏輯 ---
+        function render() {
+            // 1. 更新基本資料區的禁用狀態
+            const inputs = ['studentClass', 'studentSeat', 'studentName'];
+            inputs.forEach(id => {
+                document.getElementById(id).disabled = (currentStep > 0 || isFinished);
+            });
+            
+            const badge = document.getElementById('progress-badge');
+            if(badge) {
+                badge.style.display = isFinished ? 'none' : 'block';
+                badge.innerText = `進度：${currentStep + 1} / 3 關`;
+            }
+
+            let html = '';
+
+            // 2. 如果完成，顯示總成績大看板
+            if (isFinished) {
+                html += `
+                <div class="bg-white rounded-xl shadow-lg p-8 border-t-8 border-indigo-500 animate-fade-in text-center mb-6">
+                    <h2 class="text-3xl font-bold mb-4">🎉 測驗完成！資料已送出</h2>
+                    <div class="flex justify-center items-end gap-2 mb-6">
+                        <span class="text-6xl font-extrabold text-indigo-600">${finalScore}</span>
+                        <span class="text-xl text-slate-500 mb-2">/ 100 分</span>
+                    </div>
+                    <p class="text-lg text-slate-600">
+                        ${finalScore === 100 ? "太神啦！你的思辨邏輯完全沒有被誘答選項騙到 🏆" : 
+                          finalScore >= 70 ? "表現不錯！但假新聞的偽裝技術很高超，請務必再複習下方的解析 🛡️" : 
+                          "再接再厲！你可能中了假新聞的心理陷阱，請好好複習下方詳盡解析 💡"}
+                    </p>
+                </div>`;
+            }
+
+            // 3. 渲染題目
+            questionsData.forEach((q, index) => {
+                // 如果沒完成，且不是當前關卡，就跳過不渲染
+                if (!isFinished && index !== currentStep) return;
+
+                html += `
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-fade-in mb-6">
+                    <div class="bg-slate-100 px-6 py-4 border-b border-slate-200">
+                        <h3 class="text-xl font-bold flex items-center gap-2">
+                            <i class="ph-fill ph-flag text-indigo-600 text-2xl"></i>
+                            ${q.title}
+                        </h3>
+                    </div>
+                    <div class="p-6">
+                        <!-- 新聞文本與圖片 -->
+                        <div class="mb-6">
+                            ${q.imageUrl ? `
+                            <div class="mb-4 bg-slate-50 rounded-lg overflow-hidden flex justify-center border border-slate-200 p-2 shadow-inner">
+                                <img src="${q.imageUrl}" alt="假新聞圖片" class="max-h-72 w-auto object-contain rounded" onerror="this.style.display='none'">
+                            </div>` : ''}
+                            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg flex gap-3 shadow-sm">
+                                <i class="ph-fill ph-warning text-yellow-600 text-2xl shrink-0 mt-1"></i>
+                                <p class="text-slate-800 leading-relaxed font-medium">${q.content}</p>
+                            </div>
+                        </div>
+
+                        <!-- 子題 -->
+                        <div class="space-y-8">
+                            ${q.subQuestions.map(sq => {
+                                const isCorrect = answers[sq.qId] === sq.answer;
+                                const showResult = isFinished || (index === currentStep && stepStatus === 'reviewed');
+
+                                let optionsHtml = sq.options.map(opt => {
+                                    const isSelected = answers[sq.qId] === opt.id;
+                                    let optionClass = "w-full text-left px-4 py-3 rounded-lg border transition-all duration-200 flex items-start justify-between gap-4 ";
+                                    
+                                    if (showResult) {
+                                        if (opt.id === sq.answer) {
+                                            optionClass += "bg-green-50 border-green-500 text-green-900 font-medium";
+                                        } else if (isSelected && !isCorrect) {
+                                            optionClass += "bg-red-50 border-red-500 text-red-900";
+                                        } else {
+                                            optionClass += "bg-white border-slate-200 opacity-50";
+                                        }
+                                    } else {
+                                        optionClass += isSelected 
+                                            ? "bg-indigo-50 border-indigo-500 ring-2 ring-indigo-500" 
+                                            : "bg-white border-slate-200 hover:border-indigo-300 hover:bg-slate-50 cursor-pointer";
+                                    }
+
+                                    let iconHtml = '';
+                                    if (showResult && opt.id === sq.answer) {
+                                        iconHtml = `<i class="ph-fill ph-check-circle text-green-500 text-xl shrink-0 mt-0.5"></i>`;
+                                    } else if (showResult && isSelected && !isCorrect) {
+                                        iconHtml = `<i class="ph-fill ph-x-circle text-red-500 text-xl shrink-0 mt-0.5"></i>`;
+                                    }
+
+                                    return `
+                                    <button onclick="handleOptionSelect('${sq.qId}', '${opt.id}')" ${showResult ? 'disabled' : ''} class="${optionClass}">
+                                        <span class="leading-relaxed"><span class="font-bold mr-1">${opt.id}.</span>${opt.text}</span>
+                                        ${iconHtml}
+                                    </button>`;
+                                }).join('');
+
+                                let explanationHtml = '';
+                                if (showResult) {
+                                    const boxClass = isCorrect ? 'bg-green-100 border border-green-200' : 'bg-orange-100 border border-orange-200';
+                                    const textClass = isCorrect ? 'text-green-800' : 'text-orange-800';
+                                    const iconColor = isCorrect ? 'text-green-700' : 'text-orange-700';
+                                    const title = isCorrect ? '答對了！' : '答錯了喔，你可能掉入誘答陷阱了。';
+                                    
+                                    explanationHtml = `
+                                    <div class="mt-5 md:ml-8 p-4 rounded-lg flex items-start gap-3 animate-fade-in ${boxClass}">
+                                        <i class="ph-fill ph-info text-xl shrink-0 mt-0.5 ${iconColor}"></i>
+                                        <div>
+                                            <span class="font-bold block mb-1 ${textClass}">${title}</span>
+                                            <span class="text-slate-700 leading-relaxed">${sq.explanation}</span>
+                                        </div>
+                                    </div>`;
+                                }
+
+                                return `
+                                <div class="bg-slate-50 rounded-lg p-5 border border-slate-100">
+                                    <div class="flex items-start gap-3 mb-4">
+                                        <i class="ph-bold ${sq.icon} text-2xl mt-0.5"></i>
+                                        <h4 class="text-lg font-semibold text-slate-800 leading-snug">${sq.question}</h4>
+                                    </div>
+                                    <div class="space-y-3 md:ml-8">
+                                        ${optionsHtml}
+                                    </div>
+                                    ${explanationHtml}
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>`;
+            });
+
+            // 4. 渲染按鈕區
+            if (!isFinished) {
+                html += `<div class="flex flex-col items-center pt-2 pb-8">`;
+                
+                if (stepStatus === 'answering') {
+                    html += `
+                    <button onclick="handleStageSubmit()" class="flex items-center gap-2 px-8 py-4 text-lg font-bold rounded-full text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg hover:-translate-y-1 transition-all">
+                        送出本關解答，查看解析
+                    </button>`;
+                } else if (stepStatus === 'reviewed' && currentStep < 2) {
+                    html += `
+                    <div class="flex flex-col items-center animate-fade-in">
+                        <p class="text-green-600 font-bold mb-4">請確實閱讀上方解析後，再前往下一關</p>
+                        <button onclick="handleNextStage()" class="flex items-center gap-2 px-8 py-4 text-lg font-bold rounded-full text-indigo-700 bg-indigo-100 hover:bg-indigo-200 border-2 border-indigo-300 transition-all">
+                            進入下一關 <i class="ph-bold ph-arrow-right text-xl"></i>
+                        </button>
+                    </div>`;
+                } else if (stepStatus === 'reviewed' && currentStep === 2) {
+                    html += `
+                    <div class="flex flex-col items-center animate-fade-in">
+                        <p class="text-green-600 font-bold mb-4">恭喜完成所有關卡！請點擊下方按鈕上傳成績</p>
+                        <button id="finalSubmitBtn" onclick="handleFinalSubmit()" class="flex items-center gap-2 px-8 py-4 text-lg font-bold rounded-full text-white bg-rose-600 hover:bg-rose-700 shadow-lg hover:-translate-y-1 transition-all">
+                            <i class="ph-bold ph-database text-xl"></i> 完成測驗並上傳紀錄
+                        </button>
+                    </div>`;
+                }
+                
+                html += `</div>`;
+            }
+
+            document.getElementById('content-container').innerHTML = html;
+        }
+
+        // 初始化渲染
+        render();
+
+    </script>
+</body>
+</html>
