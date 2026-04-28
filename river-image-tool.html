@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>河道實驗影像分析工具</title>
+  
+  <!-- 載入 Tailwind CSS (不用編譯即可使用所有 class) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- 載入 Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <style>
+    /* 避免圖片在手機上被預設手勢干擾 */
+    .touch-none { touch-action: none; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-100 text-slate-800 font-sans pb-12">
+
+  <!-- Header -->
+  <header class="bg-white shadow-sm border-b border-slate-200 px-6 py-4 mb-8">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <i data-lucide="crop" class="w-6 h-6 text-blue-600"></i>
+        <h1 class="text-xl font-bold text-slate-900">河道實驗影像分析工具</h1>
+      </div>
+      
+      <!-- Progress Steps -->
+      <div class="hidden md:flex items-center gap-4 text-sm font-medium">
+        <div id="progress-1" class="flex items-center gap-1 text-blue-600">
+          <div class="w-6 h-6 rounded-full flex items-center justify-center bg-current text-white text-xs">1</div>
+          上傳照片
+        </div>
+        <div id="progress-line-1" class="h-px w-8 bg-slate-300"></div>
+        
+        <div id="progress-2" class="flex items-center gap-1 text-slate-400">
+          <div class="w-6 h-6 rounded-full flex items-center justify-center bg-current text-white text-xs">2</div>
+          梯形校正
+        </div>
+        <div id="progress-line-2" class="h-px w-8 bg-slate-300"></div>
+        
+        <div id="progress-3" class="flex items-center gap-1 text-slate-400">
+          <div class="w-6 h-6 rounded-full flex items-center justify-center bg-current text-white text-xs">3</div>
+          分段裁切
+        </div>
+        <div id="progress-line-3" class="h-px w-8 bg-slate-300"></div>
+        
+        <div id="progress-4" class="flex items-center gap-1 text-slate-400">
+          <div class="w-6 h-6 rounded-full flex items-center justify-center bg-current text-white text-xs">4</div>
+          匯出結果
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 relative">
+    
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex-col items-center justify-center text-white">
+      <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+      <p class="text-lg font-medium">影像處理中，請稍候...</p>
+    </div>
+
+    <!-- STEP 1: UPLOAD -->
+    <div id="step-1" class="step-container">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 flex flex-col items-center justify-center text-center min-h-[60vh]">
+        <div class="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-6">
+          <i data-lucide="upload" class="w-10 h-10"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-slate-900 mb-2">上傳河道原圖</h2>
+        <p class="text-slate-500 mb-8 max-w-md">支援 JPG, PNG 格式。上傳後即可開始進行梯形校正與分段裁切。</p>
+        
+        <label class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-medium cursor-pointer transition-colors shadow-sm">
+          選擇照片檔案
+          <input type="file" id="image-upload" accept="image/*" class="hidden" />
+        </label>
+      </div>
+    </div>
+
+    <!-- STEP 2: KEYSTONE -->
+    <div id="step-2" class="step-container hidden">
+      <div class="flex flex-col gap-6">
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3 text-blue-800">
+          <i data-lucide="alert-circle" class="w-6 h-6 shrink-0"></i>
+          <div>
+            <h3 class="font-bold mb-1">步驟 2：校正河道視角</h3>
+            <p class="text-sm opacity-90">請拖曳照片上的 <strong class="text-blue-900">四個紫色十字瞄準圈</strong>，使其對齊透明壓克力水道的四個角落（或方格紙的邊界）。系統會自動將歪斜的視角拉平成完美矩形。</p>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center relative overflow-hidden select-none">
+          <div id="keystone-container" class="relative w-full max-w-[1000px] touch-none">
+            <img id="original-image" src="" alt="Original" class="w-full h-auto object-contain block pointer-events-none" />
+            <!-- SVG Overlay -->
+            <svg id="keystone-svg" class="absolute inset-0 w-full h-full pointer-events-none overflow-visible"></svg>
+          </div>
+
+          <div class="mt-8 flex gap-4">
+            <button onclick="setStep(1)" class="px-6 py-2.5 rounded-lg border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-colors">
+              重新上傳
+            </button>
+            <button onclick="processKeystone()" class="px-8 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+              執行校正 <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3: SEGMENTATION -->
+    <div id="step-3" class="step-container hidden">
+      <div class="flex flex-col gap-6">
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 text-amber-900">
+          <i data-lucide="alert-circle" class="w-6 h-6 shrink-0"></i>
+          <div>
+            <h3 class="font-bold mb-1">步驟 3：設定實驗計算區間</h3>
+            <p class="text-sm opacity-90 mb-2">請左右拖曳下方的四條垂直色線，對齊您的實驗定義位置：</p>
+            <ul class="text-sm list-disc list-inside grid grid-cols-1 md:grid-cols-2 gap-1 ml-1 font-medium">
+              <li><span class="text-red-600">紅線 (1)</span>：橘色箭頭往上(左) 20 排</li>
+              <li><span class="text-orange-600">橘線 (2)</span>：橘色箭頭位置</li>
+              <li><span class="text-green-600">綠線 (3)</span>：綠色箭頭位置</li>
+              <li><span class="text-blue-600">藍線 (4)</span>：黑色方格紙結束往下(右) 7 排</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center select-none">
+          <div id="segment-container" class="relative w-full touch-none" style="padding-bottom: 30px;">
+            <img id="warped-image" src="" alt="Warped" class="w-full h-auto object-contain block border border-slate-300 pointer-events-none" />
+            <!-- Markers Container -->
+            <div id="markers-container"></div>
+          </div>
+
+          <div class="mt-12 flex gap-4">
+            <button onclick="setStep(2)" class="px-6 py-2.5 rounded-lg border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-colors flex items-center gap-2">
+              <i data-lucide="rotate-ccw" class="w-4 h-4"></i> 重新校正
+            </button>
+            <button onclick="processSegments()" class="px-8 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+              確認並裁切分段 <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 4: RESULTS -->
+    <div id="step-4" class="step-container hidden">
+      <div class="flex flex-col gap-6">
+         <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex gap-3 text-emerald-800">
+          <i data-lucide="check-circle-2" class="w-6 h-6 shrink-0"></i>
+          <div>
+            <h3 class="font-bold mb-1">裁切完成！</h3>
+            <p class="text-sm opacity-90">已根據您的設定將河道分為上游、中游與下游。您可以預覽結果並個別下載圖片。</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-6">
+          
+          <!-- Upstream -->
+          <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+            <div class="flex justify-between items-center mb-4">
+              <h4 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-red-500"></div> 上游 (開頭至橘色箭頭)
+              </h4>
+              <button onclick="downloadSegment('upstream')" class="text-sm px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-medium transition-colors flex items-center gap-1.5">
+                <i data-lucide="download" class="w-4 h-4"></i> 下載
+              </button>
+            </div>
+            <div class="bg-slate-100 rounded-lg overflow-hidden border border-slate-200" id="result-upstream"></div>
+          </div>
+
+          <!-- Midstream -->
+          <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+            <div class="flex justify-between items-center mb-4">
+              <h4 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-orange-500"></div> 中游 (橘色箭頭至綠色箭頭)
+              </h4>
+              <button onclick="downloadSegment('midstream')" class="text-sm px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-medium transition-colors flex items-center gap-1.5">
+                <i data-lucide="download" class="w-4 h-4"></i> 下載
+              </button>
+            </div>
+            <div class="bg-slate-100 rounded-lg overflow-hidden border border-slate-200" id="result-midstream"></div>
+          </div>
+
+          <!-- Downstream -->
+          <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+            <div class="flex justify-between items-center mb-4">
+              <h4 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-green-500"></div> 下游 (綠色箭頭至計算終點)
+              </h4>
+              <button onclick="downloadSegment('downstream')" class="text-sm px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-medium transition-colors flex items-center gap-1.5">
+                <i data-lucide="download" class="w-4 h-4"></i> 下載
+              </button>
+            </div>
+            <div class="bg-slate-100 rounded-lg overflow-hidden border border-slate-200" id="result-downstream"></div>
+          </div>
+
+        </div>
+
+        <div class="mt-8 flex justify-center pb-8">
+          <button onclick="resetApp()" class="px-8 py-3 rounded-lg border-2 border-slate-300 text-slate-700 font-bold hover:bg-slate-50 transition-colors flex items-center gap-2">
+            處理下一張照片
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // 初始化 Lucide 圖示
+    lucide.createIcons();
+
+    // --- State Variables ---
+    let currentStep = 1;
+    let imageElement = null;
+    let imageSize = { w: 0, h: 0 };
+    
+    // Corners for Keystone ( percentages )
+    let corners = [
+      { x: 0.1, y: 0.2 }, { x: 0.9, y: 0.2 },
+      { x: 0.9, y: 0.8 }, { x: 0.1, y: 0.8 }
+    ];
+    let activeCorner = null;
+
+    // Markers for Segmentation
+    let warpedImgElement = null;
+    let warpedSize = { w: 0, h: 0 };
+    let markers = [0.1, 0.4, 0.7, 0.9];
+    let activeMarker = null;
+
+    // Results mapping
+    let segmentDataUrls = { upstream: null, midstream: null, downstream: null };
+
+    // --- Math & Image Processing Helpers ---
+
+    function solveSystem(A, b) {
+      let n = A.length;
+      for (let i = 0; i < n; i++) {
+        let maxEl = Math.abs(A[i][i]), maxRow = i;
+        for (let k = i + 1; k < n; k++) {
+          if (Math.abs(A[k][i]) > maxEl) { maxEl = Math.abs(A[k][i]); maxRow = k; }
+        }
+        for (let k = i; k < n; k++) {
+          let tmp = A[maxRow][k]; A[maxRow][k] = A[i][k]; A[i][k] = tmp;
+        }
+        let tmp2 = b[maxRow]; b[maxRow] = b[i]; b[i] = tmp2;
+
+        for (let k = i + 1; k < n; k++) {
+          if (A[i][i] === 0) continue;
+          let c = -A[k][i] / A[i][i];
+          for (let j = i; j < n; j++) {
+            if (i === j) A[k][j] = 0; else A[k][j] += c * A[i][j];
+          }
+          b[k] += c * b[i];
+        }
+      }
+      let x = new Array(n).fill(0);
+      for (let i = n - 1; i >= 0; i--) {
+        if (A[i][i] === 0) continue;
+        x[i] = b[i] / A[i][i];
+        for (let k = i - 1; k >= 0; k--) b[k] -= A[k][i] * x[i];
+      }
+      return x;
+    }
+
+    function getHomography(src, dst) {
+      let A = [], b = [];
+      for (let i = 0; i < 4; i++) {
+        A.push([src[i].x, src[i].y, 1, 0, 0, 0, -src[i].x * dst[i].x, -src[i].y * dst[i].x]);
+        b.push(dst[i].x);
+        A.push([0, 0, 0, src[i].x, src[i].y, 1, -src[i].x * dst[i].y, -src[i].y * dst[i].y]);
+        b.push(dst[i].y);
+      }
+      let h = solveSystem(A, b);
+      return [...h, 1];
+    }
+
+    function transformPoint(x, y, h) {
+      let w = h[6] * x + h[7] * y + h[8];
+      return {
+        x: (h[0] * x + h[1] * y + h[2]) / w,
+        y: (h[3] * x + h[4] * y + h[5]) / w
+      };
+    }
+
+    // --- UI Logic ---
+
+    function setStep(step) {
+      currentStep = step;
+      // Hide all steps
+      document.querySelectorAll('.step-container').forEach(el => el.classList.add('hidden'));
+      // Show target step
+      document.getElementById(`step-${step}`).classList.remove('hidden');
+
+      // Update progress bar
+      for (let i = 1; i <= 4; i++) {
+        const ind = document.getElementById(`progress-${i}`);
+        const line = document.getElementById(`progress-line-${i}`);
+        
+        if (ind) {
+          ind.className = `flex items-center gap-1 ${step >= i ? 'text-blue-600' : 'text-slate-400'}`;
+        }
+        if (line) {
+          line.className = `h-px w-8 ${step > i ? 'bg-blue-600' : 'bg-slate-300'}`;
+        }
+      }
+      
+      lucide.createIcons();
+
+      if (step === 2) renderKeystoneSVG();
+      if (step === 3) renderMarkers();
+    }
+
+    function showLoading(show) {
+      const overlay = document.getElementById('loading-overlay');
+      if (show) overlay.style.display = 'flex';
+      else overlay.style.display = 'none';
+    }
+
+    // --- File Upload ---
+
+    document.getElementById('image-upload').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX_DIM = 2400;
+          let w = img.width;
+          let h = img.height;
+          if (w > MAX_DIM || h > MAX_DIM) {
+            const scale = Math.min(MAX_DIM / w, MAX_DIM / h);
+            w = Math.round(w * scale);
+            h = Math.round(h * scale);
+          }
+          
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+
+          imageElement = new Image();
+          imageElement.onload = () => {
+            imageSize = { w, h };
+            document.getElementById('original-image').src = imageElement.src;
+            setStep(2);
+          };
+          imageElement.src = canvas.toDataURL('image/jpeg', 0.95);
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // --- Step 2: Keystone SVG Render & Drag ---
+
+    function renderKeystoneSVG() {
+      const svg = document.getElementById('keystone-svg');
+      let pointsStr = corners.map(c => `${c.x * 100}%,${c.y * 100}%`).join(' ');
+      
+      let html = `<polygon points="${pointsStr}" class="fill-blue-500/20 stroke-blue-500 stroke-[3px]" vector-effect="non-scaling-stroke"></polygon>`;
+
+      corners.forEach((corner, i) => {
+        html += `
+          <g class="cursor-move pointer-events-auto group" onpointerdown="handleCornerPointerDown(event, ${i})">
+            <circle cx="${corner.x * 100}%" cy="${corner.y * 100}%" r="30" fill="transparent" />
+            <circle cx="${corner.x * 100}%" cy="${corner.y * 100}%" r="16" class="fill-purple-500/30 stroke-purple-600 stroke-[2px] group-hover:fill-purple-500/50 transition-colors" vector-effect="non-scaling-stroke" />
+            <line x1="calc(${corner.x * 100}% - 24px)" y1="${corner.y * 100}%" x2="calc(${corner.x * 100}% + 24px)" y2="${corner.y * 100}%" class="stroke-purple-600 stroke-[2px] opacity-80" vector-effect="non-scaling-stroke" />
+            <line x1="${corner.x * 100}%" y1="calc(${corner.y * 100}% - 24px)" x2="${corner.x * 100}%" y2="calc(${corner.y * 100}% + 24px)" class="stroke-purple-600 stroke-[2px] opacity-80" vector-effect="non-scaling-stroke" />
+            <circle cx="${corner.x * 100}%" cy="${corner.y * 100}%" r="2" class="fill-purple-900" vector-effect="non-scaling-stroke" />
+          </g>
+        `;
+      });
+      svg.innerHTML = html;
+    }
+
+    function handleCornerPointerDown(e, index) {
+      e.preventDefault();
+      activeCorner = index;
+    }
+
+    // --- Step 3: Markers Render & Drag ---
+
+    function renderMarkers() {
+      const container = document.getElementById('markers-container');
+      let html = '';
+      
+      const colors = [
+        { bg: 'bg-red-500', text: 'text-red-700', label: '1. 上游起點' },
+        { bg: 'bg-orange-500', text: 'text-orange-700', label: '2. 橘箭頭' },
+        { bg: 'bg-green-500', text: 'text-green-700', label: '3. 綠箭頭' },
+        { bg: 'bg-blue-500', text: 'text-blue-700', label: '4. 下游終點' }
+      ];
+
+      markers.forEach((markerX, index) => {
+        let c = colors[index];
+        html += `
+          <div class="absolute top-0 bottom-0 flex flex-col items-center cursor-ew-resize group" style="left: ${markerX * 100}%; width: 20px; margin-left: -10px;" onpointerdown="handleMarkerPointerDown(event, ${index})">
+            <div class="absolute inset-0 z-10"></div>
+            <div class="w-1 h-[calc(100%-30px)] ${c.bg} shadow-[0_0_4px_rgba(0,0,0,0.5)] group-hover:w-1.5 transition-all"></div>
+            <div class="absolute top-0 w-4 h-4 rounded-full ${c.bg} border-2 border-white shadow-sm -mt-2 group-hover:scale-125 transition-transform"></div>
+            <div class="absolute bottom-0 whitespace-nowrap text-xs font-bold ${c.text} bg-white/90 px-1.5 py-0.5 rounded shadow-sm border border-slate-200 translate-y-full mt-1 pointer-events-none z-20">${c.label}</div>
+          </div>
+        `;
+      });
+
+      let min = Math.min(...markers) * 100;
+      let max = Math.max(...markers) * 100;
+      html += `<div class="absolute top-0 bottom-[30px] left-0 pointer-events-none bg-slate-900/40" style="width: ${min}%"></div>`;
+      html += `<div class="absolute top-0 bottom-[30px] right-0 pointer-events-none bg-slate-900/40" style="width: ${100 - max}%"></div>`;
+
+      container.innerHTML = html;
+    }
+
+    function handleMarkerPointerDown(e, index) {
+      e.preventDefault();
+      activeMarker = index;
+    }
+
+    // --- Global Pointer Events for Dragging ---
+
+    window.addEventListener('pointermove', (e) => {
+      if (activeCorner !== null) {
+        const container = document.getElementById('keystone-container');
+        const rect = container.getBoundingClientRect();
+        let x = (e.clientX - rect.left) / rect.width;
+        let y = (e.clientY - rect.top) / rect.height;
+        corners[activeCorner].x = Math.max(0, Math.min(1, x));
+        corners[activeCorner].y = Math.max(0, Math.min(1, y));
+        renderKeystoneSVG();
+      } else if (activeMarker !== null) {
+        const container = document.getElementById('segment-container');
+        const rect = container.getBoundingClientRect();
+        let x = (e.clientX - rect.left) / rect.width;
+        markers[activeMarker] = Math.max(0, Math.min(1, x));
+        renderMarkers();
+      }
+    });
+
+    window.addEventListener('pointerup', () => {
+      activeCorner = null;
+      activeMarker = null;
+    });
+
+
+    // --- Processing Actions ---
+
+    function processKeystone() {
+      showLoading(true);
+      
+      // Use setTimeout to allow UI to update with loading state
+      setTimeout(() => {
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+
+          const pts = corners.map(c => ({ x: c.x * imageSize.w, y: c.y * imageSize.h }));
+
+          const w1 = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+          const w2 = Math.hypot(pts[3].x - pts[2].x, pts[3].y - pts[2].y);
+          const h1 = Math.hypot(pts[0].x - pts[3].x, pts[0].y - pts[3].y);
+          const h2 = Math.hypot(pts[1].x - pts[2].x, pts[1].y - pts[2].y);
+          
+          let outW = Math.round(Math.max(w1, w2));
+          let outH = Math.round(Math.max(h1, h2));
+
+          if (outW > 3000) {
+              const s = 3000 / outW;
+              outW = 3000; outH = Math.round(outH * s);
+          }
+
+          canvas.width = outW; canvas.height = outH;
+
+          const dstPts = [
+            { x: 0, y: 0 }, { x: outW, y: 0 },
+            { x: outW, y: outH }, { x: 0, y: outH }
+          ];
+
+          const h = getHomography(dstPts, pts);
+
+          const srcCanvas = document.createElement('canvas');
+          srcCanvas.width = imageSize.w; srcCanvas.height = imageSize.h;
+          const srcCtx = srcCanvas.getContext('2d');
+          srcCtx.drawImage(imageElement, 0, 0);
+          const srcData = srcCtx.getImageData(0, 0, imageSize.w, imageSize.h).data;
+
+          const dstImgData = ctx.createImageData(outW, outH);
+          const dstData = dstImgData.data;
+
+          for (let y = 0; y < outH; y++) {
+            for (let x = 0; x < outW; x++) {
+              const pt = transformPoint(x, y, h);
+              const sx = pt.x; const sy = pt.y;
+
+              const sx1 = Math.floor(sx), sy1 = Math.floor(sy);
+              const sx2 = sx1 + 1, sy2 = sy1 + 1;
+              const dx = sx - sx1, dy = sy - sy1;
+
+              if (sx1 >= 0 && sx2 < imageSize.w && sy1 >= 0 && sy2 < imageSize.h) {
+                const idx11 = (sy1 * imageSize.w + sx1) * 4;
+                const idx21 = (sy1 * imageSize.w + sx2) * 4;
+                const idx12 = (sy2 * imageSize.w + sx1) * 4;
+                const idx22 = (sy2 * imageSize.w + sx2) * 4;
+
+                for (let c = 0; c < 4; c++) {
+                  if(c === 3) {
+                      dstData[(y * outW + x) * 4 + c] = 255;
+                      continue;
+                  }
+                  const val =
+                    srcData[idx11 + c] * (1 - dx) * (1 - dy) +
+                    srcData[idx21 + c] * dx * (1 - dy) +
+                    srcData[idx12 + c] * (1 - dx) * dy +
+                    srcData[idx22 + c] * dx * dy;
+                  dstData[(y * outW + x) * 4 + c] = val;
+                }
+              }
+            }
+          }
+          ctx.putImageData(dstImgData, 0, 0);
+          
+          warpedImgElement = new Image();
+          warpedImgElement.onload = () => {
+              warpedSize = { w: outW, h: outH };
+              document.getElementById('warped-image').src = warpedImgElement.src;
+              showLoading(false);
+              setStep(3);
+          };
+          warpedImgElement.src = canvas.toDataURL('image/jpeg', 0.95);
+
+        } catch (err) {
+          console.error(err);
+          alert("影像處理發生錯誤，請重試。");
+          showLoading(false);
+        }
+      }, 50);
+    }
+
+    function processSegments() {
+      showLoading(true);
+      setTimeout(() => {
+        const sortedMarkers = [...markers].sort((a, b) => a - b);
+        const mPx = sortedMarkers.map(m => Math.round(m * warpedSize.w));
+
+        const crop = (xStart, xEnd) => {
+          if(xStart >= xEnd) return null;
+          const canvas = document.createElement('canvas');
+          canvas.width = xEnd - xStart;
+          canvas.height = warpedSize.h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(warpedImgElement, xStart, 0, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
+          return canvas.toDataURL('image/jpeg', 0.95);
+        };
+
+        segmentDataUrls.upstream = crop(mPx[0], mPx[1]);
+        segmentDataUrls.midstream = crop(mPx[1], mPx[2]);
+        segmentDataUrls.downstream = crop(mPx[2], mPx[3]);
+
+        // Display results
+        ['upstream', 'midstream', 'downstream'].forEach(key => {
+            const container = document.getElementById(`result-${key}`);
+            if (segmentDataUrls[key]) {
+                container.innerHTML = `<img src="${segmentDataUrls[key]}" alt="${key}" class="w-full h-auto block" />`;
+            } else {
+                container.innerHTML = `<p class="p-4 text-slate-400">區間無效</p>`;
+            }
+        });
+
+        showLoading(false);
+        setStep(4);
+      }, 50);
+    }
+
+    // --- Helpers ---
+
+    function downloadSegment(key) {
+      if (!segmentDataUrls[key]) return;
+      const link = document.createElement('a');
+      link.href = segmentDataUrls[key];
+      link.download = `${key}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function resetApp() {
+      document.getElementById('image-upload').value = '';
+      imageElement = null;
+      warpedImgElement = null;
+      setStep(1);
+    }
+
+  </script>
+</body>
+</html>
