@@ -22,7 +22,7 @@
     <header class="bg-white shadow-sm flex flex-col z-10">
         <div class="p-4 flex justify-between items-center">
             <div>
-                <h1 class="text-xl font-bold text-gray-800">影像分類識別系統 (64x64)</h1>
+                <h1 class="text-xl font-bold text-gray-800">影像分類識別系統 (16x16)</h1>
                 <p class="text-sm text-gray-500 mt-1">讀取 ZIP 檔，並根據檔名進行拼圖與分類</p>
             </div>
             <div class="flex items-center gap-4">
@@ -74,7 +74,7 @@
             </div>
             
             <div class="flex-1 p-6 flex flex-col items-center justify-center">
-                <div class="w-64 h-64 border-2 border-dashed border-gray-300 rounded flex items-center justify-center bg-gray-100 overflow-hidden mb-4 relative">
+                <div class="w-16 h-16 border-2 border-dashed border-gray-300 rounded flex items-center justify-center bg-gray-100 overflow-hidden mb-4 relative">
                     <img id="currentImg" class="w-full h-full object-contain [image-rendering:pixelated] hidden" />
                     <span id="imgPlaceholder" class="text-gray-400">尚未載入圖片</span>
                     
@@ -363,9 +363,9 @@
             const group = baseGroups[baseName];
             if (!group) return;
 
-            // 設定 Canvas 尺寸 (最大座標 + 64 px 寬高)
-            const width = group.maxX + 64;
-            const height = group.maxY + 64;
+            // 設定 Canvas 尺寸 (最大座標 + 16 px 寬高)
+            const width = group.maxX + 16;
+            const height = group.maxY + 16;
 
             canvasBase.width = width;
             canvasBase.height = height;
@@ -379,7 +379,7 @@
             // 繪製該群組的所有圖片
             group.items.forEach(item => {
                 if (item.imgElement) {
-                    ctxBase.drawImage(item.imgElement, item.x, item.y, 64, 64);
+                    ctxBase.drawImage(item.imgElement, item.x, item.y, 16, 16);
                 }
             });
         }
@@ -389,19 +389,19 @@
             // 清空前一次的框框
             ctxOverlay.clearRect(0, 0, canvasOverlay.width, canvasOverlay.height);
             
-            // 繪製 64x64 的半透明綠色疊加區與粗綠色邊框
+            // 繪製 16x16 的半透明綠色疊加區與粗綠色邊框
             ctxOverlay.fillStyle = 'rgba(34, 197, 94, 0.4)'; // Tailwind green-500 透明
-            ctxOverlay.fillRect(x, y, 64, 64);
+            ctxOverlay.fillRect(x, y, 16, 16);
             
             ctxOverlay.strokeStyle = '#22c55e'; // Tailwind green-500
             ctxOverlay.lineWidth = 3;
-            ctxOverlay.strokeRect(x, y, 64, 64);
+            ctxOverlay.strokeRect(x, y, 16, 16);
 
             // 如果有已經分類過的，畫個小標記上去
             baseGroups[currentActiveBase].items.forEach(item => {
                 if (item.category && (item.x !== x || item.y !== y)) {
                     ctxOverlay.fillStyle = 'rgba(0, 0, 0, 0.5)';
-                    ctxOverlay.fillRect(item.x, item.y, 64, 64);
+                    ctxOverlay.fillRect(item.x, item.y, 16, 16);
                     ctxOverlay.fillStyle = CATEGORIES[getCategoryKeyByName(item.category)].color;
                     ctxOverlay.beginPath();
                     ctxOverlay.arc(item.x + 32, item.y + 32, 10, 0, Math.PI * 2);
@@ -415,7 +415,7 @@
             const containerWidth = canvasWrapper.clientWidth;
             const containerHeight = canvasWrapper.clientHeight;
             
-            const targetScrollLeft = x - (containerWidth / 2) + 32; // +32 是 64 寬的一半
+            const targetScrollLeft = x - (containerWidth / 2) + 32; // +32 是 16 寬的一半
             const targetScrollTop = y - (containerHeight / 2) + 32;
 
             canvasWrapper.scrollTo({
