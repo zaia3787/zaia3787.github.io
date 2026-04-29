@@ -3,415 +3,520 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>圖片快速分類工具</title>
-    <!-- 引入 Tailwind CSS -->
+    <title>圖片分類識別工具</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 JSZip 用於處理 ZIP 壓縮檔 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- 使用 FileSaver.js 協助儲存下載檔案 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        /* 隱藏捲軸但保持可捲動 */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
+        .canvas-container { position: relative; overflow: auto; max-height: 50vh; border: 1px solid #d1d5db; background-color: #e5e7eb; }
+        #canvasBase, #canvasOverlay { position: absolute; top: 0; left: 0; }
+        #canvasOverlay { pointer-events: none; }
+        .key-hint { display: inline-block; padding: 4px 10px; background-color: #1f2937; color: white; border-radius: 6px; font-family: monospace; font-weight: bold; margin-right: 5px; }
     </style>
 </head>
-<body class="bg-slate-100 text-slate-800 h-screen flex flex-col overflow-hidden">
+<body class="flex flex-col h-screen text-gray-800">
 
-    <!-- 頂部導覽列 -->
-    <header class="bg-white shadow-sm px-6 py-4 flex justify-between items-center z-10">
-        <h1 class="text-xl font-bold text-slate-700 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-            圖片快速分類工具
-        </h1>
-        <div id="status-text" class="text-sm font-medium text-slate-500">等待上傳 ZIP 檔案...</div>
+    <!-- 頂部資訊列 -->
+    <header class="bg-white shadow-sm flex flex-col z-10">
+        <div class="p-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold text-gray-800">影像分類識別系統 (64x64)</h1>
+                <p class="text-sm text-gray-500 mt-1">讀取 ZIP 檔，並根據檔名進行拼圖與分類</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <input type="file" id="zipInput" accept=".zip" class="hidden" />
+                <label for="zipInput" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded cursor-pointer transition">
+                    1. 上傳 ZIP 檔案
+                </label>
+                <button id="exportBtn" disabled class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed transition">
+                    匯出分類 ZIP
+                </button>
+            </div>
+        </div>
+        <!-- 拼圖校正設定區 -->
+        <div class="bg-yellow-50 px-4 py-2 text-sm flex items-center gap-6 border-t border-gray-200">
+            <span class="font-bold text-yellow-800">🔧 拼圖排版校正：</span>
+            <label class="flex items-center gap-1 cursor-pointer text-gray-700 hover:text-blue-600 transition" title="若拼圖出現上下錯位，請嘗試勾選/取消此選項">
+                <input type="checkbox" id="invertYCheckbox" checked class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"> 
+                Y 軸反轉 (將 Y 座標視為由下往上)
+            </label>
+            <label class="flex items-center gap-1 cursor-pointer text-gray-700 hover:text-blue-600 transition" title="若拼出來的圖片寬高比例不對，請嘗試勾選此選項">
+                <input type="checkbox" id="swapXYCheckbox" class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"> 
+                X/Y 座標對調
+            </label>
+            <span class="text-xs text-gray-500 ml-auto">(修改後會即時重新拼圖，不影響已分類進度)</span>
+        </div>
     </header>
 
     <!-- 主要內容區 -->
-    <main class="flex-1 flex flex-col relative overflow-hidden">
+    <main class="flex-1 flex p-4 gap-4 overflow-hidden">
         
-        <!-- 步驟一：上傳畫面 -->
-        <div id="upload-view" class="absolute inset-0 flex items-center justify-center bg-slate-100 z-20 transition-opacity duration-300">
-            <div class="bg-white p-10 rounded-2xl shadow-lg max-w-md w-full text-center border border-slate-200">
-                <div class="mb-6 flex justify-center text-blue-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-                </div>
-                <h2 class="text-2xl font-bold mb-2">上傳圖片 ZIP 檔</h2>
-                <p class="text-slate-500 text-sm mb-8">請選擇包含大量圖片的 ZIP 壓縮檔，系統將自動解析並準備進行分類。</p>
-                
-                <label class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors shadow-md inline-flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-                    選擇 ZIP 檔案
-                    <input type="file" id="zip-input" accept=".zip" class="hidden">
-                </label>
-                <div id="loading-msg" class="mt-4 text-sm text-blue-600 font-medium hidden">
-                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-600 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    正在解析壓縮檔，請稍候...
-                </div>
+        <!-- 左側：拼圖概覽區 -->
+        <section class="flex-1 bg-white rounded-lg shadow-sm flex flex-col overflow-hidden border border-gray-200">
+            <div class="p-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                <h2 class="font-semibold">整體拼圖預覽 (綠框為目前位置)</h2>
+                <span id="currentBaseName" class="text-sm font-mono text-gray-600">尚未載入</span>
             </div>
-        </div>
+            <div class="canvas-container flex-1" id="canvasWrapper">
+                <!-- 兩個 Canvas，一個畫底圖，一個畫綠色框框避免每次重繪 -->
+                <canvas id="canvasBase"></canvas>
+                <canvas id="canvasOverlay"></canvas>
+            </div>
+        </section>
 
-        <!-- 步驟二：分類畫面 -->
-        <div id="workspace-view" class="flex-1 flex flex-col hidden h-full p-6 gap-4">
+        <!-- 右側：當前操作區 -->
+        <section class="w-96 bg-white rounded-lg shadow-sm flex flex-col overflow-hidden border border-gray-200">
+            <div class="p-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                <h2 class="font-semibold">目前圖片 (放大檢視)</h2>
+                <span id="progressText" class="text-sm font-bold text-blue-600">0 / 0</span>
+            </div>
             
-            <!-- 上方進度條與操作 -->
-            <div class="flex justify-between items-end bg-white p-4 rounded-xl shadow-sm border border-slate-200 shrink-0">
-                <div class="flex-1 mr-6">
-                    <div class="flex justify-between text-sm font-medium mb-1">
-                        <span class="text-slate-600" id="progress-text">進度: 0 / 0</span>
-                        <span class="text-blue-600" id="current-filename">filename.jpg</span>
+            <div class="flex-1 p-6 flex flex-col items-center justify-center">
+                <div class="w-64 h-64 border-2 border-dashed border-gray-300 rounded flex items-center justify-center bg-gray-100 overflow-hidden mb-4 relative">
+                    <img id="currentImg" class="w-full h-full object-contain [image-rendering:pixelated] hidden" />
+                    <span id="imgPlaceholder" class="text-gray-400">尚未載入圖片</span>
+                    
+                    <!-- 分類標籤覆蓋層 -->
+                    <div id="statusBadge" class="absolute top-2 right-2 px-2 py-1 rounded text-xs font-bold text-white hidden"></div>
+                </div>
+
+                <div class="text-center mb-6">
+                    <p id="currentFilename" class="font-mono text-sm text-gray-600 break-all mb-1">---</p>
+                    <p id="currentCoords" class="text-[11px] text-gray-500">X: -, Y: -</p>
+                </div>
+
+                <!-- 操作說明 -->
+                <div class="w-full bg-blue-50 border border-blue-100 rounded-lg p-4 text-sm space-y-3">
+                    <div class="flex items-center justify-between p-2 bg-white rounded border border-gray-100 shadow-sm">
+                        <span><span class="key-hint">1</span> Gravel</span>
+                        <span class="text-gray-400 text-xs">礫石</span>
                     </div>
-                    <div class="w-full bg-slate-200 rounded-full h-2.5">
-                        <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    <div class="flex items-center justify-between p-2 bg-white rounded border border-gray-100 shadow-sm">
+                        <span><span class="key-hint">2</span> Coarse_Sand</span>
+                        <span class="text-gray-400 text-xs">粗砂</span>
+                    </div>
+                    <div class="flex items-center justify-between p-2 bg-white rounded border border-gray-100 shadow-sm">
+                        <span><span class="key-hint">3</span> Fine_Sand</span>
+                        <span class="text-gray-400 text-xs">細砂</span>
+                    </div>
+                    <hr class="border-gray-200 my-2">
+                    <div class="flex items-center justify-between p-2">
+                        <span><span class="key-hint">Q</span> 返回上一個</span>
                     </div>
                 </div>
-                <button id="btn-export" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg font-medium shadow-md transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                    匯出 ZIP
-                </button>
             </div>
+        </section>
 
-            <!-- 中間圖片展示區 -->
-            <div class="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 flex items-center justify-center p-4 min-h-[50vh] relative">
-                <!-- 提示文字 (目前已分類) -->
-                <div id="classified-badge" class="absolute top-4 left-4 bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-bold border border-emerald-200 hidden">
-                    已標記為: <span id="classified-label"></span>
-                </div>
-
-                <div id="img-loader" class="absolute hidden">
-                    <svg class="animate-spin h-10 w-10 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                </div>
-                
-                <img id="main-image" src="" alt="待分類圖片" class="max-w-full max-h-full object-contain rounded drop-shadow-md hidden">
-                
-                <div id="end-message" class="text-center hidden">
-                    <div class="text-6xl mb-4">🎉</div>
-                    <h3 class="text-2xl font-bold text-slate-800 mb-2">分類完成！</h3>
-                    <p class="text-slate-500">您已處理完所有的圖片，可以點擊右上角的「匯出 ZIP」來儲存結果。</p>
-                </div>
-            </div>
-
-            <!-- 下方按鈕區 -->
-            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 shrink-0">
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <button onclick="handleClassification('Gravel')" class="classify-btn flex flex-col items-center justify-center py-3 bg-slate-50 hover:bg-blue-50 border-2 border-slate-200 hover:border-blue-400 rounded-lg transition-all group">
-                        <div class="text-xs text-slate-400 mb-1 group-hover:text-blue-500 font-bold">按鍵 1</div>
-                        <div class="text-lg font-bold text-slate-700">Gravel</div>
-                        <div class="text-xs text-slate-500">(礫石)</div>
-                    </button>
-                    <button onclick="handleClassification('Coarse_Sand')" class="classify-btn flex flex-col items-center justify-center py-3 bg-slate-50 hover:bg-blue-50 border-2 border-slate-200 hover:border-blue-400 rounded-lg transition-all group">
-                        <div class="text-xs text-slate-400 mb-1 group-hover:text-blue-500 font-bold">按鍵 2</div>
-                        <div class="text-lg font-bold text-slate-700">Coarse_Sand</div>
-                        <div class="text-xs text-slate-500">(粗砂)</div>
-                    </button>
-                    <button onclick="handleClassification('Fine_Sand')" class="classify-btn flex flex-col items-center justify-center py-3 bg-slate-50 hover:bg-blue-50 border-2 border-slate-200 hover:border-blue-400 rounded-lg transition-all group">
-                        <div class="text-xs text-slate-400 mb-1 group-hover:text-blue-500 font-bold">按鍵 3</div>
-                        <div class="text-lg font-bold text-slate-700">Fine_Sand</div>
-                        <div class="text-xs text-slate-500">(細砂)</div>
-                    </button>
-                    <button onclick="undo()" class="flex flex-col items-center justify-center py-3 bg-slate-100 hover:bg-slate-200 border-2 border-slate-200 rounded-lg transition-all group">
-                        <div class="text-xs text-slate-400 mb-1 group-hover:text-slate-600 font-bold">按鍵 Q</div>
-                        <div class="text-lg font-bold text-slate-700 flex items-center gap-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
-                            返回上一個
-                        </div>
-                    </button>
-                </div>
-            </div>
-        </div>
     </main>
 
-    <!-- 處理中遮罩 (匯出時) -->
-    <div id="processing-overlay" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center hidden flex-col">
-        <div class="bg-white p-8 rounded-2xl shadow-xl flex flex-col items-center">
-            <svg class="animate-spin h-12 w-12 text-green-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-            <h3 class="text-xl font-bold text-slate-800">正在打包匯出檔案...</h3>
-            <p class="text-slate-500 text-sm mt-2">請勿關閉視窗</p>
+    <!-- 載入中的遮罩 -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white p-6 rounded-lg shadow-xl text-center">
+            <div class="inline-block animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mb-4"></div>
+            <p id="loadingText" class="font-bold text-gray-700">正在處理檔案，請稍候...</p>
         </div>
     </div>
 
     <script>
-        // === 應用程式狀態 ===
-        let imageFiles = [];       // 存放所有圖片檔的 JSZip 物件資訊
-        let currentIndex = 0;      // 目前顯示的圖片索引
-        let classifications = [];  // 分類結果陣列，索引對應 imageFiles
-        let currentObjectUrl = null; // 避免記憶體洩漏
-        let isProcessing = false;  // 防止按鍵連擊導致出錯
-
-        // === DOM 元素 ===
-        const uploadInput = document.getElementById('zip-input');
-        const uploadView = document.getElementById('upload-view');
-        const workspaceView = document.getElementById('workspace-view');
-        const loadingMsg = document.getElementById('loading-msg');
+        // 核心狀態變數
+        let imageItems = []; // 儲存所有圖片資訊的陣列
+        let currentIndex = -1; // 目前正在分類的圖片索引
+        let baseGroups = {}; // 根據檔名 Base 分類的群組 (用於拼圖)
+        let currentActiveBase = ''; // 目前顯示的拼圖底圖名稱
         
-        const mainImage = document.getElementById('main-image');
-        const imgLoader = document.getElementById('img-loader');
-        const endMessage = document.getElementById('end-message');
-        const classifiedBadge = document.getElementById('classified-badge');
-        const classifiedLabel = document.getElementById('classified-label');
+        // DOM 元素參考
+        const zipInput = document.getElementById('zipInput');
+        const exportBtn = document.getElementById('exportBtn');
+        const canvasBase = document.getElementById('canvasBase');
+        const ctxBase = canvasBase.getContext('2d', { willReadFrequently: true });
+        const canvasOverlay = document.getElementById('canvasOverlay');
+        const ctxOverlay = canvasOverlay.getContext('2d');
+        const canvasWrapper = document.getElementById('canvasWrapper');
         
-        const progressText = document.getElementById('progress-text');
-        const progressBar = document.getElementById('progress-bar');
-        const currentFilename = document.getElementById('current-filename');
-        const statusText = document.getElementById('status-text');
-        const btnExport = document.getElementById('btn-export');
-        const processingOverlay = document.getElementById('processing-overlay');
+        const currentImg = document.getElementById('currentImg');
+        const imgPlaceholder = document.getElementById('imgPlaceholder');
+        const progressText = document.getElementById('progressText');
+        const currentFilename = document.getElementById('currentFilename');
+        const currentCoords = document.getElementById('currentCoords');
+        const currentBaseNameLabel = document.getElementById('currentBaseName');
+        const statusBadge = document.getElementById('statusBadge');
+        
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
 
-        // === 支援的圖片格式正規表示式 ===
-        const imageRegex = /\.(png|jpe?g|gif|webp|bmp)$/i;
+        // 定義分類項目
+        const CATEGORIES = {
+            '1': { name: 'Gravel', color: '#ef4444' },      // Red
+            '2': { name: 'Coarse_Sand', color: '#f59e0b' }, // Yellow/Orange
+            '3': { name: 'Fine_Sand', color: '#3b82f6' }    // Blue
+        };
 
-        // === 事件監聽 ===
-        uploadInput.addEventListener('change', handleFileUpload);
-        document.addEventListener('keydown', handleGlobalKeydown);
-        btnExport.addEventListener('click', exportResult);
+        // 計算實際畫布座標並排序的函數
+        function calculateCoordinatesAndSort() {
+            const invertY = document.getElementById('invertYCheckbox').checked;
+            const swapXY = document.getElementById('swapXYCheckbox').checked;
 
-        /**
-         * 處理 ZIP 檔案上傳
-         */
-        async function handleFileUpload(e) {
+            // 1. 計算每個 baseGroup 的最大 X 與最大 Y
+            for (const baseName in baseGroups) {
+                let maxX = 0;
+                let maxY = 0;
+                baseGroups[baseName].items.forEach(item => {
+                    let currentX = swapXY ? item.fileY : item.fileX;
+                    let currentY = swapXY ? item.fileX : item.fileY;
+                    if (currentX > maxX) maxX = currentX;
+                    if (currentY > maxY) maxY = currentY;
+                });
+                baseGroups[baseName].maxX = maxX;
+                baseGroups[baseName].maxY = maxY;
+
+                // 2. 計算每個 item 最終在畫布上的 x, y 座標
+                baseGroups[baseName].items.forEach(item => {
+                    let currentX = swapXY ? item.fileY : item.fileX;
+                    let currentY = swapXY ? item.fileX : item.fileY;
+                    
+                    item.x = currentX;
+                    // 如果勾選反轉 Y，則將 Y 座標倒過來 (MaxY - CurrentY)
+                    item.y = invertY ? (maxY - currentY) : currentY;
+                });
+            }
+            
+            // 3. 記住當前索引對應的檔名，避免重排後跳到別張圖
+            let currentFilename = '';
+            if (currentIndex >= 0 && currentIndex < imageItems.length) {
+                currentFilename = imageItems[currentIndex].filename;
+            }
+
+            // 4. 根據「畫布座標 (x, y)」重新排序，符合人類閱讀順序 (由上到下，由左到右)
+            imageItems.sort((a, b) => {
+                if (a.baseName !== b.baseName) return a.baseName.localeCompare(b.baseName);
+                if (a.y !== b.y) return a.y - b.y;
+                return a.x - b.x;
+            });
+
+            // 5. 找回原本在看的圖片 currentIndex
+            if (currentFilename) {
+                currentIndex = imageItems.findIndex(item => item.filename === currentFilename);
+                if (currentIndex === -1) currentIndex = 0;
+            }
+        }
+
+        // 手動切換校正設定時觸發
+        function applyTransform() {
+            if (imageItems.length === 0) return;
+            
+            calculateCoordinatesAndSort();
+            
+            // 強制重新繪製底圖
+            currentActiveBase = '';
+            updateUI();
+        }
+
+        document.getElementById('invertYCheckbox').addEventListener('change', applyTransform);
+        document.getElementById('swapXYCheckbox').addEventListener('change', applyTransform);
+
+        // 監聽 ZIP 上傳
+        zipInput.addEventListener('change', async function(e) {
             const file = e.target.files[0];
             if (!file) return;
 
-            loadingMsg.classList.remove('hidden');
-            uploadInput.parentElement.classList.add('opacity-50', 'pointer-events-none');
-
+            showLoading('正在讀取 ZIP 檔案...');
+            
             try {
-                const zip = new JSZip();
-                const loadedZip = await zip.loadAsync(file);
+                // 重置狀態
+                imageItems = [];
+                baseGroups = {};
+                currentIndex = -1;
+                currentActiveBase = '';
                 
-                imageFiles = [];
-                classifications = [];
-                currentIndex = 0;
+                const zip = await JSZip.loadAsync(file);
+                const promises = [];
 
-                // 過濾並搜集所有圖片檔案 (排除目錄與無關檔案，如 __MACOSX 隱藏檔)
-                loadedZip.forEach((relativePath, zipEntry) => {
-                    if (!zipEntry.dir && imageRegex.test(zipEntry.name) && !zipEntry.name.includes('__MACOSX')) {
-                        imageFiles.push(zipEntry);
-                    }
+                zip.forEach((relativePath, zipEntry) => {
+                    // 略過資料夾與非圖片檔案
+                    if (zipEntry.dir || !relativePath.match(/\.(jpg|jpeg|png)$/i)) return;
+
+                    promises.push(
+                        zipEntry.async('blob').then(blob => {
+                            const filename = zipEntry.name.split('/').pop(); // 取檔名
+                            
+                            // 解析檔名，格式: 檔名_X_Y.jpg
+                            const match = filename.match(/(.*)_(\d+)_(\d+)\.(jpg|jpeg|png)$/i);
+                            
+                            if (match) {
+                                const baseName = match[1];
+                                const fileX = parseInt(match[2], 10);
+                                const fileY = parseInt(match[3], 10);
+                                const url = URL.createObjectURL(blob);
+
+                                const item = {
+                                    filename: filename,
+                                    baseName: baseName,
+                                    fileX: fileX, // 記錄原始檔名上的 X
+                                    fileY: fileY, // 記錄原始檔名上的 Y
+                                    x: 0, // 畫布 X，稍後由函數計算
+                                    y: 0, // 畫布 Y，稍後由函數計算
+                                    blob: blob,
+                                    url: url,
+                                    imgElement: null, // 稍後建立
+                                    category: null // 使用者分類的結果
+                                };
+                                
+                                imageItems.push(item);
+
+                                // 記錄 Base 群組
+                                if (!baseGroups[baseName]) {
+                                    baseGroups[baseName] = { maxX: 0, maxY: 0, items: [] };
+                                }
+                                baseGroups[baseName].items.push(item);
+                            }
+                        })
+                    );
                 });
 
-                if (imageFiles.length === 0) {
-                    alert('在此 ZIP 檔案中找不到支援的圖片！');
-                    resetUpload();
+                await Promise.all(promises);
+
+                if (imageItems.length === 0) {
+                    alert('找不到符合格式 (檔名_X_Y.jpg) 的圖片！');
+                    hideLoading();
                     return;
                 }
 
-                // 準備進入工作區
-                classifications = new Array(imageFiles.length).fill(null);
-                
-                uploadView.classList.add('hidden');
-                workspaceView.classList.remove('hidden');
-                statusText.textContent = `已載入 ${imageFiles.length} 張圖片`;
-                
-                renderCurrentImage();
+                showLoading('正在產生預覽拼圖，這可能需要一點時間...');
+
+                // 根據當前打勾狀態，計算座標並排序
+                calculateCoordinatesAndSort();
+
+                // 預先載入所有 Image 物件供 Canvas 繪圖使用
+                const imgLoadPromises = imageItems.map(item => {
+                    return new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            item.imgElement = img;
+                            resolve();
+                        };
+                        img.onerror = resolve; // 錯誤也繼續
+                        img.src = item.url;
+                    });
+                });
+
+                await Promise.all(imgLoadPromises);
+
+                // 啟用匯出按鈕並開始分類流程
+                exportBtn.disabled = false;
+                currentIndex = 0;
+                updateUI();
+                hideLoading();
 
             } catch (err) {
                 console.error(err);
-                alert('讀取 ZIP 檔案失敗：' + err.message);
-                resetUpload();
+                alert('讀取 ZIP 檔案時發生錯誤：' + err.message);
+                hideLoading();
             }
+            
+            // 清空 input 讓同個檔案可以重新觸發 change
+            zipInput.value = '';
+        });
+
+        // 更新 UI (切換圖片時呼叫)
+        function updateUI() {
+            if (currentIndex < 0 || currentIndex >= imageItems.length) return;
+
+            const item = imageItems[currentIndex];
+
+            // 1. 更新右側當前圖片顯示
+            currentImg.src = item.url;
+            currentImg.classList.remove('hidden');
+            imgPlaceholder.classList.add('hidden');
+            
+            currentFilename.textContent = item.filename;
+            currentCoords.textContent = `原始檔名: X=${item.fileX}, Y=${item.fileY} | 畫布位置: X=${item.x}, Y=${item.y}`;
+            progressText.textContent = `${currentIndex + 1} / ${imageItems.length}`;
+
+            // 顯示目前分類狀態標籤
+            if (item.category) {
+                const catInfo = CATEGORIES[getCategoryKeyByName(item.category)];
+                statusBadge.textContent = item.category;
+                statusBadge.style.backgroundColor = catInfo.color;
+                statusBadge.classList.remove('hidden');
+            } else {
+                statusBadge.classList.add('hidden');
+            }
+
+            // 2. 處理拼圖 Canvas (若 baseName 改變才需要重繪底圖)
+            if (currentActiveBase !== item.baseName) {
+                drawBaseCanvas(item.baseName);
+                currentActiveBase = item.baseName;
+                currentBaseNameLabel.textContent = `拼圖群組: ${item.baseName}`;
+            }
+
+            // 3. 繪製綠色提示框並自動捲動對焦
+            drawOverlayHighlight(item.x, item.y);
+            
+            // 自動捲動預覽區讓綠框置中顯示
+            scrollCanvasTo(item.x, item.y);
         }
 
-        /**
-         * 顯示目前的圖片
-         */
-        async function renderCurrentImage() {
-            if (currentIndex >= imageFiles.length) {
-                // 分類完成
-                mainImage.classList.add('hidden');
-                endMessage.classList.remove('hidden');
-                classifiedBadge.classList.add('hidden');
-                currentFilename.textContent = "完成！";
-                updateProgress();
-                return;
-            }
+        // 繪製底圖 (僅在切換不同前綴檔名時執行)
+        function drawBaseCanvas(baseName) {
+            const group = baseGroups[baseName];
+            if (!group) return;
 
-            isProcessing = true;
-            mainImage.classList.add('hidden');
-            endMessage.classList.add('hidden');
-            imgLoader.classList.remove('hidden');
+            // 設定 Canvas 尺寸 (最大座標 + 64 px 寬高)
+            const width = group.maxX + 64;
+            const height = group.maxY + 64;
 
-            const entry = imageFiles[currentIndex];
-            currentFilename.textContent = entry.name.split('/').pop(); // 只顯示檔名不顯示路徑
+            canvasBase.width = width;
+            canvasBase.height = height;
+            canvasOverlay.width = width;
+            canvasOverlay.height = height;
 
-            try {
-                // 從 ZIP 中提取 Blob
-                const blob = await entry.async("blob");
-                
-                // 清除舊的 ObjectURL 避免 Memory Leak
-                if (currentObjectUrl) {
-                    URL.revokeObjectURL(currentObjectUrl);
+            // 清空並繪製底色
+            ctxBase.fillStyle = '#000000'; // 黑色底
+            ctxBase.fillRect(0, 0, width, height);
+
+            // 繪製該群組的所有圖片
+            group.items.forEach(item => {
+                if (item.imgElement) {
+                    ctxBase.drawImage(item.imgElement, item.x, item.y, 64, 64);
                 }
-                
-                currentObjectUrl = URL.createObjectURL(blob);
-                
-                // 圖片載入完成後再顯示
-                mainImage.onload = () => {
-                    imgLoader.classList.add('hidden');
-                    mainImage.classList.remove('hidden');
-                    isProcessing = false;
-                };
-                mainImage.src = currentObjectUrl;
+            });
+        }
 
-                // 檢查是否已經有分類過 (當我們按 Q 返回時)
-                const existingClass = classifications[currentIndex];
-                if (existingClass) {
-                    classifiedLabel.textContent = existingClass;
-                    classifiedBadge.classList.remove('hidden');
-                } else {
-                    classifiedBadge.classList.add('hidden');
+        // 繪製提示綠框
+        function drawOverlayHighlight(x, y) {
+            // 清空前一次的框框
+            ctxOverlay.clearRect(0, 0, canvasOverlay.width, canvasOverlay.height);
+            
+            // 繪製 64x64 的半透明綠色疊加區與粗綠色邊框
+            ctxOverlay.fillStyle = 'rgba(34, 197, 94, 0.4)'; // Tailwind green-500 透明
+            ctxOverlay.fillRect(x, y, 64, 64);
+            
+            ctxOverlay.strokeStyle = '#22c55e'; // Tailwind green-500
+            ctxOverlay.lineWidth = 3;
+            ctxOverlay.strokeRect(x, y, 64, 64);
+
+            // 如果有已經分類過的，畫個小標記上去
+            baseGroups[currentActiveBase].items.forEach(item => {
+                if (item.category && (item.x !== x || item.y !== y)) {
+                    ctxOverlay.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctxOverlay.fillRect(item.x, item.y, 64, 64);
+                    ctxOverlay.fillStyle = CATEGORIES[getCategoryKeyByName(item.category)].color;
+                    ctxOverlay.beginPath();
+                    ctxOverlay.arc(item.x + 32, item.y + 32, 10, 0, Math.PI * 2);
+                    ctxOverlay.fill();
                 }
-
-                updateProgress();
-
-            } catch (err) {
-                console.error("圖片載入失敗", err);
-                alert("圖片載入失敗，跳至下一張");
-                currentIndex++;
-                renderCurrentImage();
-            }
+            });
         }
 
-        /**
-         * 更新進度條與文字
-         */
-        function updateProgress() {
-            let processedCount = classifications.filter(c => c !== null).length;
-            let total = imageFiles.length;
+        // 自動捲動 Canvas 區塊將目標置中
+        function scrollCanvasTo(x, y) {
+            const containerWidth = canvasWrapper.clientWidth;
+            const containerHeight = canvasWrapper.clientHeight;
             
-            // 顯示目前進度 (例如: 第 5 張 / 共 10 張) 
-            // 若到底了，就顯示 "完成總數 / 總數"
-            let displayIndex = Math.min(currentIndex + 1, total);
-            if (currentIndex >= total) displayIndex = total;
+            const targetScrollLeft = x - (containerWidth / 2) + 32; // +32 是 64 寬的一半
+            const targetScrollTop = y - (containerHeight / 2) + 32;
 
-            progressText.textContent = `圖片: ${displayIndex} / ${total} (已分類: ${processedCount})`;
-            
-            let percent = (processedCount / total) * 100;
-            progressBar.style.width = `${percent}%`;
-
-            // 如果有分類過，就允許匯出（即使只有一張）
-            btnExport.disabled = processedCount === 0;
+            canvasWrapper.scrollTo({
+                left: targetScrollLeft,
+                top: targetScrollTop,
+                behavior: 'smooth'
+            });
         }
 
-        /**
-         * 處理分類動作
-         */
-        function handleClassification(categoryName) {
-            if (isProcessing || currentIndex >= imageFiles.length) return;
-
-            // 記錄分類結果
-            classifications[currentIndex] = categoryName;
-            
-            // 前進下一張
-            currentIndex++;
-            renderCurrentImage();
+        // 從名稱反查按鍵 Key (例如用 'Gravel' 找 '1')
+        function getCategoryKeyByName(name) {
+            return Object.keys(CATEGORIES).find(key => CATEGORIES[key].name === name);
         }
 
-        /**
-         * 處理返回動作 (Undo)
-         */
-        function undo() {
-            if (isProcessing) return;
-            if (currentIndex > 0) {
-                currentIndex--;
-                renderCurrentImage();
-            }
-        }
+        // 鍵盤事件監聽 (1, 2, 3, Q)
+        window.addEventListener('keydown', function(e) {
+            // 確保有載入圖片且沒有被 loading 擋住
+            if (imageItems.length === 0 || !loadingOverlay.classList.contains('hidden')) return;
 
-        /**
-         * 鍵盤事件對應
-         */
-        function handleGlobalKeydown(e) {
-            // 如果畫面還沒進入工作區，就不處理鍵盤事件
-            if (workspaceView.classList.contains('hidden')) return;
-            
             const key = e.key.toLowerCase();
-            
-            if (key === '1') {
-                handleClassification('Gravel');
-            } else if (key === '2') {
-                handleClassification('Coarse_Sand');
-            } else if (key === '3') {
-                handleClassification('Fine_Sand');
-            } else if (key === 'q') {
-                undo();
-            }
-        }
 
-        /**
-         * 匯出分類結果 ZIP
-         */
-        async function exportResult() {
-            if (classifications.filter(c => c !== null).length === 0) {
-                alert("目前還沒有分類任何圖片。");
-                return;
+            // 分類按鍵
+            if (CATEGORIES[key]) {
+                // 記錄分類
+                imageItems[currentIndex].category = CATEGORIES[key].name;
+                
+                // 跳到下一張
+                if (currentIndex < imageItems.length - 1) {
+                    currentIndex++;
+                    updateUI();
+                } else {
+                    updateUI();
+                    // 已是最後一張
+                    setTimeout(() => {
+                        if (confirm('已經是最後一張了！是否立即匯出結果？')) {
+                            exportResults();
+                        }
+                    }, 100);
+                }
+            } 
+            // 復原 (返回上一張)
+            else if (key === 'q') {
+                if (currentIndex > 0) {
+                    currentIndex--;
+                    updateUI();
+                }
             }
+        });
 
-            processingOverlay.classList.remove('hidden');
+        // 匯出功能
+        exportBtn.addEventListener('click', exportResults);
+
+        async function exportResults() {
+            if (imageItems.length === 0) return;
+
+            showLoading('正在建立匯出檔案 (這會包含您所有已分類及未分類的進度)...');
 
             try {
-                const outZip = new JSZip();
+                const newZip = new JSZip();
                 
-                // 建立要求的三個資料夾
-                const folders = {
-                    'Gravel': outZip.folder('Gravel'),
-                    'Coarse_Sand': outZip.folder('Coarse_Sand'),
-                    'Fine_Sand': outZip.folder('Fine_Sand')
-                };
+                // 建立資料夾
+                const folderGravel = newZip.folder('Gravel');
+                const folderCoarse = newZip.folder('Coarse_Sand');
+                const folderFine = newZip.folder('Fine_Sand');
+                const folderUncategorized = newZip.folder('Uncategorized'); // 尚未分類的保留區
 
-                let exportCount = 0;
-
-                // 處理所有有被分類的圖片
-                for (let i = 0; i < imageFiles.length; i++) {
-                    const category = classifications[i];
-                    if (category && folders[category]) {
-                        const entry = imageFiles[i];
-                        // 取得原本檔案的位元資料
-                        const data = await entry.async("uint8array");
-                        
-                        // 取得原始檔名 (忽略原先路徑)
-                        const originalFilename = entry.name.split('/').pop();
-                        
-                        // 將檔案放入對應資料夾
-                        folders[category].file(originalFilename, data);
-                        exportCount++;
+                // 將圖片放進對應資料夾
+                for (const item of imageItems) {
+                    if (item.category === 'Gravel') {
+                        folderGravel.file(item.filename, item.blob);
+                    } else if (item.category === 'Coarse_Sand') {
+                        folderCoarse.file(item.filename, item.blob);
+                    } else if (item.category === 'Fine_Sand') {
+                        folderFine.file(item.filename, item.blob);
+                    } else {
+                        folderUncategorized.file(item.filename, item.blob);
                     }
                 }
 
-                // 產生新的 ZIP
-                const content = await outZip.generateAsync({
-                    type: "blob",
-                    compression: "STORE" // 圖片已壓縮，直接 STORE 較快
-                });
-
-                // 下載檔案
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(content);
-                link.download = `Classified_Images_${exportCount}.zip`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                // 產生 ZIP Blob
+                const content = await newZip.generateAsync({ type: 'blob' });
                 
-                setTimeout(() => {
-                    alert(`成功匯出 ${exportCount} 張分類圖片！`);
-                }, 500);
+                // 使用 FileSaver 觸發下載
+                saveAs(content, 'Classified_Images.zip');
+                hideLoading();
 
             } catch (err) {
                 console.error(err);
-                alert("打包匯出時發生錯誤：" + err.message);
-            } finally {
-                processingOverlay.classList.add('hidden');
+                alert('匯出時發生錯誤：' + err.message);
+                hideLoading();
             }
         }
 
-        /**
-         * 重設上傳區狀態
-         */
-        function resetUpload() {
-            loadingMsg.classList.add('hidden');
-            uploadInput.parentElement.classList.remove('opacity-50', 'pointer-events-none');
-            uploadInput.value = ''; // 清除輸入
+        // Loading UI 切換
+        function showLoading(msg) {
+            loadingText.textContent = msg;
+            loadingOverlay.classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            loadingOverlay.classList.add('hidden');
         }
 
     </script>
