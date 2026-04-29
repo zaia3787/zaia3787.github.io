@@ -74,7 +74,7 @@
             </div>
             
             <div class="flex-1 p-6 flex flex-col items-center justify-center">
-                <div class="w-16 h-16 border-2 border-dashed border-gray-300 rounded flex items-center justify-center bg-gray-100 overflow-hidden mb-4 relative">
+                <div class="w-64 h-64 border-2 border-dashed border-gray-300 rounded flex items-center justify-center bg-gray-100 overflow-hidden mb-4 relative">
                     <img id="currentImg" class="w-full h-full object-contain [image-rendering:pixelated] hidden" />
                     <span id="imgPlaceholder" class="text-gray-400">尚未載入圖片</span>
                     
@@ -394,7 +394,7 @@
             ctxOverlay.fillRect(x, y, 16, 16);
             
             ctxOverlay.strokeStyle = '#22c55e'; // Tailwind green-500
-            ctxOverlay.lineWidth = 3;
+            ctxOverlay.lineWidth = 1.5; // 調細框線以適應 16x16
             ctxOverlay.strokeRect(x, y, 16, 16);
 
             // 如果有已經分類過的，畫個小標記上去
@@ -404,7 +404,8 @@
                     ctxOverlay.fillRect(item.x, item.y, 16, 16);
                     ctxOverlay.fillStyle = CATEGORIES[getCategoryKeyByName(item.category)].color;
                     ctxOverlay.beginPath();
-                    ctxOverlay.arc(item.x + 32, item.y + 32, 10, 0, Math.PI * 2);
+                    // 標記圓點半徑縮小為 4，中心偏移 8
+                    ctxOverlay.arc(item.x + 8, item.y + 8, 4, 0, Math.PI * 2);
                     ctxOverlay.fill();
                 }
             });
@@ -415,8 +416,8 @@
             const containerWidth = canvasWrapper.clientWidth;
             const containerHeight = canvasWrapper.clientHeight;
             
-            const targetScrollLeft = x - (containerWidth / 2) + 32; // +32 是 16 寬的一半
-            const targetScrollTop = y - (containerHeight / 2) + 32;
+            const targetScrollLeft = x - (containerWidth / 2) + 8; // +8 是 16 寬的一半
+            const targetScrollTop = y - (containerHeight / 2) + 8;
 
             canvasWrapper.scrollTo({
                 left: targetScrollLeft,
