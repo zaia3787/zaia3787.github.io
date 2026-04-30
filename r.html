@@ -174,8 +174,8 @@
                 <fieldset>
                     <legend>2. 選擇標籤組合 (Label Selection)</legend>
                     <div class="info-text" style="margin-bottom:10px;">
-                        * 畫布四周已預留 100px 的灰色「出血區」，方便框選邊緣，面積僅計算實際圖片範圍。<br>
-                        * 同顏色的相交圈會自動融合為單一閉鎖形狀，邊框細緻化為 1px。<br>
+                        * 畫布四周已預留 100px 的灰色「出血區」，方便框選邊緣，面積與顯示僅限實際圖片範圍。<br>
+                        * 同顏色的相交圈會自動聯集(OR)融合為單一閉鎖形狀，邊框細緻化為 1px。<br>
                         * 勾選複合標籤時，面積歸類邏輯：含細砂泥當作細砂泥；含粗砂當作粗砂。<br>
                         * 畫布實體重疊優先權：粗礪 > 粗砂 > 細砂泥（高優先權會直接覆蓋低優先權）。
                     </div>
@@ -397,7 +397,7 @@
             };
         }
 
-        // 重新繪製畫面 (支援閉鎖融合與細緻外框)
+        // 重新繪製畫面 (支援閉鎖融合、細緻外框，與影像範圍內裁切)
         function redrawCanvas() {
             ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
             
@@ -414,13 +414,30 @@
                 ctx.setLineDash([5, 5]);
                 ctx.strokeRect(BLEED, BLEED, img.width, img.height);
                 ctx.setLineDash([]);
+
+                // ★ 新增：設定裁切區域，確保所有標註只顯示在圖片內部
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(BLEED, BLEED, img.width, img.height);
+                ctx.clip();
             }
 
             // 2. 處理差集與圖層繪製
             fillCtx.clearRect(0, 0, fillLayerCanvas.width, fillLayerCanvas.height);
             borderCtx.clearRect(0, 0, borderLayerCanvas.width, borderLayerCanvas.height);
 
-            // 將多邊形依據「顏色」分組，達成同色完美融合 (Union)
+            // 輔助函式：繪製多邊形路徑
+            const tracePoly = (targetCtx, pts) => {
+                if (pts.length < 3) return;
+                targetCtx.beginPath();
+                targetCtx.moveTo(pts[0].x, pts[0].y);
+                for (let i = 1; i < pts.length; i++) {
+                    targetCtx.lineTo(pts[i].x, pts[i].y);
+                }
+                targetCtx.closePath();
+            };
+
+            // 將多邊形依據「顏色」分組，達成同色完美融合 (Union/OR)
             const groups = {};
             polygons.forEach(poly => {
                 const key = `${poly.cat.r},${poly.cat.g},${poly.cat.b}`;
@@ -432,26 +449,22 @@
             const sortedGroups = Object.values(groups).sort((a, b) => a.cat.prio - b.cat.prio);
 
             sortedGroups.forEach(group => {
-                // 將同色多邊形轉化為單一 Path2D
-                const path = new Path2D();
-                group.polys.forEach(poly => {
-                    if (poly.points.length < 3) return;
-                    path.moveTo(poly.points[0].x, poly.points[0].y);
-                    for (let i = 1; i < poly.points.length; i++) {
-                        path.lineTo(poly.points[i].x, poly.points[i].y);
-                    }
-                    path.closePath();
-                });
-
-                // a. 處理填色 (Fill Layer)
+                
+                // a. 處理填色 (Fill Layer)：逐一 fill 避免反方向路徑相消 (Winding Cancellation)
                 fillCtx.globalCompositeOperation = 'source-over';
                 fillCtx.fillStyle = `rgb(${group.cat.r}, ${group.cat.g}, ${group.cat.b})`;
-                fillCtx.fill(path, 'nonzero');
+                group.polys.forEach(poly => {
+                    tracePoly(fillCtx, poly.points);
+                    fillCtx.fill('nonzero');
+                });
 
-                // b. 在外框層先挖空此群組面積，讓低優先權的內部線條被抹除
+                // b. 在外框層先挖空此群組的內部面積，確保多個圖形交疊時內部線條被抹除
                 borderCtx.globalCompositeOperation = 'destination-out';
                 borderCtx.fillStyle = 'black';
-                borderCtx.fill(path, 'nonzero');
+                group.polys.forEach(poly => {
+                    tracePoly(borderCtx, poly.points);
+                    borderCtx.fill('nonzero');
+                });
 
                 // c. 在暫存畫布製作完美 1px 外框 (畫 2px 粗線再挖空內部)
                 tempCtx.clearRect(0, 0, tempCatCanvas.width, tempCatCanvas.height);
@@ -460,11 +473,17 @@
                 tempCtx.strokeStyle = `rgb(${group.cat.r}, ${group.cat.g}, ${group.cat.b})`;
                 tempCtx.lineWidth = 2; 
                 tempCtx.lineJoin = 'round';
-                tempCtx.stroke(path);
+                group.polys.forEach(poly => {
+                    tracePoly(tempCtx, poly.points);
+                    tempCtx.stroke();
+                });
 
                 tempCtx.globalCompositeOperation = 'destination-out';
                 tempCtx.fillStyle = 'black';
-                tempCtx.fill(path, 'nonzero');
+                group.polys.forEach(poly => {
+                    tracePoly(tempCtx, poly.points);
+                    tempCtx.fill('nonzero');
+                });
 
                 // d. 將完美外框繪製到 Border Layer
                 borderCtx.globalCompositeOperation = 'source-over';
@@ -481,11 +500,7 @@
             // 3. 繪製套索工具「正在拖拉」的預覽
             if (isDrawing && currentPolygon.length > 0) {
                 const cat = getActiveCategory();
-                ctx.beginPath();
-                ctx.moveTo(currentPolygon[0].x, currentPolygon[0].y);
-                for (let i = 1; i < currentPolygon.length; i++) {
-                    ctx.lineTo(currentPolygon[i].x, currentPolygon[i].y);
-                }
+                tracePoly(ctx, currentPolygon);
                 
                 ctx.fillStyle = `rgba(${cat.r}, ${cat.g}, ${cat.b}, 0.2)`;
                 ctx.fill();
@@ -495,6 +510,11 @@
                 ctx.setLineDash([5, 5]); 
                 ctx.stroke();
                 ctx.setLineDash([]); 
+            }
+
+            if (img.src) {
+                // ★ 新增：還原裁切設定，以免影響下一幀或其他非裁切內容
+                ctx.restore();
             }
         }
 
