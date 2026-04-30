@@ -28,7 +28,30 @@
             gap: 20px;
         }
 
-        /* 上方區域：扁長形圖片預覽與畫布 */
+        /* 上方區域容器 */
+        .top-section {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 畫布上方工具列 */
+        .canvas-toolbar {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            background-color: #f0f0f0;
+            border: 1px solid #000;
+            border-bottom: none;
+            padding: 8px 15px;
+            gap: 10px;
+            font-size: 0.95rem;
+        }
+
+        .canvas-toolbar input[type="range"] {
+            cursor: pointer;
+        }
+
+        /* 扁長形圖片預覽與畫布 */
         .top-panel {
             width: 100%;
             border: 1px solid #000;
@@ -157,8 +180,16 @@
 
     <div class="layout-wrapper">
         <!-- 上方預覽與繪製區域 -->
-        <div class="top-panel" id="canvasContainer">
-            <canvas id="mainCanvas"></canvas>
+        <div class="top-section">
+            <!-- 不透明度調整工具列 -->
+            <div class="canvas-toolbar">
+                <label for="opacitySlider"><strong>標籤不透明度:</strong></label>
+                <input type="range" id="opacitySlider" min="0" max="40" value="40">
+                <span id="opacityValue" style="min-width: 35px; text-align: right;">40%</span>
+            </div>
+            <div class="top-panel" id="canvasContainer">
+                <canvas id="mainCanvas"></canvas>
+            </div>
         </div>
 
         <!-- 下方分析與控制區域 -->
@@ -174,10 +205,7 @@
                 <fieldset>
                     <legend>2. 選擇標籤組合 (Label Selection)</legend>
                     <div class="info-text" style="margin-bottom:10px;">
-                        * 畫布四周已預留 100px 的灰色「出血區」，方便框選邊緣，面積與顯示僅限實際圖片範圍。<br>
-                        * 同顏色的相交圈會自動聯集(OR)融合為單一閉鎖形狀，邊框細緻化為 1px。<br>
-                        * 勾選複合標籤時，面積歸類邏輯：含細砂泥當作細砂泥；含粗砂當作粗砂。<br>
-                        * 畫布實體重疊優先權：粗礪 > 粗砂 > 細砂泥（高優先權會直接覆蓋低優先權）。
+                        * 畫布實體重疊優先權：粗礪 > 粗砂 > 細砂泥 。
                     </div>
                     <div class="checkbox-group">
                         <label>
@@ -229,7 +257,7 @@
             <div class="stats-panel">
                 <h3 style="margin-top: 0;">面積統計 (Area Statistics - 像素級差集運算)</h3>
                 <div class="info-text" style="margin-bottom: 10px;">
-                    ※ 此表格採用像素遮罩 (Pixel Mask) 技術計算。不同標籤圖層發生重疊時，系統會自動處理差集，保證面積計算 100% 不重複。
+                    ※ 包含兩種之標籤面積計算以顆粒直徑最小沉積物計算 。
                 </div>
                 <table>
                     <thead>
@@ -271,6 +299,10 @@
         const imageLoader = document.getElementById('imageLoader');
         const mainCanvas = document.getElementById('mainCanvas');
         const ctx = mainCanvas.getContext('2d');
+        
+        // UI 元素
+        const opacitySlider = document.getElementById('opacitySlider');
+        const opacityValue = document.getElementById('opacityValue');
         
         // 設定出血區大小 (畫布比圖片多出的邊界)
         const BLEED = 100;
@@ -314,6 +346,12 @@
             if(e.target.files[0]){
                 reader.readAsDataURL(e.target.files[0]);
             }
+        });
+
+        // 監聽不透明度滑桿變化
+        opacitySlider.addEventListener('input', function() {
+            opacityValue.innerText = this.value + '%';
+            redrawCanvas(); // 數值改變時即時重繪畫布
         });
 
         // 解析當前勾選狀態
@@ -415,7 +453,7 @@
                 ctx.strokeRect(BLEED, BLEED, img.width, img.height);
                 ctx.setLineDash([]);
 
-                // ★ 新增：設定裁切區域，確保所有標註只顯示在圖片內部
+                // 設定裁切區域，確保所有標註只顯示在圖片內部
                 ctx.save();
                 ctx.beginPath();
                 ctx.rect(BLEED, BLEED, img.width, img.height);
@@ -450,7 +488,7 @@
 
             sortedGroups.forEach(group => {
                 
-                // a. 處理填色 (Fill Layer)：逐一 fill 避免反方向路徑相消 (Winding Cancellation)
+                // a. 處理填色 (Fill Layer)：逐一 fill 避免反方向路徑相消
                 fillCtx.globalCompositeOperation = 'source-over';
                 fillCtx.fillStyle = `rgb(${group.cat.r}, ${group.cat.g}, ${group.cat.b})`;
                 group.polys.forEach(poly => {
@@ -490,11 +528,12 @@
                 borderCtx.drawImage(tempCatCanvas, 0, 0);
             });
 
-            // 將處理好的填色層與外框層疊加上去
-            ctx.globalAlpha = 0.4;
+            // 將處理好的填色層與外框層疊加上去 (讀取滑桿設定的數值)
+            const currentOpacity = parseFloat(opacitySlider.value) / 100;
+            ctx.globalAlpha = currentOpacity;
             ctx.drawImage(fillLayerCanvas, 0, 0);
             
-            ctx.globalAlpha = 1.0; // 外框不透明
+            ctx.globalAlpha = 1.0; // 外框保持不透明
             ctx.drawImage(borderLayerCanvas, 0, 0);
 
             // 3. 繪製套索工具「正在拖拉」的預覽
@@ -502,7 +541,9 @@
                 const cat = getActiveCategory();
                 tracePoly(ctx, currentPolygon);
                 
-                ctx.fillStyle = `rgba(${cat.r}, ${cat.g}, ${cat.b}, 0.2)`;
+                // 拖拉時的預覽透明度設為當前設定值的一半，避免視覺混淆
+                const previewOpacity = currentOpacity * 0.5;
+                ctx.fillStyle = `rgba(${cat.r}, ${cat.g}, ${cat.b}, ${previewOpacity})`;
                 ctx.fill();
 
                 ctx.strokeStyle = `rgb(${cat.r}, ${cat.g}, ${cat.b})`;
@@ -513,7 +554,7 @@
             }
 
             if (img.src) {
-                // ★ 新增：還原裁切設定，以免影響下一幀或其他非裁切內容
+                // 還原裁切設定
                 ctx.restore();
             }
         }
@@ -543,7 +584,7 @@
                 calcCtx.fill();
             });
 
-            // ★ 關鍵：僅提取「實際圖片範圍」的像素，無視出血區！
+            // 僅提取「實際圖片範圍」的像素，無視出血區！
             if (img.src) {
                 const imgData = calcCtx.getImageData(BLEED, BLEED, img.width, img.height).data;
                 let areaG = 0, areaC = 0, areaF = 0;
