@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>學生創造力表單評分系統 (混合工具進階推薦版)</title>
+    <title>學生創造力表單評分系統 (智能推薦通用版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -32,9 +32,9 @@
     <header class="bg-indigo-800 text-white p-4 shadow-md shrink-0 flex justify-between items-center z-20">
         <div>
             <h1 class="text-2xl font-bold flex items-center gap-2">
-                批次創造力評分系統 <span class="text-xs bg-amber-400 text-indigo-900 px-2 py-1 rounded font-bold border border-amber-300">單/雙/三工具智能推薦版</span>
+                批次創造力評分系統 <span class="text-xs bg-amber-400 text-indigo-900 px-2 py-1 rounded font-bold border border-amber-300">智能推薦 8 格通用版</span>
             </h1>
-            <p class="text-sm text-indigo-200 mt-1">本地關鍵字比對將精準提供 4個單工具、2個雙工具、2個三工具推薦！</p>
+            <p class="text-sm text-indigo-200 mt-1">智能推薦：前 4 個單工具、後 4 個混合工具，點擊自動依序填入！</p>
         </div>
         <div class="flex items-center gap-3 text-sm md:text-base">
             <label id="btn-norm" class="bg-amber-500 hover:bg-amber-400 cursor-pointer px-3 py-2 rounded font-bold transition-colors shadow flex items-center gap-2">
@@ -54,7 +54,7 @@
     <!-- AI 處理中遮罩 -->
     <div id="ai-overlay" class="fixed inset-0 bg-slate-900 bg-opacity-80 z-50 flex flex-col items-center justify-center hidden">
         <div class="loader mb-6"></div>
-        <h2 id="ai-loading-title" class="text-3xl font-bold text-white mb-2">Gemini AI 正在深度比對並分類常模...</h2>
+        <h2 id="ai-loading-title" class="text-3xl font-bold text-white mb-2">Gemini AI 正在深度比對常模資料...</h2>
         <p id="ai-loading-desc" class="text-indigo-200 text-lg">這可能需要幾秒鐘的時間，請稍候。</p>
         
         <div id="ai-progress-container" class="w-full max-w-md mt-6 hidden">
@@ -83,10 +83,10 @@
             <!-- 批次執行按鈕 -->
             <div id="batch-ai-container" class="p-3 border-b border-slate-200 bg-indigo-50 hidden flex-col gap-2">
                 <button id="ai-batch-pre-btn" type="button" class="w-full py-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded font-bold shadow-md transition-transform transform active:scale-95 text-xs flex justify-center items-center gap-1 cursor-pointer">
-                    <span>🚀 Gemini AI 批次改全班 (前測)</span>
+                    <span>🚀 AI 批次改全班 (前測)</span>
                 </button>
                 <button id="ai-batch-post-btn" type="button" class="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded font-bold shadow-md transition-transform transform active:scale-95 text-xs flex justify-center items-center gap-1 cursor-pointer">
-                    <span>🚀 Gemini AI 批次改全班 (後測)</span>
+                    <span>🚀 AI 批次改全班 (後測)</span>
                 </button>
             </div>
 
@@ -151,11 +151,10 @@
 
     <script>
         // === 系統設定 ===
-        // 每題有 8 個輸入格 (單工具4、雙工具2、三工具2)
         const CONFIG = { scenarios: 3, questionsPerScenario: 3, blanksPerQuestion: 8 };
         const START_COL_INDEX = 8; 
         
-        // Gemini API Key (系統環境內建提供)
+        // Gemini API Key
         const apiKey = ""; 
 
         // === 狀態管理 ===
@@ -336,14 +335,13 @@
         }
 
         // ==========================================
-        // 🔍 本地字詞比對推薦演算法 (智能分類：單/雙/三工具)
+        // 🔍 本地字詞比對推薦演算法 (順序：4單、2雙、2三)
         // ==========================================
-        function getTopKeywordMatchesGrouped(studentText, normPool) {
-            const result = { single: [], mix1: [], mix2: [] };
-            if (!studentText || studentText.trim() === '' || studentText === '無作答') return result;
+        function getTopKeywordMatchesOrdered(studentText, normPool) {
+            if (!studentText || studentText.trim() === '' || studentText === '無作答') return [];
 
             const sText = studentText.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '');
-            if (sText.length === 0) return result;
+            if (sText.length === 0) return [];
 
             let scoredNorms = normPool.map(norm => {
                 const nText = norm.text.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '');
@@ -361,23 +359,24 @@
                 return { norm, score, plusCount };
             });
 
-            // 過濾掉未命中的，依照分數高至低排序
+            // 僅保留有命中的項目，並按分數由高到低排序 (分數相同則字少優先)
             scoredNorms = scoredNorms.filter(sn => sn.score > 0);
             scoredNorms.sort((a, b) => {
                 if (b.score !== a.score) return b.score - a.score;
                 return a.norm.text.length - b.norm.text.length;
             });
 
-            // 擷取對應數量的最佳推薦
-            result.single = scoredNorms.filter(sn => sn.plusCount === 0).slice(0, 4).map(sn => sn.norm);
-            result.mix1   = scoredNorms.filter(sn => sn.plusCount === 1).slice(0, 2).map(sn => sn.norm);
-            result.mix2   = scoredNorms.filter(sn => sn.plusCount >= 2).slice(0, 2).map(sn => sn.norm);
+            // 擷取指定數量的分類項目並設定樣式
+            const singles = scoredNorms.filter(sn => sn.plusCount === 0).slice(0, 4).map(sn => ({...sn.norm, tag: '單工具', color: 'text-slate-600', bg: 'bg-slate-200'}));
+            const mix1 = scoredNorms.filter(sn => sn.plusCount === 1).slice(0, 2).map(sn => ({...sn.norm, tag: '雙工具', color: 'text-blue-700', bg: 'bg-blue-100'}));
+            const mix2 = scoredNorms.filter(sn => sn.plusCount >= 2).slice(0, 2).map(sn => ({...sn.norm, tag: '三工具', color: 'text-purple-700', bg: 'bg-purple-100'}));
 
-            return result;
+            // 合併成一個單一的排序陣列 (長度最多為 8)
+            return [...singles, ...mix1, ...mix2];
         }
 
         // ==========================================
-        // 🤖 3. AI 評分核心邏輯 (分類版：單、雙、三工具)
+        // 🤖 3. AI 評分核心邏輯 (通用 8 格版)
         // ==========================================
         async function runAIGradingForStudent(studentIndex, testType) {
             const studentRow = studentsData[studentIndex];
@@ -424,26 +423,23 @@
             }
 
             promptText += `
-請嚴格輸出為 JSON 格式，為每一題產生三個分類的陣列：
+請嚴格輸出為 JSON 格式，格式如下：
 {
-  "Q1_Single": ["符合的編號A", "符合的編號B"],
-  "Q1_Mix1": ["符合的編號C"],
-  "Q1_Mix2": ["符合的編號D"],
+  "Q1": ["符合的編號A", "符合的編號B"],
+  "Q2": ["符合的編號C"],
   ...
+  "Q9": [] 
 }
 注意：
-1. 【Single】陣列：僅放入「單一工具解法」的常模編號（常模【精簡版】名稱中「沒有」 + 號）。最多選 4 個。
-2. 【Mix1】陣列：僅放入「雙工具混合解法」的常模編號（常模【精簡版】名稱中「剛好有 1 個」 + 號）。最多選 2 個。
-3. 【Mix2】陣列：僅放入「三工具混合解法」的常模編號（常模【精簡版】名稱中「剛好有 2 個」或以上 + 號）。最多選 2 個。
-4. 僅放入「確實對應到學生作答」的常模編號，如果沒有作答或與任何常模皆不相干，請給空陣列 []。
-5. 若為前測，編號必定從該【情境】可選常模選；若為後測，必定從該【題目】專屬常模選。只回傳有效編號。
+1. 每題最多挑選 8 個不重複的編號。
+2. 由於學生較少使用混合工具，請「優先尋找」符合的單工具編號。若學生的解法明確結合了多種工具，再挑選含有「+」號的混合工具編號。
+3. 僅放入「確實對應到學生作答」的常模編號，如果沒有作答或與任何常模皆不相干，請給空陣列 []。
+4. 若為前測，編號必定從該【情境】可選常模選；若為後測，必定從該【題目】專屬常模選。只回傳有效編號字串。
 `;
 
             const propertiesObj = {};
             for(let i=1; i<=9; i++) {
-                propertiesObj[`Q${i}_Single`] = { type: "ARRAY", items: { type: "STRING" } };
-                propertiesObj[`Q${i}_Mix1`] = { type: "ARRAY", items: { type: "STRING" } };
-                propertiesObj[`Q${i}_Mix2`] = { type: "ARRAY", items: { type: "STRING" } };
+                propertiesObj[`Q${i}`] = { type: "ARRAY", items: { type: "STRING" } };
             }
 
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
@@ -472,29 +468,22 @@
             let hasAnyGrade = false;
 
             for (let i = 0; i < 9; i++) {
-                const singleIds = parsedResult[`Q${i + 1}_Single`] || [];
-                const mix1Ids   = parsedResult[`Q${i + 1}_Mix1`] || [];
-                const mix2Ids   = parsedResult[`Q${i + 1}_Mix2`] || [];
+                const matchedIds = parsedResult[`Q${i + 1}`] || [];
                 
+                // 清空 8 格
                 for(let b=0; b < CONFIG.blanksPerQuestion; b++) { targetScoreData.questions[i].inputs[b] = ''; }
 
-                const fillIds = (ids, startIndex, maxCount) => {
-                    for (let j = 0; j < Math.min(ids.length, maxCount); j++) {
-                        const targetId = ids[j].toString().trim();
-                        const normItem = findNormItemInfo(targetId);
-                        if (normItem) {
-                            targetScoreData.questions[i].inputs[startIndex + j] = `${normItem.id}(${normItem.val},${normItem.orig})`;
-                            hasAnyGrade = true;
-                        } else if (targetId && targetId !== "none" && targetId !== "null") {
-                            targetScoreData.questions[i].inputs[startIndex + j] = `${targetId}(0,0)`;
-                            hasAnyGrade = true;
-                        }
+                for (let j = 0; j < Math.min(matchedIds.length, CONFIG.blanksPerQuestion); j++) {
+                    const targetId = matchedIds[j].toString().trim();
+                    const normItem = findNormItemInfo(targetId);
+                    if (normItem) {
+                        targetScoreData.questions[i].inputs[j] = `${normItem.id}(${normItem.val},${normItem.orig})`;
+                        hasAnyGrade = true;
+                    } else if (targetId && targetId !== "none" && targetId !== "null") {
+                        targetScoreData.questions[i].inputs[j] = `${targetId}(0,0)`;
+                        hasAnyGrade = true;
                     }
-                };
-
-                fillIds(singleIds, 0, 4); // 單工具 (4格)
-                fillIds(mix1Ids, 4, 2);   // 雙工具 (2格)
-                fillIds(mix2Ids, 6, 2);   // 三工具 (2格)
+                }
             }
             return hasAnyGrade;
         }
@@ -576,27 +565,18 @@
             }
         }
 
-        // 全域：點擊建議常模，自動計算加號數量並智能入座
-        window.fillSuggestion = function(qIdx, valStr, plusCount) {
-            let startIdx = 0, endIdx = 4;
-            let typeName = "單工具";
-            
-            if (plusCount === 1) { 
-                startIdx = 4; endIdx = 6; typeName = "雙工具"; 
-            } else if (plusCount >= 2) { 
-                startIdx = 6; endIdx = 8; typeName = "三工具"; 
-            }
-
+        // 全域：點擊建議常模，自動由左至右尋找空格填入！
+        window.fillSuggestion = function(qIdx, valStr) {
             const inputs = document.querySelectorAll(`.score-input[data-qidx="${qIdx}"]`);
-            for (let i = startIdx; i < endIdx; i++) {
+            for (let i = 0; i < inputs.length; i++) {
                 if (inputs[i].value.trim() === '') {
                     inputs[i].value = valStr;
-                    inputs[i].dispatchEvent(new Event('input'));
-                    showMessage(`✅ 已自動加入【${typeName}】空格！`, "success");
+                    inputs[i].dispatchEvent(new Event('input')); // 觸發計算
+                    showMessage(`✅ 已自動加入空格！`, "success");
                     return;
                 }
             }
-            showMessage(`⚠️ 該題的【${typeName}】空格（共 ${endIdx - startIdx} 格）已經滿囉！`, "error");
+            showMessage(`⚠️ 該題的 8 個空格已經滿囉！`, "error");
         };
 
         // 背景重算成績
@@ -719,7 +699,7 @@
             formContainer.scrollTop = 0;
         }
 
-        // 動態生成畫面 (包含 8 個分類空格 + 🔍 分群本地推薦區塊)
+        // 動態生成畫面 (包含 8 個通用空格 + 🔍 本地字詞順序推薦區塊)
         function buildScoringForm(studentRow, scoreData) {
             let html = '';
             let qCounter = 1;
@@ -758,7 +738,8 @@
                         else if (s === 3) currentNormPool = [...normDB[7], ...normDB[8], ...normDB[9]];
                     }
                     
-                    const keywordSuggestions = getTopKeywordMatchesGrouped(combinedTextForMatch, currentNormPool);
+                    // 取出智能排序後的推薦陣列 (上限 8 筆)
+                    const keywordSuggestions = getTopKeywordMatchesOrdered(combinedTextForMatch, currentNormPool);
                     const savedInputs = scoreData.questions[globalQIdx].inputs;
 
                     html += `
@@ -766,7 +747,6 @@
                             <h3 class="text-base font-bold text-indigo-700 mb-3 border-b pb-2">第 ${qCounter} 題 <span class="text-xs font-normal text-slate-400 ml-2">(${isPostTestFormat ? '後測模式' : '前測模式'})</span></h3>
                     `;
 
-                    // 學生回答區塊
                     if (isPostTestFormat) {
                         html += `
                             <div class="grid grid-cols-1 gap-4 mb-5 text-sm">
@@ -795,29 +775,19 @@
                         `;
                     }
                             
-                    // 評分輸入區塊 (8個格子分類)
+                    // 評分通用輸入區塊 (8個格子)
                     html += `
                             <div class="bg-slate-50 p-4 rounded border border-slate-200">
-                                <div class="text-xs text-slate-500 mb-3 font-bold">分類評分編碼區域 (共8格)：</div>
+                                <div class="text-xs text-slate-500 mb-3 font-bold">評分編碼區域 (共8格通用)：</div>
                                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                     `;
 
                     for (let b = 0; b < CONFIG.blanksPerQuestion; b++) {
-                        let label = "", placeholder = "", labelColor = "";
-                        if (b < 4) {
-                            label = "單工具 (無+)"; placeholder = `單工具 ${b+1}`; labelColor = "text-slate-500";
-                        } else if (b < 6) {
-                            label = "雙工具 (一個+)"; placeholder = `雙工具 ${b-3}`; labelColor = "text-blue-500";
-                        } else {
-                            label = "三工具 (兩個+)"; placeholder = `三工具 ${b-5}`; labelColor = "text-purple-500";
-                        }
-                        
                         html += `
                                 <div class="flex flex-col">
-                                    <span class="text-[11px] font-bold ${labelColor} mb-1">${label}</span>
                                     <input type="text" 
                                         class="score-input w-full p-2 border border-slate-300 rounded text-sm text-slate-700 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition-colors" 
-                                        placeholder="${placeholder}" 
+                                        placeholder="編碼 ${b+1}" 
                                         data-qidx="${globalQIdx}" 
                                         data-bidx="${b}"
                                         value="${savedInputs[b] || ''}">
@@ -835,41 +805,29 @@
                             </div>
                     `;
 
-                    // 🔍 系統字詞比對推薦區塊 (智能分類版)
-                    const hasSuggestions = keywordSuggestions.single.length > 0 || keywordSuggestions.mix1.length > 0 || keywordSuggestions.mix2.length > 0;
-                    if (hasSuggestions) {
+                    // 🔍 系統字詞比對推薦區塊 (混合清單排序版)
+                    if (keywordSuggestions.length > 0) {
                         html += `
-                            <div class="mt-4 bg-amber-50/50 p-4 rounded-lg border border-amber-200 shadow-inner">
+                            <div class="mt-4 bg-amber-50 p-4 rounded-lg border border-amber-200 shadow-sm">
                                 <div class="text-sm font-bold text-amber-800 mb-3 flex items-center gap-1 border-b border-amber-200 pb-2">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                                    系統智能字詞推薦 (依命中字數分組排列，點擊自動入座)：
+                                    系統智能字詞推薦 (依序：前4單工具、後4混合工具)：
                                 </div>
-                                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                         `;
                         
-                        // 輔助函式: 生成推薦群組 HTML
-                        const renderGroup = (title, items, plusCount, colorClass) => {
-                            if (items.length === 0) return '';
-                            let groupHtml = `
-                                <div class="flex flex-col gap-1.5 bg-white p-2 rounded border border-slate-200 shadow-sm">
-                                    <div class="text-xs font-bold ${colorClass} mb-1 border-b pb-1">${title} (最多 ${items.length} 筆)</div>
+                        keywordSuggestions.forEach((norm) => {
+                            const valStr = `${norm.id}(${norm.val},${norm.orig})`;
+                            html += `
+                                <button type="button" onclick="window.fillSuggestion(${globalQIdx}, '${valStr}')" class="text-left text-xs bg-white hover:bg-amber-100 border border-amber-200 p-2 rounded transition-colors flex justify-between items-center group cursor-pointer shadow-sm">
+                                    <div class="flex items-center gap-2 overflow-hidden flex-1 pr-2">
+                                        <span class="${norm.bg} ${norm.color} px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap font-bold shrink-0">${norm.tag}</span>
+                                        <span class="text-slate-700 truncate" title="${norm.text}"><span class="font-bold text-slate-900 mr-1">${norm.id}</span>${norm.text}</span>
+                                    </div>
+                                    <span class="text-[10px] font-bold text-slate-400 group-hover:text-amber-700 whitespace-nowrap shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">點擊填入 ↵</span>
+                                </button>
                             `;
-                            items.forEach((norm) => {
-                                const valStr = `${norm.id}(${norm.val},${norm.orig})`;
-                                groupHtml += `
-                                    <button type="button" onclick="window.fillSuggestion(${globalQIdx}, '${valStr}', ${plusCount})" class="text-left text-xs hover:bg-slate-100 border border-transparent hover:border-slate-300 p-1.5 rounded transition-colors flex justify-between items-center group cursor-pointer">
-                                        <span class="text-slate-600 flex-1 pr-2 line-clamp-2" title="${norm.text}"><span class="font-bold text-slate-800 mr-1">${norm.id}</span>${norm.text}</span>
-                                        <span class="text-[10px] font-bold text-slate-400 group-hover:text-indigo-600 whitespace-nowrap bg-slate-50 group-hover:bg-indigo-100 px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">填入</span>
-                                    </button>
-                                `;
-                            });
-                            groupHtml += `</div>`;
-                            return groupHtml;
-                        };
-
-                        html += renderGroup("單工具推薦 (無+)", keywordSuggestions.single, 0, "text-slate-600");
-                        html += renderGroup("雙工具推薦 (一個+)", keywordSuggestions.mix1, 1, "text-blue-600");
-                        html += renderGroup("三工具推薦 (兩個+)", keywordSuggestions.mix2, 2, "text-purple-600");
+                        });
 
                         html += `</div></div>`;
                     }
