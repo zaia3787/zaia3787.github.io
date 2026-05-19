@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>學生創造力表單評分系統 (混合工具進階分類版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #6366f1;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-slate-100 h-screen overflow-hidden flex flex-col font-sans text-slate-800">
+
+    <!-- 自訂浮動提示訊息容器 -->
+    <div id="toast-container" class="fixed top-5 left-1/2 transform -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- 頂部導覽列 -->
+    <header class="bg-indigo-800 text-white p-4 shadow-md shrink-0 flex justify-between items-center z-20">
+        <div>
+            <h1 class="text-2xl font-bold flex items-center gap-2">
+                批次創造力評分系統 <span class="text-xs bg-amber-400 text-indigo-900 px-2 py-1 rounded font-bold border border-amber-300">單雙三工具智能分類版</span>
+            </h1>
+            <p class="text-sm text-indigo-200 mt-1">單工具4格、雙工具2格、三工具2格，AI 與點擊均會自動分類入座！</p>
+        </div>
+        <div class="flex items-center gap-3 text-sm md:text-base">
+            <label id="btn-norm" class="bg-amber-500 hover:bg-amber-400 cursor-pointer px-3 py-2 rounded font-bold transition-colors shadow flex items-center gap-2">
+                <span>📂 1. 上傳常模 (Excel)</span>
+                <input type="file" id="norm-upload" accept=".xlsx, .xls, .csv" class="hidden">
+            </label>
+            <label id="btn-student" class="bg-indigo-500 text-slate-300 cursor-not-allowed px-3 py-2 rounded font-bold transition-colors shadow flex items-center gap-2" title="請先上傳常模">
+                <span>📂 2. 上傳作答 (Excel)</span>
+                <input type="file" id="file-upload" accept=".xlsx, .xls, .csv" class="hidden" disabled>
+            </label>
+            <button id="export-btn" type="button" class="bg-green-600 hover:bg-green-500 text-white px-3 py-2 rounded font-bold transition-colors shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2" disabled>
+                <span>💾 3. 匯出成績 (Excel)</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- AI 處理中遮罩 -->
+    <div id="ai-overlay" class="fixed inset-0 bg-slate-900 bg-opacity-80 z-50 flex flex-col items-center justify-center hidden">
+        <div class="loader mb-6"></div>
+        <h2 id="ai-loading-title" class="text-3xl font-bold text-white mb-2">AI 正在深度比對並分類常模...</h2>
+        <p id="ai-loading-desc" class="text-indigo-200 text-lg">這可能需要幾秒鐘的時間，請稍候。</p>
+        
+        <div id="ai-progress-container" class="w-full max-w-md mt-6 hidden">
+            <div class="bg-slate-700 rounded-full h-4 w-full overflow-hidden">
+                <div id="ai-progress-bar" class="bg-gradient-to-r from-indigo-500 to-purple-500 h-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <p id="ai-progress-text" class="text-center text-slate-300 mt-2 text-sm">進度: 0 / 0</p>
+        </div>
+    </div>
+
+    <!-- 主要工作區 -->
+    <main class="flex flex-1 overflow-hidden relative">
+        
+        <!-- 左側：學生清單 -->
+        <aside class="w-1/4 max-w-xs bg-white border-r border-slate-200 flex flex-col z-0 shadow-lg">
+            <div class="p-4 bg-slate-50 border-b border-slate-200 font-bold flex justify-between items-center">
+                <span>學生清單</span>
+                <span id="student-count" class="text-sm text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">0 人</span>
+            </div>
+            
+            <div id="norm-status" class="px-4 py-2 bg-amber-50 border-b border-amber-100 text-xs text-amber-800 flex items-center gap-2 hidden">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                常模已精確載入至題庫 (Q1~Q9)
+            </div>
+
+            <!-- 批次執行按鈕 -->
+            <div id="batch-ai-container" class="p-3 border-b border-slate-200 bg-indigo-50 hidden flex-col gap-2">
+                <button id="ai-batch-pre-btn" type="button" class="w-full py-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded font-bold shadow-md transition-transform transform active:scale-95 text-xs flex justify-center items-center gap-1 cursor-pointer">
+                    <span>🚀 AI 批次改全班 (前測)</span>
+                </button>
+                <button id="ai-batch-post-btn" type="button" class="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded font-bold shadow-md transition-transform transform active:scale-95 text-xs flex justify-center items-center gap-1 cursor-pointer">
+                    <span>🚀 AI 批次改全班 (後測)</span>
+                </button>
+            </div>
+
+            <ul id="student-list" class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                <li class="text-center text-slate-400 mt-10 text-sm">請先依序上傳檔案</li>
+            </ul>
+        </aside>
+
+        <!-- 右側：評分主畫面 -->
+        <section class="flex-1 flex flex-col bg-slate-100 overflow-hidden relative">
+            
+            <!-- 學生基本資料標頭 -->
+            <div id="student-header" class="bg-white p-4 border-b border-slate-200 shadow-sm shrink-0 flex justify-between items-center hidden">
+                <div>
+                    <span class="text-sm text-slate-500 font-bold mr-2" id="stu-class"></span>
+                    <span class="text-2xl font-black text-indigo-900 mr-4" id="stu-name"></span>
+                    <span class="text-sm bg-indigo-100 text-indigo-700 px-2 py-1 rounded" id="stu-no"></span>
+                </div>
+                <div class="flex gap-2">
+                    <button id="ai-pre-btn" type="button" class="px-3 py-2 bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-400 hover:to-blue-400 text-white rounded font-bold shadow flex items-center gap-1 transition-transform transform active:scale-95 text-sm cursor-pointer">
+                        <span>✨ AI 前測評估</span>
+                    </button>
+                    <button id="ai-post-btn" type="button" class="px-3 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white rounded font-bold shadow flex items-center gap-1 transition-transform transform active:scale-95 text-sm mr-2 cursor-pointer">
+                        <span>✨ AI 後測評估</span>
+                    </button>
+                    
+                    <div class="h-full w-px bg-slate-300 mx-1"></div>
+                    <button id="prev-btn" type="button" class="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded font-bold cursor-pointer">⬅ 上一個</button>
+                    <button id="next-btn" type="button" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold cursor-pointer">下一個 ➡</button>
+                </div>
+            </div>
+
+            <!-- 題目與評分區 -->
+            <div id="form-container" class="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8 pb-32 hidden"></div>
+
+            <!-- 未載入時的提示 -->
+            <div id="empty-state" class="absolute inset-0 flex items-center justify-center text-slate-400 flex-col">
+                <svg class="w-16 h-16 mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                <p class="text-lg" id="empty-msg">等待載入常模與作答資料...</p>
+            </div>
+
+            <!-- 底部固定總成績 -->
+            <div id="score-footer" class="absolute bottom-0 w-full bg-white border-t-4 border-indigo-500 p-3 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] hidden">
+                <div class="flex justify-between items-center max-w-5xl mx-auto">
+                    <div class="font-bold text-slate-600">目前學生總結</div>
+                    <div class="flex gap-4 text-sm md:text-base">
+                        <div class="bg-blue-50 text-blue-800 px-4 py-1.5 rounded-lg border border-blue-200">
+                            總價值: <span id="grand-val" class="text-xl font-bold ml-1">0</span>
+                        </div>
+                        <div class="bg-green-50 text-green-800 px-4 py-1.5 rounded-lg border border-green-200">
+                            總獨創: <span id="grand-orig" class="text-xl font-bold ml-1">0</span>
+                        </div>
+                        <div class="bg-purple-50 text-purple-800 px-4 py-1.5 rounded-lg border border-purple-200">
+                            總創造: <span id="grand-crea" class="text-xl font-bold ml-1">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <script>
+        // === 系統設定 ===
+        // 現在每題有 8 個輸入格 (單工具4、雙工具2、三工具2)
+        const CONFIG = { scenarios: 3, questionsPerScenario: 3, blanksPerQuestion: 8 };
+        const START_COL_INDEX = 8; 
+        
+        // Gemini API Key (系統環境內建提供)
+        const apiKey = ""; 
+
+        // === 狀態管理 ===
+        let normDB = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [], 8: [], 9: [] }; 
+        let isNormLoaded = false;
+        
+        let headers = [];       
+        let studentsData = [];  
+        let scoresData = [];    
+        let currentIndex = -1;  
+
+        // === DOM 元素 ===
+        const normUpload = document.getElementById('norm-upload');
+        const fileUpload = document.getElementById('file-upload');
+        const exportBtn = document.getElementById('export-btn');
+        const btnStudentLabel = document.getElementById('btn-student');
+        const btnNormLabel = document.getElementById('btn-norm');
+        
+        const studentListEl = document.getElementById('student-list');
+        const formContainer = document.getElementById('form-container');
+        const studentHeader = document.getElementById('student-header');
+        const scoreFooter = document.getElementById('score-footer');
+        const emptyState = document.getElementById('empty-state');
+        const emptyMsg = document.getElementById('empty-msg');
+        
+        const aiOverlay = document.getElementById('ai-overlay');
+        const aiLoadingTitle = document.getElementById('ai-loading-title');
+        const aiLoadingDesc = document.getElementById('ai-loading-desc');
+        const aiProgressContainer = document.getElementById('ai-progress-container');
+        const aiProgressBar = document.getElementById('ai-progress-bar');
+        const aiProgressText = document.getElementById('ai-progress-text');
+        
+        const aiPreBtn = document.getElementById('ai-pre-btn');
+        const aiPostBtn = document.getElementById('ai-post-btn');
+        const aiBatchPreBtn = document.getElementById('ai-batch-pre-btn');
+        const aiBatchPostBtn = document.getElementById('ai-batch-post-btn');
+        const batchAiContainer = document.getElementById('batch-ai-container');
+
+        // 🚀 UI 訊息提示
+        function showMessage(msg, type = 'error') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgColor = type === 'error' ? 'bg-red-600' : (type === 'success' ? 'bg-green-600' : 'bg-blue-600');
+            toast.className = `${bgColor} text-white px-6 py-3 rounded-lg shadow-xl font-bold transition-opacity duration-300 opacity-0`;
+            toast.innerText = msg;
+            container.appendChild(toast);
+            
+            requestAnimationFrame(() => toast.classList.remove('opacity-0'));
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // 解析 Excel 的共用函式
+        function parseExcelFile(file, isHeaderRow) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const json = XLSX.utils.sheet_to_json(firstSheet, { 
+                            header: isHeaderRow ? undefined : 1,
+                            defval: "" 
+                        });
+                        resolve(json);
+                    } catch (err) { reject(err); }
+                };
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // 📁 1. 處理常模上傳
+        normUpload.addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                const data = await parseExcelFile(file, true);
+                if (data.length === 0 || !data[0]['編號']) {
+                    showMessage("常模格式錯誤！請確保包含『編號』、『使用方法(精簡版)』、『價值性』、『獨創性』等標題。", "error");
+                    return;
+                }
+                
+                normDB = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [], 8: [], 9: [] };
+                let validCount = 0;
+                
+                data.forEach(row => {
+                    const idStr = row['編號'] ? row['編號'].toString().trim() : '';
+                    if (idStr.length >= 5) {
+                        const firstDigit = parseInt(idStr.charAt(0), 10);
+                        if (!isNaN(firstDigit) && firstDigit >= 1 && firstDigit <= 9) {
+                            const item = {
+                                id: idStr,
+                                text: row['使用方法(精簡版)'] || '',
+                                val: parseInt(row['價值性'] || '0', 10),
+                                orig: parseInt(row['獨創性'] || '0', 10)
+                            };
+                            normDB[firstDigit].push(item);
+                            validCount++;
+                        }
+                    }
+                });
+
+                if (validCount > 0) {
+                    isNormLoaded = true;
+                    document.getElementById('norm-status').classList.remove('hidden');
+                    
+                    btnNormLabel.classList.replace('bg-amber-500', 'bg-slate-200');
+                    btnNormLabel.classList.replace('hover:bg-amber-400', 'hover:bg-slate-300');
+                    btnNormLabel.classList.replace('text-white', 'text-slate-600');
+                    btnNormLabel.querySelector('span').innerText = `✅ 常模已載入 (${validCount} 筆)`;
+                    
+                    btnStudentLabel.classList.replace('bg-indigo-500', 'bg-indigo-600');
+                    btnStudentLabel.classList.replace('text-slate-300', 'text-white');
+                    btnStudentLabel.classList.replace('cursor-not-allowed', 'cursor-pointer');
+                    btnStudentLabel.classList.replace('hover:bg-indigo-400', 'hover:bg-indigo-500');
+                    btnStudentLabel.title = "";
+                    fileUpload.disabled = false;
+
+                    emptyMsg.innerText = "請上傳學生作答 Excel (不限前後測)";
+                    showMessage(`✅ 常模成功載入 (${validCount} 筆)`, "success");
+                } else {
+                    showMessage("未能成功解析常模編號，請確認檔案格式正確 (需為 1xxxx ~ 9xxxx)。", "error");
+                }
+            } catch (error) {
+                showMessage("讀取檔案發生錯誤，請確認檔案是否為正常的 Excel。", "error");
+            }
+        });
+
+        // 📁 2. 處理學生作答上傳
+        fileUpload.addEventListener('change', async function(e) {
+            if (!isNormLoaded) {
+                showMessage("請先上傳常模！", "error");
+                return;
+            }
+
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                const data = await parseExcelFile(file, false);
+                const validData = data.filter(row => row.some(cell => cell !== ""));
+                
+                if (validData.length < 2) {
+                    showMessage("學生檔案格式似乎不對或沒有資料！", "error");
+                    return;
+                }
+                
+                headers = validData[0];
+                studentsData = validData.slice(1);
+                scoresData = studentsData.map(() => initEmptyScoreData());
+                
+                renderStudentList();
+                exportBtn.disabled = false;
+                
+                batchAiContainer.classList.remove('hidden'); 
+                batchAiContainer.classList.add('flex'); 
+                
+                showMessage(`✅ 學生作答已載入 (${studentsData.length} 筆)`, "success");
+                selectStudent(0); 
+            } catch (error) {
+                showMessage("讀取檔案發生錯誤，請確認檔案是否為正常的 Excel。", "error");
+            }
+        });
+
+        function findNormItemInfo(id) {
+            if (!id) return null;
+            const firstDigit = parseInt(id.toString().charAt(0), 10);
+            if(firstDigit >= 1 && firstDigit <= 9) {
+                const found = normDB[firstDigit].find(n => n.id == id);
+                if (found) return found;
+            }
+            return null;
+        }
+
+        // ==========================================
+        // 🔍 本地字詞比對推薦演算法 (瞬間完成)
+        // ==========================================
+        function getTopKeywordMatches(studentText, normPool) {
+            if (!studentText || studentText.trim() === '' || studentText === '無作答') return [];
+
+            // 移除標點符號，只保留中英文數字
+            const sText = studentText.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '');
+            if (sText.length === 0) return [];
+
+            let scoredNorms = normPool.map(norm => {
+                const nText = norm.text.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '');
+                let score = 0;
+
+                if (nText.length > 0) {
+                    // 雙字串 (Bi-gram) 比對
+                    for(let i=0; i<nText.length-1; i++) {
+                        if(sText.includes(nText.substring(i, i+2))) {
+                            score += 3;
+                        }
+                    }
+                    // 單字比對
+                    for(let i=0; i<nText.length; i++) {
+                        if(sText.includes(nText[i])) {
+                            score += 1;
+                        }
+                    }
+                }
+                return { norm, score };
+            });
+
+            // 依據分數降冪排序；分數相同時字數少的優先
+            scoredNorms.sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score;
+                return a.norm.text.length - b.norm.text.length;
+            });
+
+            // 取 Top 5
+            return scoredNorms.filter(sn => sn.score > 0).slice(0, 5).map(sn => sn.norm);
+        }
+
+        // ==========================================
+        // 🤖 3. AI 評分核心邏輯 (分類版：單、雙、三工具)
+        // ==========================================
+        async function runAIGradingForStudent(studentIndex, testType) {
+            const studentRow = studentsData[studentIndex];
+            let promptText = `你是一個專業的創造力評分系統。學生的作答分為 3 個情境，共 9 題。\n`;
+
+            if (testType === 'pre') {
+                promptText += `【重要】：前測中，學生在同一個情境內的作答順序可能是錯亂的！
+請閱讀該情境內的「所有」學生作答，並從我提供的「該情境專屬常模」中，找出對應的編號。\n\n`;
+
+                let qCounter = 1;
+                for (let s = 1; s <= CONFIG.scenarios; s++) {
+                    promptText += `======== 【情境 ${s}】 ========\n學生作答如下：\n`;
+                    for (let q = 1; q <= CONFIG.questionsPerScenario; q++) {
+                        const globalQIdx = qCounter - 1;
+                        const dataColStart = START_COL_INDEX + (globalQIdx) * 3;
+                        const problem = studentRow[dataColStart] || '無作答';
+                        const tools = studentRow[dataColStart + 1] || '無作答';
+                        const solution = studentRow[dataColStart + 2] || '無作答';
+                        promptText += `- Q${qCounter}: 主要問題：${problem}；使用工具：${tools}；解法：${solution}\n`;
+                        qCounter++;
+                    }
+                    
+                    promptText += `\n【情境 ${s} 可選的常模編號清單】 (請僅從此清單挑選)：\n`;
+                    let scenarioNorms = [];
+                    if (s === 1) scenarioNorms = [...normDB[1], ...normDB[2], ...normDB[3]];
+                    if (s === 2) scenarioNorms = [...normDB[4], ...normDB[5], ...normDB[6]];
+                    if (s === 3) scenarioNorms = [...normDB[7], ...normDB[8], ...normDB[9]];
+                    const normOptions = scenarioNorms.map(n => `${n.id}: ${n.text}`).join('\n');
+                    promptText += `${normOptions}\n\n`;
+                }
+            } else {
+                promptText += `【重要】：後測的題目與常模是「一對一固定」的！
+請針對每一題的作答，從該題「專屬的常模清單」中找出對應的編號。\n\n`;
+
+                for (let qCounter = 1; qCounter <= 9; qCounter++) {
+                    promptText += `======== 【Q${qCounter}】 ========\n`;
+                    const solution = studentRow[START_COL_INDEX + (qCounter - 1)] || '無作答';
+                    promptText += `學生解法：${solution}\n`;
+                    
+                    promptText += `【Q${qCounter} 專屬可選常模編號清單】 (請僅從此清單挑選)：\n`;
+                    const normOptions = normDB[qCounter].map(n => `${n.id}: ${n.text}`).join('\n');
+                    promptText += `${normOptions}\n\n`;
+                }
+            }
+
+            // 新版分類指令
+            promptText += `
+請嚴格輸出為 JSON 格式，為每一題產生三個分類的陣列：
+{
+  "Q1_Single": ["符合的編號A", "符合的編號B"],
+  "Q1_Mix1": ["符合的編號C"],
+  "Q1_Mix2": ["符合的編號D"],
+  ...
+}
+注意：
+1. 【Single】陣列：僅放入「單一工具解法」的常模編號（常模【精簡版】名稱中「沒有」 + 號）。最多選 4 個。
+2. 【Mix1】陣列：僅放入「雙工具混合解法」的常模編號（常模【精簡版】名稱中「剛好有 1 個」 + 號）。最多選 2 個。
+3. 【Mix2】陣列：僅放入「三工具混合解法」的常模編號（常模【精簡版】名稱中「剛好有 2 個」或以上 + 號）。最多選 2 個。
+4. 僅放入「確實對應到學生作答」的常模編號，如果沒有作答或與任何常模皆不相干，請給空陣列 []。
+5. 若為前測，編號必定從該【情境】可選常模選；若為後測，必定從該【題目】專屬常模選。只回傳有效編號。
+`;
+
+            // 動態構建 JSON Schema
+            const propertiesObj = {};
+            for(let i=1; i<=9; i++) {
+                propertiesObj[`Q${i}_Single`] = { type: "ARRAY", items: { type: "STRING" } };
+                propertiesObj[`Q${i}_Mix1`] = { type: "ARRAY", items: { type: "STRING" } };
+                propertiesObj[`Q${i}_Mix2`] = { type: "ARRAY", items: { type: "STRING" } };
+            }
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ parts: [{ text: promptText }] }],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: { type: "OBJECT", properties: propertiesObj }
+                }
+            };
+
+            const result = await fetchWithRetry(url, {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+            });
+
+            const rawJsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!rawJsonText) throw new Error("AI 回傳格式不符預期");
+
+            let parsedResult = {};
+            try {
+                const cleanJson = rawJsonText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                parsedResult = JSON.parse(cleanJson);
+            } catch(e) { throw new Error("無法解析 AI 回傳的 JSON 資料"); }
+
+            const targetScoreData = scoresData[studentIndex];
+            let hasAnyGrade = false;
+
+            for (let i = 0; i < 9; i++) {
+                const singleIds = parsedResult[`Q${i + 1}_Single`] || [];
+                const mix1Ids   = parsedResult[`Q${i + 1}_Mix1`] || [];
+                const mix2Ids   = parsedResult[`Q${i + 1}_Mix2`] || [];
+                
+                // 清空原有的空格 (總共 8 格)
+                for(let b=0; b < CONFIG.blanksPerQuestion; b++) { targetScoreData.questions[i].inputs[b] = ''; }
+
+                // 填入輔助函式
+                const fillIds = (ids, startIndex, maxCount) => {
+                    for (let j = 0; j < Math.min(ids.length, maxCount); j++) {
+                        const targetId = ids[j].toString().trim();
+                        const normItem = findNormItemInfo(targetId);
+                        if (normItem) {
+                            targetScoreData.questions[i].inputs[startIndex + j] = `${normItem.id}(${normItem.val},${normItem.orig})`;
+                            hasAnyGrade = true;
+                        } else if (targetId && targetId !== "none" && targetId !== "null") {
+                            targetScoreData.questions[i].inputs[startIndex + j] = `${targetId}(0,0)`;
+                            hasAnyGrade = true;
+                        }
+                    }
+                };
+
+                // 分別依序填入對應的空位區間
+                fillIds(singleIds, 0, 4); // Index 0~3: 單工具 (4格)
+                fillIds(mix1Ids, 4, 2);   // Index 4~5: 雙工具 (2格)
+                fillIds(mix2Ids, 6, 2);   // Index 6~7: 三工具 (2格)
+            }
+            return hasAnyGrade;
+        }
+
+        // 單一學生點擊事件 (AI 功能)
+        aiPreBtn.addEventListener('click', () => triggerSingleAIGrade('pre'));
+        aiPostBtn.addEventListener('click', () => triggerSingleAIGrade('post'));
+
+        async function triggerSingleAIGrade(testType) {
+            if (!isNormLoaded) { showMessage("請先上傳常模檔案！", "error"); return; }
+            if (currentIndex === -1) return;
+            
+            aiLoadingTitle.innerText = `AI 正在比對當前學生的回答 (${testType === 'pre' ? '前測' : '後測'})...`;
+            aiLoadingDesc.innerText = "這可能需要幾秒鐘，請稍候。";
+            aiProgressContainer.classList.add('hidden');
+            aiOverlay.classList.remove('hidden');
+
+            try {
+                await runAIGradingForStudent(currentIndex, testType);
+                buildScoringForm(studentsData[currentIndex], scoresData[currentIndex]);
+                calculateAndSaveScores();
+                showMessage("✨ AI 評估完成！", "success");
+            } catch (error) {
+                showMessage("處理失敗，請稍後重試。原因：" + error.message, "error");
+            } finally {
+                aiOverlay.classList.add('hidden');
+            }
+        }
+
+        // 全班批次點擊事件 (AI 功能)
+        aiBatchPreBtn.addEventListener('click', () => triggerBatchAIGrade('pre'));
+        aiBatchPostBtn.addEventListener('click', () => triggerBatchAIGrade('post'));
+
+        async function triggerBatchAIGrade(testType) {
+            if (!isNormLoaded) { showMessage("請先上傳常模檔案！", "error"); return; }
+            if (studentsData.length === 0) { showMessage("請先上傳學生作答資料！", "error"); return; }
+            
+            const modeName = testType === 'pre' ? '前測' : '後測';
+            
+            aiLoadingTitle.innerText = `🚀 AI 全班批次評分進行中 (${modeName})...`;
+            aiProgressContainer.classList.remove('hidden');
+            aiOverlay.classList.remove('hidden');
+            
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            let successCount = 0;
+            
+            for (let i = 0; i < studentsData.length; i++) {
+                const percent = Math.round((i / studentsData.length) * 100);
+                aiProgressBar.style.width = `${percent}%`;
+                aiProgressText.innerText = `正在評估: ${studentsData[i][3] || '未知姓名'} (第 ${i + 1} / ${studentsData.length} 位)`;
+                aiLoadingDesc.innerText = "請勿關閉視窗，資料正在處理中...";
+                
+                await new Promise(r => setTimeout(r, 50));
+
+                try {
+                    await runAIGradingForStudent(i, testType);
+                    successCount++;
+                    
+                    recalculateBackgroundScore(i);
+                    renderStudentList(); 
+                    
+                    if (i < studentsData.length - 1) {
+                        await new Promise(r => setTimeout(r, 500));
+                    }
+                } catch (error) {
+                    aiProgressText.innerText = `⚠️ ${studentsData[i][3] || '未知姓名'} 評分失敗，將跳過...`;
+                    await new Promise(r => setTimeout(r, 500)); 
+                }
+            }
+
+            aiOverlay.classList.add('hidden');
+            if (currentIndex !== -1) { selectStudent(currentIndex); }
+            
+            if(successCount === 0) {
+                showMessage(`⚠️ 批次評估完成，但「成功數為 0」。`, "error");
+            } else {
+                showMessage(`🎉 批次評估完成！共成功自動評閱了 ${successCount} / ${studentsData.length} 位學生。`, "success");
+            }
+        }
+
+        // 全域：點擊建議常模，自動計算加號數量並智能入座
+        window.fillSuggestion = function(qIdx, valStr, plusCount) {
+            let startIdx = 0, endIdx = 4;
+            let typeName = "單工具";
+            
+            if (plusCount === 1) { 
+                startIdx = 4; endIdx = 6; typeName = "雙工具"; 
+            } else if (plusCount >= 2) { 
+                startIdx = 6; endIdx = 8; typeName = "三工具"; 
+            }
+
+            const inputs = document.querySelectorAll(`.score-input[data-qidx="${qIdx}"]`);
+            for (let i = startIdx; i < endIdx; i++) {
+                if (inputs[i].value.trim() === '') {
+                    inputs[i].value = valStr;
+                    // 觸發 input 事件，讓原有的計算邏輯接手
+                    inputs[i].dispatchEvent(new Event('input'));
+                    showMessage(`✅ 已自動加入【${typeName}】空格！`, "success");
+                    return;
+                }
+            }
+            showMessage(`⚠️ 該題的【${typeName}】空格（共 ${endIdx - startIdx} 格）已經滿囉！`, "error");
+        };
+
+        // 背景重算成績
+        function recalculateBackgroundScore(idx) {
+            const currentData = scoresData[idx];
+            let grandTotalVal = 0, grandTotalOrig = 0, grandTotalCrea = 0;
+            let hasAnyInput = false;
+
+            for (let s = 0; s < CONFIG.scenarios; s++) {
+                let sVal = 0, sOrig = 0, sCrea = 0;
+                for (let q = 0; q < CONFIG.questionsPerScenario; q++) {
+                    let globalQIdx = s * CONFIG.questionsPerScenario + q;
+                    let qVal = 0, qOrig = 0, qCrea = 0;
+
+                    currentData.questions[globalQIdx].inputs.forEach(val => {
+                        let match = val.match(/[\(（]\s*(\d+)\s*[,，]\s*(\d+)\s*[\)）]/);
+                        if (match) {
+                            hasAnyInput = true;
+                            let a = parseInt(match[1], 10);
+                            let b = parseInt(match[2], 10);
+                            qVal += a; qOrig += b; qCrea += (a * b);
+                        } else if (val.trim() !== "") { hasAnyInput = true; }
+                    });
+                    
+                    currentData.questions[globalQIdx].val = qVal;
+                    currentData.questions[globalQIdx].orig = qOrig;
+                    currentData.questions[globalQIdx].crea = qCrea;
+                    sVal += qVal; sOrig += qOrig; sCrea += qCrea;
+                }
+                currentData.scenarios[s].val = sVal;
+                currentData.scenarios[s].orig = sOrig;
+                currentData.scenarios[s].crea = sCrea;
+                grandTotalVal += sVal; grandTotalOrig += sOrig; grandTotalCrea += sCrea;
+            }
+            currentData.total.val = grandTotalVal;
+            currentData.total.orig = grandTotalOrig;
+            currentData.total.crea = grandTotalCrea;
+            currentData.isGraded = hasAnyInput;
+        }
+
+        // Fetch 重試
+        async function fetchWithRetry(url, options, maxRetries = 5) {
+            const delays = [1000, 2000, 4000, 8000, 16000];
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return await response.json();
+                } catch (e) {
+                    if (i === maxRetries - 1) throw e;
+                    console.log(`API 發生錯誤，正進行第 ${i+1} 次重試...`);
+                    await new Promise(res => setTimeout(res, delays[i]));
+                }
+            }
+        }
+
+        // 📊 UI 初始化
+        function initEmptyScoreData() {
+            let data = { questions: [], scenarios: [], total: { val: 0, orig: 0, crea: 0 }, isGraded: false };
+            for(let q=1; q<=9; q++) data.questions.push({ inputs: Array(CONFIG.blanksPerQuestion).fill(''), val: 0, orig: 0, crea: 0 });
+            for(let s=1; s<=3; s++) data.scenarios.push({ val: 0, orig: 0, crea: 0 });
+            return data;
+        }
+
+        function renderStudentList() {
+            document.getElementById('student-count').innerText = `${studentsData.length} 人`;
+            studentListEl.innerHTML = '';
+
+            studentsData.forEach((row, index) => {
+                const name = row[3] || '未知姓名';
+                const classNum = row[1] ? `${row[1]}班` : '';
+                const seatNum = row[2] ? `${row[2]}號` : '';
+                const isGraded = scoresData[index].isGraded;
+
+                const li = document.createElement('li');
+                li.className = `p-3 rounded cursor-pointer border-l-4 transition-colors ${
+                    index === currentIndex 
+                    ? 'bg-indigo-50 border-indigo-500 font-bold text-indigo-800' 
+                    : 'bg-white border-transparent hover:bg-slate-50 text-slate-700'
+                }`;
+                li.onclick = () => selectStudent(index);
+                
+                li.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <div class="text-xs text-slate-400">${classNum} ${seatNum}</div>
+                            <div class="text-sm">${name}</div>
+                        </div>
+                        <div id="status-${index}" class="text-xs px-2 py-1 rounded ${isGraded ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}">
+                            ${isGraded ? '已評' : '未評'}
+                        </div>
+                    </div>
+                `;
+                studentListEl.appendChild(li);
+            });
+        }
+
+        function selectStudent(index) {
+            if (index < 0 || index >= studentsData.length) return;
+            currentIndex = index;
+            const student = studentsData[index];
+            
+            renderStudentList();
+            emptyState.classList.add('hidden');
+            studentHeader.classList.remove('hidden');
+            formContainer.classList.remove('hidden');
+            scoreFooter.classList.remove('hidden');
+
+            document.getElementById('stu-class').innerText = student[1] ? `${student[1]} 班` : '';
+            document.getElementById('stu-no').innerText = student[2] ? `座號: ${student[2]}` : '';
+            document.getElementById('stu-name').innerText = student[3] || '未知姓名';
+
+            document.getElementById('prev-btn').disabled = (index === 0);
+            document.getElementById('prev-btn').classList.toggle('opacity-50', index === 0);
+            document.getElementById('next-btn').disabled = (index === studentsData.length - 1);
+            document.getElementById('next-btn').classList.toggle('opacity-50', index === studentsData.length - 1);
+
+            buildScoringForm(student, scoresData[index]);
+            calculateAndSaveScores(); 
+            formContainer.scrollTop = 0;
+        }
+
+        // 動態生成畫面 (包含 8 個分類空格 + 🔍 本地字詞比對區塊)
+        function buildScoringForm(studentRow, scoreData) {
+            let html = '';
+            let qCounter = 1;
+            const isPostTestFormat = studentRow.length <= 20;
+
+            for (let s = 1; s <= CONFIG.scenarios; s++) {
+                html += `
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-slate-50 border-b border-slate-200 px-5 py-3 flex justify-between items-center">
+                        <h2 class="text-xl font-bold text-slate-800">情境 ${s}</h2>
+                        <span class="text-xs text-slate-500">常模比對範圍: ${isPostTestFormat ? '對應單一題庫' : (s===1?'1xxxx-3xxxx':(s===2?'4xxxx-6xxxx':'7xxxx-9xxxx'))}</span>
+                    </div>
+                    <div class="p-5 space-y-6">
+                `;
+
+                for (let q = 1; q <= CONFIG.questionsPerScenario; q++) {
+                    const globalQIdx = qCounter - 1;
+                    
+                    let problem = '', tools = '', solution = '';
+                    let combinedTextForMatch = ''; 
+                    let currentNormPool = [];      
+
+                    if (isPostTestFormat) {
+                        solution = studentRow[START_COL_INDEX + globalQIdx] || '<span class="text-slate-400 italic">無作答</span>';
+                        combinedTextForMatch = solution;
+                        currentNormPool = normDB[qCounter] || [];
+                    } else {
+                        const dataColStart = START_COL_INDEX + (globalQIdx) * 3;
+                        problem = studentRow[dataColStart] || '<span class="text-slate-400 italic">無作答</span>';
+                        tools = studentRow[dataColStart + 1] || '<span class="text-slate-400 italic">無作答</span>';
+                        solution = studentRow[dataColStart + 2] || '<span class="text-slate-400 italic">無作答</span>';
+                        
+                        combinedTextForMatch = `${problem} ${tools} ${solution}`;
+                        if (s === 1) currentNormPool = [...normDB[1], ...normDB[2], ...normDB[3]];
+                        else if (s === 2) currentNormPool = [...normDB[4], ...normDB[5], ...normDB[6]];
+                        else if (s === 3) currentNormPool = [...normDB[7], ...normDB[8], ...normDB[9]];
+                    }
+                    
+                    const keywordSuggestions = getTopKeywordMatches(combinedTextForMatch, currentNormPool);
+                    const savedInputs = scoreData.questions[globalQIdx].inputs;
+
+                    html += `
+                        <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+                            <h3 class="text-base font-bold text-indigo-700 mb-3 border-b pb-2">第 ${qCounter} 題 <span class="text-xs font-normal text-slate-400 ml-2">(${isPostTestFormat ? '後測模式' : '前測模式'})</span></h3>
+                    `;
+
+                    // 學生回答區塊
+                    if (isPostTestFormat) {
+                        html += `
+                            <div class="grid grid-cols-1 gap-4 mb-5 text-sm">
+                                <div class="bg-emerald-50 p-3 rounded border border-emerald-100">
+                                    <div class="text-xs text-emerald-600 font-bold mb-1">學生的解決方法 (評分依據)</div>
+                                    <div class="text-slate-700 leading-relaxed">${solution}</div>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        html += `
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5 text-sm">
+                                <div class="bg-orange-50 p-3 rounded border border-orange-100">
+                                    <div class="text-xs text-orange-600 font-bold mb-1">主要問題</div>
+                                    <div class="text-slate-700">${problem}</div>
+                                </div>
+                                <div class="bg-blue-50 p-3 rounded border border-blue-100">
+                                    <div class="text-xs text-blue-600 font-bold mb-1">選擇工具</div>
+                                    <div class="text-slate-700">${tools}</div>
+                                </div>
+                                <div class="bg-emerald-50 p-3 rounded border border-emerald-100 md:col-span-1">
+                                    <div class="text-xs text-emerald-600 font-bold mb-1">解決方法 (評分依據)</div>
+                                    <div class="text-slate-700">${solution}</div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                            
+                    // 評分輸入區塊 (8個格子分類)
+                    html += `
+                            <div class="bg-slate-50 p-4 rounded border border-slate-200">
+                                <div class="text-xs text-slate-500 mb-3 font-bold">分類評分編碼區域 (共8格)：</div>
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                    `;
+
+                    for (let b = 0; b < CONFIG.blanksPerQuestion; b++) {
+                        let label = "", placeholder = "", labelColor = "";
+                        if (b < 4) {
+                            label = "單工具 (無+)"; placeholder = `單工具 ${b+1}`; labelColor = "text-slate-500";
+                        } else if (b < 6) {
+                            label = "雙工具 (一個+)"; placeholder = `雙工具 ${b-3}`; labelColor = "text-blue-500";
+                        } else {
+                            label = "三工具 (兩個+)"; placeholder = `三工具 ${b-5}`; labelColor = "text-purple-500";
+                        }
+                        
+                        html += `
+                                <div class="flex flex-col">
+                                    <span class="text-[11px] font-bold ${labelColor} mb-1">${label}</span>
+                                    <input type="text" 
+                                        class="score-input w-full p-2 border border-slate-300 rounded text-sm text-slate-700 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition-colors" 
+                                        placeholder="${placeholder}" 
+                                        data-qidx="${globalQIdx}" 
+                                        data-bidx="${b}"
+                                        value="${savedInputs[b] || ''}">
+                                </div>
+                        `;
+                    }
+
+                    html += `
+                                </div>
+                                <div class="flex justify-end gap-3 text-sm font-semibold">
+                                    <div class="text-blue-700">價值性: <span id="q-val-${globalQIdx}">0</span></div>
+                                    <div class="text-green-700">獨創性: <span id="q-orig-${globalQIdx}">0</span></div>
+                                    <div class="text-purple-700">創造力: <span id="q-crea-${globalQIdx}">0</span></div>
+                                </div>
+                            </div>
+                    `;
+
+                    // 🔍 系統字詞比對推薦區塊
+                    if (keywordSuggestions.length > 0) {
+                        html += `
+                            <div class="mt-4 bg-amber-50/50 p-3 rounded-lg border border-amber-200 shadow-inner">
+                                <div class="text-xs font-bold text-amber-800 mb-2 flex items-center gap-1">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                    系統智能字詞推薦 (點擊後將自動判斷加號數量並填入對應分類格)：
+                                </div>
+                                <div class="flex flex-col gap-1.5">
+                        `;
+                        
+                        keywordSuggestions.forEach((norm) => {
+                            const valStr = `${norm.id}(${norm.val},${norm.orig})`;
+                            // 計算有幾個 + 號
+                            const plusCount = (norm.text.match(/\+/g) || []).length;
+                            
+                            html += `
+                                <button type="button" onclick="window.fillSuggestion(${globalQIdx}, '${valStr}', ${plusCount})" class="text-left text-sm bg-white hover:bg-amber-100 border border-amber-200 p-2 rounded transition-colors flex justify-between items-center group cursor-pointer shadow-sm">
+                                    <span class="text-slate-700 flex-1 pr-4"><span class="font-bold text-amber-700 mr-2">${norm.id}</span>${norm.text}</span>
+                                    <span class="text-xs font-bold text-slate-400 group-hover:text-amber-700 whitespace-nowrap bg-slate-100 group-hover:bg-amber-200 px-2 py-1 rounded">點擊入座 ↵</span>
+                                </button>
+                            `;
+                        });
+
+                        html += `</div></div>`;
+                    }
+
+                    html += `</div>`; 
+                    qCounter++;
+                }
+
+                html += `
+                    </div>
+                    <div class="bg-indigo-50 border-t border-indigo-100 p-3 px-5 flex justify-between items-center font-bold text-sm">
+                        <span class="text-indigo-900">情境 ${s} 小計</span>
+                        <div class="flex gap-4">
+                            <span class="text-blue-700">價值: <span id="s-val-${s-1}">0</span></span>
+                            <span class="text-green-700">獨創: <span id="s-orig-${s-1}">0</span></span>
+                            <span class="text-purple-700">創造: <span id="s-crea-${s-1}">0</span></span>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            formContainer.innerHTML = html;
+
+            document.querySelectorAll('.score-input').forEach(input => {
+                input.addEventListener('input', calculateAndSaveScores);
+            });
+        }
+
+        function calculateAndSaveScores() {
+            if (currentIndex === -1) return;
+            const currentScoreData = scoresData[currentIndex];
+            let hasAnyInput = false;
+            let grandTotalVal = 0, grandTotalOrig = 0, grandTotalCrea = 0;
+
+            for (let s = 0; s < CONFIG.scenarios; s++) {
+                let sVal = 0, sOrig = 0, sCrea = 0;
+                for (let q = 0; q < CONFIG.questionsPerScenario; q++) {
+                    let globalQIdx = s * CONFIG.questionsPerScenario + q;
+                    let qVal = 0, qOrig = 0, qCrea = 0;
+
+                    const inputs = document.querySelectorAll(`.score-input[data-qidx="${globalQIdx}"]`);
+                    inputs.forEach((input, idx) => {
+                        let val = input.value;
+                        currentScoreData.questions[globalQIdx].inputs[idx] = val; 
+
+                        let match = val.match(/[\(（]\s*(\d+)\s*[,，]\s*(\d+)\s*[\)）]/);
+                        if (match) {
+                            hasAnyInput = true;
+                            let a = parseInt(match[1], 10);
+                            let b = parseInt(match[2], 10);
+                            qVal += a; qOrig += b; qCrea += (a * b);
+                            input.classList.remove('border-slate-300', 'border-red-400', 'bg-red-50');
+                            input.classList.add('border-green-400', 'bg-green-50');
+                        } else if (val.trim() !== "") {
+                            hasAnyInput = true;
+                            input.classList.remove('border-slate-300', 'border-green-400', 'bg-green-50');
+                            input.classList.add('border-red-400', 'bg-red-50');
+                        } else {
+                            input.classList.remove('border-green-400', 'bg-green-50', 'border-red-400', 'bg-red-50');
+                            input.classList.add('border-slate-300');
+                        }
+                    });
+
+                    currentScoreData.questions[globalQIdx].val = qVal;
+                    currentScoreData.questions[globalQIdx].orig = qOrig;
+                    currentScoreData.questions[globalQIdx].crea = qCrea;
+                    document.getElementById(`q-val-${globalQIdx}`).innerText = qVal;
+                    document.getElementById(`q-orig-${globalQIdx}`).innerText = qOrig;
+                    document.getElementById(`q-crea-${globalQIdx}`).innerText = qCrea;
+
+                    sVal += qVal; sOrig += qOrig; sCrea += qCrea;
+                }
+
+                currentScoreData.scenarios[s].val = sVal;
+                currentScoreData.scenarios[s].orig = sOrig;
+                currentScoreData.scenarios[s].crea = sCrea;
+                document.getElementById(`s-val-${s}`).innerText = sVal;
+                document.getElementById(`s-orig-${s}`).innerText = sOrig;
+                document.getElementById(`s-crea-${s}`).innerText = sCrea;
+                grandTotalVal += sVal; grandTotalOrig += sOrig; grandTotalCrea += sCrea;
+            }
+
+            currentScoreData.total.val = grandTotalVal;
+            currentScoreData.total.orig = grandTotalOrig;
+            currentScoreData.total.crea = grandTotalCrea;
+            document.getElementById('grand-val').innerText = grandTotalVal;
+            document.getElementById('grand-orig').innerText = grandTotalOrig;
+            document.getElementById('grand-crea').innerText = grandTotalCrea;
+
+            if (hasAnyInput && !currentScoreData.isGraded) {
+                currentScoreData.isGraded = true;
+                const statusEl = document.getElementById(`status-${currentIndex}`);
+                if (statusEl) {
+                    statusEl.className = 'text-xs px-2 py-1 rounded bg-green-100 text-green-700';
+                    statusEl.innerText = '已評';
+                }
+            } else if (!hasAnyInput && currentScoreData.isGraded) {
+                currentScoreData.isGraded = false;
+                const statusEl = document.getElementById(`status-${currentIndex}`);
+                if (statusEl) {
+                    statusEl.className = 'text-xs px-2 py-1 rounded bg-slate-100 text-slate-400';
+                    statusEl.innerText = '未評';
+                }
+            }
+        }
+
+        document.getElementById('prev-btn').addEventListener('click', () => selectStudent(currentIndex - 1));
+        document.getElementById('next-btn').addEventListener('click', () => selectStudent(currentIndex + 1));
+
+        // 6. 匯出成績 (結合 8 個空格)
+        exportBtn.addEventListener('click', function() {
+            if (studentsData.length === 0) return;
+
+            const isPostTestFormat = studentsData[0].length <= 20;
+            let exportData = [];
+            let newHeaders = ["時間戳記", "班級", "座號", "姓名", "性別", "現在心情", "幼童軍", "野外求生"];
+            
+            for(let q=1; q<=9; q++) {
+                newHeaders.push(`Q${q}_編碼紀錄`, `Q${q}_價值性(A)`, `Q${q}_獨創性(B)`, `Q${q}_創造力(AxB)`);
+            }
+            for(let s=1; s<=3; s++) {
+                newHeaders.push(`情境${s}_價值性`, `情境${s}_獨創性`, `情境${s}_創造力`);
+            }
+            newHeaders.push("總價值性", "總獨創性", "總創造力");
+            
+            for(let q=1; q<=9; q++) {
+                if(isPostTestFormat) {
+                    newHeaders.push(`Q${q}_解法`);
+                } else {
+                    newHeaders.push(`Q${q}_問題`, `Q${q}_工具`, `Q${q}_解法`);
+                }
+            }
+
+            exportData.push(newHeaders);
+
+            studentsData.forEach((student, index) => {
+                const score = scoresData[index];
+                let row = [];
+
+                for(let i=0; i<8; i++) row.push(student[i] || "");
+
+                for(let q=0; q<9; q++) {
+                    const qData = score.questions[q];
+                    // 將 8 個輸入的值組合
+                    const combinedInputs = qData.inputs.filter(v => v.trim() !== "").join(" ; ");
+                    row.push(combinedInputs, qData.val, qData.orig, qData.crea);
+                }
+
+                for(let s=0; s<3; s++) {
+                    row.push(score.scenarios[s].val, score.scenarios[s].orig, score.scenarios[s].crea);
+                }
+                row.push(score.total.val, score.total.orig, score.total.crea);
+
+                if(isPostTestFormat) {
+                    for(let i=8; i<8+9; i++) row.push(student[i] || "");
+                } else {
+                    for(let i=8; i<8+27; i++) row.push(student[i] || "");
+                }
+
+                exportData.push(row);
+            });
+
+            const worksheet = XLSX.utils.aoa_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "成績單");
+            
+            const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,"");
+            XLSX.writeFile(workbook, `創造力評分結果_${dateStr}.xlsx`);
+        });
+
+    </script>
+</body>
+</html>
