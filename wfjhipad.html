@@ -10,73 +10,69 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     
+    <!-- 步驟 1: Babel 設定，強制使用 classic 模式編譯，避免找不到 jsx-runtime 的錯誤 -->
+    <script>
+        console.log("[系統啟動] 步驟 1: 設定 Babel 編譯模式...");
+        Babel = {
+            presets: [
+                ["react", { runtime: "classic" }]
+            ]
+        };
+    </script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"></script>
+    <!-- 注意：已經刪除這裡多餘的 Firebase script 標籤，避免與下方的 module import 發生衝突 -->
 
     <style>
-        body { font-family: "Microsoft JhengHei", "Noto Sans TC", sans-serif; background-color: #f0f9ff; overscroll-behavior: none; } /* Changed bg to light blue tint */
-        .card-shadow { box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.1), 0 2px 4px -1px rgba(59, 130, 246, 0.06); } /* Blue-tinted shadow */
+        body { font-family: "Microsoft JhengHei", "Noto Sans TC", sans-serif; background-color: #f0f9ff; overscroll-behavior: none; }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.1), 0 2px 4px -1px rgba(59, 130, 246, 0.06); }
         .animate-fade-in { animation: fadeIn 0.3s ease-out; }
         .animate-slide-up { animation: slideUp 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        
-        /* Jump Animation for Success */
-        @keyframes jump {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-20px); }
-        }
+        @keyframes jump { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
         .icon-jump { animation: jump 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite; }
-
-        /* Error Animation */
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
-            20%, 40%, 60%, 80% { transform: translateX(10px); }
-        }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); } 20%, 40%, 60%, 80% { transform: translateX(10px); } }
         .shake-error { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
-
-        /* Warning Pulse Animation */
-        @keyframes pulse-warning {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.1); opacity: 0.8; }
-        }
+        @keyframes pulse-warning { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; } }
         .animate-pulse-warning { animation: pulse-warning 1.5s infinite; }
-
-        /* Progress Bar Animation */
-        @keyframes progress {
-            0% { width: 0%; }
-            100% { width: 100%; }
-        }
+        @keyframes progress { 0% { width: 0%; } 100% { width: 100%; } }
         .animate-progress { animation: progress 1.5s ease-in-out forwards; }
-
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #e0f2fe; }
         ::-webkit-scrollbar-thumb { background: #93c5fd; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #60a5fa; }
-        
-        /* Matrix Cell */
         .matrix-cell input:checked + div { background-color: #eff6ff; border-color: #3b82f6; color: #1d4ed8; }
-        
-        /* Period Indicator Tooltip Container */
         .period-indicator:hover { transform: scale(1.2); z-index: 10; }
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="root">
+        <!-- 預設載入文字，如果白畫面但看到這段字，代表 React 根本沒啟動 -->
+        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5rem; color: #3b82f6; font-weight: bold;">
+            系統初始化中，請稍候... (如果卡在此畫面，請按 F12 檢查 Console)
+        </div>
+    </div>
 
     <script type="text/babel" data-type="module">
+        console.log("[系統啟動] 步驟 2: 開始載入主要模組...");
+
+        // --- 環境檢查：非常重要 ---
+        if (window.location.protocol === 'file:') {
+            console.warn("[提示] 偵測到 file:// 協定！ES 模組 (import) 無法在直接雙擊的 HTML 檔案中運行。");
+            alert("溫馨提示：您目前直接雙擊 HTML 檔案開啟電腦本地檔案。\n\n基於瀏覽器安全性，模組將無法載入而呈現白畫面。請直接將此檔案上傳至 GitHub 並透過 GitHub Pages 網址 (https://...) 瀏覽，即可正常運作！");
+        } else {
+            console.log("[環境檢查] 通過，目前運行於伺服器環境：" + window.location.protocol);
+        }
+
+        // --- Firebase Init ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, deleteDoc, doc, updateDoc, setDoc, serverTimestamp, writeBatch, getDocs, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebase Init ---
+        console.log("[系統啟動] 步驟 3: Firebase SDK 模組載入完畢");
+
         const firebaseConfig = {
           apiKey: "AIzaSyBAhA7PnvzJYT_Lil1iX-TVIEgtd9rBVHg",
           authDomain: "wfjh-87c3c.firebaseapp.com",
@@ -86,9 +82,18 @@
           appId: "1:884700920300:web:a21314106a0c7b1d67e8c9"
         };
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        let app, auth, db;
+        try {
+            console.log("[系統啟動] 步驟 4: 嘗試初始化 Firebase...");
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            console.log("[系統啟動] 步驟 4: Firebase 初始化成功");
+        } catch (error) {
+            console.error("[致命錯誤] Firebase 初始化失敗！", error);
+            alert("Firebase 初始化失敗，請檢查網路連線或開發者工具 Console。");
+        }
+
         const appId = 'wfjh-tablet-system';
 
         // --- Initial Data ---
@@ -113,21 +118,17 @@
         const DAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
         const ALL_DEVICES = Array.from({length: 36}, (_, i) => i + 1);
 
-        // --- UPDATE 1: Define ID Pools ---
         const TEACHER_DEVICE_IDS = [34, 35, 36];
-        const STUDENT_MAX_ID = 33; // IDs 1 to 33 are for students
+        const STUDENT_MAX_ID = 33;
 
         // --- Utility Functions ---
         const generateUUID = () => {
-            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-                return crypto.randomUUID();
-            }
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
                 var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
                 return v.toString(16);
             });
         };
-
         const getDayOfWeek = (dateStr) => new Date(dateStr).getDay();
         const formatDate = (date) => {
             const d = new Date(date);
@@ -138,52 +139,35 @@
             if (day.length < 2) day = '0' + day;
             return [year, month, day].join('-');
         };
-        const getMinDate = () => {
-            const d = new Date();
-            d.setDate(d.getDate() + 7);
-            return formatDate(d);
-        };
-        const addDays = (dateStr, days) => {
-            const d = new Date(dateStr);
-            d.setDate(d.getDate() + days);
-            return formatDate(d);
-        };
-
+        const getMinDate = () => { const d = new Date(); d.setDate(d.getDate() + 7); return formatDate(d); };
+        const addDays = (dateStr, days) => { const d = new Date(dateStr); d.setDate(d.getDate() + days); return formatDate(d); };
         const getCurrentWeekDays = () => {
             const curr = new Date();
             const day = curr.getDay(); 
             const diff = curr.getDate() - day + (day === 0 ? -6 : 1); 
             const monday = new Date(curr.setDate(diff));
-            
             const days = [];
             for (let i = 0; i < 5; i++) {
-                const d = new Date(monday);
-                d.setDate(monday.getDate() + i);
-                days.push(formatDate(d));
+                const d = new Date(monday); d.setDate(monday.getDate() + i); days.push(formatDate(d));
             }
             return days;
         };
-
         const formatDeviceList = (ids) => {
             if (!ids || ids.length === 0) return "未分配";
             const sorted = [...ids].sort((a,b)=>a-b);
             const ranges = [];
-            let rangeStart = sorted[0];
-            let prev = sorted[0];
+            let rangeStart = sorted[0]; let prev = sorted[0];
             for (let i = 1; i < sorted.length; i++) {
-                if (sorted[i] === prev + 1) {
-                    prev = sorted[i];
-                } else {
+                if (sorted[i] === prev + 1) { prev = sorted[i]; } else {
                     ranges.push(rangeStart === prev ? `No.${rangeStart}` : `No.${rangeStart}~${prev}`);
-                    rangeStart = sorted[i];
-                    prev = sorted[i];
+                    rangeStart = sorted[i]; prev = sorted[i];
                 }
             }
             ranges.push(rangeStart === prev ? `No.${rangeStart}` : `No.${rangeStart}~${prev}`);
             return ranges.join('、');
         };
 
-        // --- Signature Pad Component ---
+        // --- UI Components ---
         function SignaturePad({ onEnd }) {
             const canvasRef = React.useRef(null);
             const [isDrawing, setIsDrawing] = React.useState(false);
@@ -192,112 +176,48 @@
                 const resizeCanvas = () => {
                     const canvas = canvasRef.current;
                     if (!canvas) return;
-                    
                     const ratio = Math.max(window.devicePixelRatio || 1, 1);
                     const rect = canvas.getBoundingClientRect();
-                    
                     if (canvas.width !== rect.width * ratio || canvas.height !== rect.height * ratio) {
-                        canvas.width = rect.width * ratio;
-                        canvas.height = rect.height * ratio;
-                        const ctx = canvas.getContext("2d");
-                        ctx.scale(ratio, ratio);
-                        ctx.lineWidth = 2;
-                        ctx.lineCap = "round";
-                        ctx.strokeStyle = "#000";
+                        canvas.width = rect.width * ratio; canvas.height = rect.height * ratio;
+                        const ctx = canvas.getContext("2d"); ctx.scale(ratio, ratio); ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.strokeStyle = "#000";
                     }
                 };
-
                 const timer = setTimeout(resizeCanvas, 300);
                 window.addEventListener('resize', resizeCanvas);
-                
-                return () => {
-                    clearTimeout(timer);
-                    window.removeEventListener('resize', resizeCanvas);
-                };
+                return () => { clearTimeout(timer); window.removeEventListener('resize', resizeCanvas); };
             }, []);
 
             const getPos = (e) => {
                 const canvas = canvasRef.current;
                 const rect = canvas.getBoundingClientRect();
                 let cx, cy;
-                if (e.touches && e.touches.length > 0) {
-                    cx = e.touches[0].clientX;
-                    cy = e.touches[0].clientY;
-                } else {
-                    cx = e.clientX;
-                    cy = e.clientY;
-                }
-                return {
-                    x: cx - rect.left,
-                    y: cy - rect.top
-                };
+                if (e.touches && e.touches.length > 0) { cx = e.touches[0].clientX; cy = e.touches[0].clientY; } else { cx = e.clientX; cy = e.clientY; }
+                return { x: cx - rect.left, y: cy - rect.top };
             };
 
-            const start = (e) => {
-                setIsDrawing(true);
-                const ctx = canvasRef.current.getContext("2d");
-                const pos = getPos(e);
-                ctx.beginPath();
-                ctx.moveTo(pos.x, pos.y);
-                if(e.cancelable) e.preventDefault();
-            };
-
-            const move = (e) => {
-                if (!isDrawing) return;
-                const ctx = canvasRef.current.getContext("2d");
-                const pos = getPos(e);
-                ctx.lineTo(pos.x, pos.y);
-                ctx.stroke();
-                if(e.cancelable) e.preventDefault();
-            };
-
-            const end = (e) => {
-                if(isDrawing) setIsDrawing(false);
-                if(e.cancelable) e.preventDefault();
-            };
-
-            const clear = () => {
-                const canvas = canvasRef.current;
-                const ctx = canvas.getContext("2d");
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-            };
+            const start = (e) => { setIsDrawing(true); const ctx = canvasRef.current.getContext("2d"); const pos = getPos(e); ctx.beginPath(); ctx.moveTo(pos.x, pos.y); if(e.cancelable) e.preventDefault(); };
+            const move = (e) => { if (!isDrawing) return; const ctx = canvasRef.current.getContext("2d"); const pos = getPos(e); ctx.lineTo(pos.x, pos.y); ctx.stroke(); if(e.cancelable) e.preventDefault(); };
+            const end = (e) => { if(isDrawing) setIsDrawing(false); if(e.cancelable) e.preventDefault(); };
+            const clear = () => { const canvas = canvasRef.current; const ctx = canvas.getContext("2d"); ctx.clearRect(0, 0, canvas.width, canvas.height); };
 
             return (
                 <div className="flex flex-col h-full select-none">
                     <div className="border-2 border-blue-200 rounded-lg overflow-hidden bg-white flex-grow touch-none relative w-full h-full">
                          <div className="absolute inset-0 flex items-center justify-center text-blue-100 text-4xl font-bold pointer-events-none z-0">請在此簽名</div>
-                        <canvas
-                            ref={canvasRef}
-                            style={{ width: '100%', height: '100%', touchAction: 'none' }}
-                            className="block z-10 relative cursor-crosshair w-full h-full"
-                            onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
-                            onTouchStart={start} onTouchMove={move} onTouchEnd={end}
-                        />
+                        <canvas ref={canvasRef} style={{ width: '100%', height: '100%', touchAction: 'none' }} className="block z-10 relative cursor-crosshair w-full h-full" onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end} onTouchStart={start} onTouchMove={move} onTouchEnd={end} />
                     </div>
                     <div className="mt-2 flex justify-between items-center text-sm text-blue-500 flex-shrink-0">
                         <span>請使用手指或滑鼠簽名</span>
-                        <div className="flex gap-2">
-                            <button type="button" onClick={clear} className="text-red-500 hover:text-red-700 font-bold px-3 py-1 border border-red-200 rounded">清除重簽</button>
-                            <button type="button" onClick={() => onEnd(canvasRef.current.toDataURL())} className="bg-blue-600 text-white font-bold px-4 py-1 rounded hover:bg-blue-700">確認簽名並送出</button>
-                        </div>
+                        <div className="flex gap-2"><button type="button" onClick={clear} className="text-red-500 hover:text-red-700 font-bold px-3 py-1 border border-red-200 rounded">清除重簽</button><button type="button" onClick={() => onEnd(canvasRef.current.toDataURL())} className="bg-blue-600 text-white font-bold px-4 py-1 rounded hover:bg-blue-700">確認簽名並送出</button></div>
                     </div>
                 </div>
             );
         }
 
-        // --- UI Components ---
         function Toast({ message, type, onClose }) {
-            React.useEffect(() => {
-                const timer = setTimeout(onClose, 3000);
-                return () => clearTimeout(timer);
-            }, [onClose]);
-            const bgClass = type === 'error' ? 'bg-red-500' : 'bg-blue-600';
-            return (
-                <div className={`fixed bottom-4 right-4 ${bgClass} text-white px-6 py-3 rounded-lg shadow-xl z-50 animate-slide-up flex items-center gap-2`}>
-                    {type === 'error' ? <i data-lucide="alert-circle" className="w-5 h-5"></i> : <i data-lucide="check-circle" className="w-5 h-5"></i>}
-                    <span className="font-medium">{message}</span>
-                </div>
-            );
+            React.useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
+            return ( <div className={`fixed bottom-4 right-4 ${type === 'error' ? 'bg-red-500' : 'bg-blue-600'} text-white px-6 py-3 rounded-lg shadow-xl z-50 animate-slide-up flex items-center gap-2`}>{type === 'error' ? <i data-lucide="alert-circle" className="w-5 h-5"></i> : <i data-lucide="check-circle" className="w-5 h-5"></i>}<span className="font-medium">{message}</span></div> );
         }
 
         function Modal({ isOpen, title, children, onClose }) {
@@ -305,10 +225,7 @@
             return (
                 <div className="fixed inset-0 bg-blue-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
                     <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden max-h-[90vh] flex flex-col border border-blue-100">
-                        <div className="bg-blue-50 px-4 py-3 border-b border-blue-100 flex justify-between items-center flex-shrink-0">
-                            <h3 className="font-bold text-blue-800">{title}</h3>
-                            <button onClick={onClose} className="text-blue-400 hover:text-blue-600"><i data-lucide="x" className="w-5 h-5"></i></button>
-                        </div>
+                        <div className="bg-blue-50 px-4 py-3 border-b border-blue-100 flex justify-between items-center flex-shrink-0"><h3 className="font-bold text-blue-800">{title}</h3><button onClick={onClose} className="text-blue-400 hover:text-blue-600"><i data-lucide="x" className="w-5 h-5"></i></button></div>
                         <div className="p-4 overflow-y-auto flex-grow">{children}</div>
                     </div>
                 </div>
@@ -317,62 +234,15 @@
 
         function FullScreenAnimation({ status, message, onClose }) {
             React.useEffect(() => {
-                // Haptic Feedback for Warning
-                if (status === 'warning' && navigator.vibrate) {
-                    navigator.vibrate([200, 100, 200, 100, 500]);
-                }
-
-                if (status !== 'loading') {
-                    // Give warning a bit more time to be read
-                    const timer = setTimeout(onClose, status === 'warning' ? 6000 : (status === 'success' ? 2500 : 5000));
-                    return () => clearTimeout(timer);
-                }
+                if (status === 'warning' && navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
+                if (status !== 'loading') { const timer = setTimeout(onClose, status === 'warning' ? 6000 : (status === 'success' ? 2500 : 5000)); return () => clearTimeout(timer); }
             }, [onClose, status]);
-
             return (
                 <div className="fixed inset-0 z-[100] bg-blue-900/95 backdrop-blur-md flex flex-col items-center justify-center text-white animate-fade-in p-4">
-                    {status === 'loading' && (
-                         <div className="text-center">
-                            <div className="w-64 h-3 bg-blue-800 rounded-full overflow-hidden mb-6 relative mx-auto">
-                                <div className="h-full bg-blue-400 animate-progress absolute left-0 top-0"></div>
-                            </div>
-                            <h2 className="text-3xl font-bold animate-pulse text-blue-300">系統處理中...</h2>
-                            <p className="text-blue-200 mt-2">正在分配平板與寫入資料</p>
-                        </div>
-                    )}
-                    {status === 'success' && (
-                        <div className="text-center">
-                            <div className="text-9xl mb-8 flex justify-center items-center gap-4 icon-jump">
-                                <span className="text-green-400">✅</span>
-                            </div>
-                            <h2 className="text-5xl font-bold mb-4 text-green-400">預約成功！</h2>
-                            <p className="text-2xl text-blue-100">請記得去「預約確認」檢查是否成功喔！</p>
-                        </div>
-                    )}
-                    {status === 'warning' && (
-                        <div className="text-center max-w-lg">
-                            <div className="text-9xl mb-8 flex justify-center items-center gap-4 animate-pulse-warning">
-                                <span>⚠️</span>
-                            </div>
-                            <h2 className="text-4xl font-bold mb-4 text-yellow-400">預約成功 (急件)</h2>
-                            <div className="bg-yellow-500/20 border-2 border-yellow-500/50 p-6 rounded-xl animate-fade-in">
-                                <p className="text-xl text-yellow-100 font-bold leading-relaxed">
-                                    時間較為緊迫！<br/>
-                                    請務必 <span className="text-white text-2xl underline decoration-wavy decoration-yellow-400 mx-1">當面或電話</span> 通知承辦人員<br/>
-                                    避免來不及準備 (分機 18)
-                                </p>
-                            </div>
-                        </div>
-                    )}
-                    {status === 'error' && (
-                        <div className="text-center shake-error max-w-lg">
-                            <div className="text-9xl mb-8">❌</div>
-                            <h2 className="text-5xl font-bold mb-6 text-red-400">預約失敗</h2>
-                            <p className="text-xl text-white font-bold bg-red-600/30 px-6 py-4 rounded-xl border-2 border-red-500/50 inline-block break-words w-full">
-                                {message}
-                            </p>
-                        </div>
-                    )}
+                    {status === 'loading' && ( <div className="text-center"><div className="w-64 h-3 bg-blue-800 rounded-full overflow-hidden mb-6 relative mx-auto"><div className="h-full bg-blue-400 animate-progress absolute left-0 top-0"></div></div><h2 className="text-3xl font-bold animate-pulse text-blue-300">系統處理中...</h2><p className="text-blue-200 mt-2">正在分配平板與寫入資料</p></div> )}
+                    {status === 'success' && ( <div className="text-center"><div className="text-9xl mb-8 flex justify-center items-center gap-4 icon-jump"><span className="text-green-400">✅</span></div><h2 className="text-5xl font-bold mb-4 text-green-400">預約成功！</h2><p className="text-2xl text-blue-100">請記得去「預約確認」檢查是否成功喔！</p></div> )}
+                    {status === 'warning' && ( <div className="text-center max-w-lg"><div className="text-9xl mb-8 flex justify-center items-center gap-4 animate-pulse-warning"><span>⚠️</span></div><h2 className="text-4xl font-bold mb-4 text-yellow-400">預約成功 (急件)</h2><div className="bg-yellow-500/20 border-2 border-yellow-500/50 p-6 rounded-xl animate-fade-in"><p className="text-xl text-yellow-100 font-bold leading-relaxed">時間較為緊迫！<br/>請務必 <span className="text-white text-2xl underline decoration-wavy decoration-yellow-400 mx-1">當面或電話</span> 通知承辦人員<br/>避免來不及準備 (分機 18)</p></div></div> )}
+                    {status === 'error' && ( <div className="text-center shake-error max-w-lg"><div className="text-9xl mb-8">❌</div><h2 className="text-5xl font-bold mb-6 text-red-400">預約失敗</h2><p className="text-xl text-white font-bold bg-red-600/30 px-6 py-4 rounded-xl border-2 border-red-500/50 inline-block break-words w-full">{message}</p></div> )}
                 </div>
             );
         }
@@ -393,39 +263,81 @@
             const showToast = (message, type = 'success') => setToast({ message, type });
             const closeToast = () => setToast(null);
 
+            // Auth Effect
             React.useEffect(() => {
+                console.log("[App] 開始初始化身份驗證...");
                 const initAuth = async () => {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            console.log("[Auth] 使用自訂 Token...");
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            console.log("[Auth] 嘗試匿名登入...");
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("[Auth] 登入失敗:", error);
+                        showToast(`登入失敗: ${error.message}`, "error");
                     }
                 };
                 initAuth();
-                const unsubscribe = onAuthStateChanged(auth, setUser);
+                
+                const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+                    if (currentUser) {
+                        console.log("[Auth] 狀態已更新，UID:", currentUser.uid);
+                    } else {
+                        console.log("[Auth] 目前未登入");
+                    }
+                    setUser(currentUser);
+                }, (error) => {
+                    console.error("[Auth] 狀態監聽錯誤:", error);
+                });
                 return () => unsubscribe();
             }, []);
 
+            // Data Fetching Effect
             React.useEffect(() => {
                 if (!user) return;
-                const qCarts = query(collection(db, 'artifacts', appId, 'public', 'data', 'carts'));
-                const unsubCarts = onSnapshot(qCarts, async (snap) => {
-                     const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                     list.sort((a, b) => a.id.localeCompare(b.id));
-                     setCarts(list);
-                });
-                const qBookings = query(collection(db, 'artifacts', appId, 'public', 'data', 'bookings'));
-                const unsubBookings = onSnapshot(qBookings, (snap) => setBookings(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-                const qStatus = query(collection(db, 'artifacts', appId, 'public', 'data', 'cart_status'));
-                const unsubStatus = onSnapshot(qStatus, (snap) => {
-                    const statusMap = {};
-                    snap.docs.forEach(d => statusMap[d.id] = d.data());
-                    setCartStatus(statusMap);
-                });
-                return () => { unsubCarts(); unsubBookings(); unsubStatus(); };
+                console.log("[App] 準備從 Firestore 獲取資料...");
+                
+                let unsubCarts, unsubBookings, unsubStatus;
+
+                try {
+                    const qCarts = query(collection(db, 'artifacts', appId, 'public', 'data', 'carts'));
+                    unsubCarts = onSnapshot(qCarts, (snap) => {
+                         const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                         list.sort((a, b) => a.id.localeCompare(b.id));
+                         console.log("[Data] 成功獲取 Carts，筆數:", list.length);
+                         setCarts(list);
+                    }, (err) => console.error("[Data] 獲取 Carts 失敗:", err));
+
+                    const qBookings = query(collection(db, 'artifacts', appId, 'public', 'data', 'bookings'));
+                    unsubBookings = onSnapshot(qBookings, (snap) => {
+                        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                        console.log("[Data] 成功獲取 Bookings，筆數:", list.length);
+                        setBookings(list);
+                    }, (err) => console.error("[Data] 獲取 Bookings 失敗:", err));
+
+                    const qStatus = query(collection(db, 'artifacts', appId, 'public', 'data', 'cart_status'));
+                    unsubStatus = onSnapshot(qStatus, (snap) => {
+                        const statusMap = {};
+                        snap.docs.forEach(d => statusMap[d.id] = d.data());
+                        console.log("[Data] 成功獲取 Cart Status，筆數:", Object.keys(statusMap).length);
+                        setCartStatus(statusMap);
+                    }, (err) => console.error("[Data] 獲取 Cart Status 失敗:", err));
+
+                } catch (error) {
+                    console.error("[Data] 設定監聽器時發生致命錯誤:", error);
+                    showToast("資料庫連線異常", "error");
+                }
+
+                return () => { 
+                    if(unsubCarts) unsubCarts(); 
+                    if(unsubBookings) unsubBookings(); 
+                    if(unsubStatus) unsubStatus(); 
+                };
             }, [user]);
 
-            // This function supports "Whole Day Lock" - used for Booking Logic
             const getAvailableDeviceIds = (cartId, dateStr, period, exclusiveUser = null) => {
                 const dayOfWeek = getDayOfWeek(dateStr);
                 const cart = carts.find(c => c.id === cartId);
@@ -438,7 +350,6 @@
 
                 bookings.forEach(b => {
                     if (b.cartId !== cartId || b.status === 'cancelled') return;
-
                     let isSameDate = false;
                     if (b.type === 'long-term') {
                         if (parseInt(b.dayOfWeek) === dayOfWeek && (!b.startDate || (dateStr >= b.startDate && dateStr <= b.endDate))) isSameDate = true;
@@ -447,12 +358,10 @@
                     if (isSameDate) {
                         const isSamePeriod = parseInt(b.period) === parseInt(period);
                         const isSameUser = exclusiveUser && b.user === exclusiveUser;
-
                         if (isSamePeriod) {
                              if (b.deviceIds) b.deviceIds.forEach(id => available.delete(id));
                         }
                         else if (!isSameUser) {
-                             // This is the "Whole Day Lock"
                              if (b.deviceIds) b.deviceIds.forEach(id => available.delete(id));
                         }
                     }
@@ -460,13 +369,6 @@
                 return Array.from(available).sort((a,b) => a-b);
             };
 
-            const getAvailabilityCount = (cartId, dateStr, period, exclusiveUser = null) => {
-                 const ids = getAvailableDeviceIds(cartId, dateStr, period, exclusiveUser);
-                 let count = ids.length;
-                 return Math.max(0, count);
-            };
-
-            // NEW: This function ignores "Whole Day Lock" - used for Displaying actual usage on Home
             const getRealPeriodAvailability = (cartId, dateStr, period) => {
                  const cart = carts.find(c => c.id === cartId);
                  if (!cart) return 0;
@@ -480,7 +382,6 @@
                          if (parseInt(b.dayOfWeek) === dayOfWeek && (!b.startDate || (dateStr >= b.startDate && dateStr <= b.endDate))) isSameDate = true;
                      } else if (b.date === dateStr) isSameDate = true;
 
-                     // Only count if it matches the EXACT period
                      if (isSameDate && parseInt(b.period) === parseInt(period)) {
                          usedCount += (b.deviceIds ? b.deviceIds.length : b.quantity);
                      }
@@ -496,27 +397,17 @@
                  return Math.max(0, total - usedCount);
             };
 
-            // UPDATE 2: Helper to calculate cart "Busyness" for priority allocation
             const calculateCartUsageScore = (cartId, startDate, endDate, selectedSlots) => {
                  let score = 0;
-                 // We roughly check usage for the selected days to prioritize carts that are already "open" (in use)
-                 // This helps grouping bookings into fewer carts.
-                 
                  bookings.forEach(b => {
                      if (b.cartId !== cartId || b.status === 'cancelled') return;
-                     
-                     // Check if booking overlaps with request date range
                      let overlapsDate = false;
                      if (b.type === 'long-term') {
                           if (startDate <= b.endDate && endDate >= b.startDate) overlapsDate = true;
                      } else {
                           if (b.date >= startDate && b.date <= endDate) overlapsDate = true;
                      }
-
-                     if (overlapsDate) {
-                         // Add score based on quantity, giving weight to active carts
-                         score += (b.quantity || 1);
-                     }
+                     if (overlapsDate) score += (b.quantity || 1);
                  });
                  return score;
             };
@@ -526,14 +417,8 @@
                 setModalConfig({
                     type: 'password', title: '管理員登入', message: '請輸入管理後台密碼',
                     onConfirm: (val) => {
-                        if (val === "wfjhadmin") { 
-                            setIsAdmin(true); 
-                            setView('backend'); 
-                            showToast("登入成功"); 
-                        }
-                        else {
-                            showToast("密碼錯誤", "error");
-                        }
+                        if (val === "wfjhadmin") { setIsAdmin(true); setView('backend'); showToast("登入成功"); }
+                        else { showToast("密碼錯誤", "error"); }
                     }
                 });
             };
@@ -545,13 +430,8 @@
             return (
                 <div className="min-h-screen flex flex-col relative bg-blue-50">
                     {animationState && (
-                        <FullScreenAnimation 
-                            status={animationState.status} 
-                            message={animationState.message} 
-                            onClose={() => setAnimationState(null)} 
-                        />
+                        <FullScreenAnimation status={animationState.status} message={animationState.message} onClose={() => setAnimationState(null)} />
                     )}
-
                     {toast && <Toast message={toast.message} type={toast.type} onClose={closeToast} />}
                     {modalConfig && <Modal isOpen={true} title={modalConfig.title} onClose={() => setModalConfig(null)}><ModalContent config={modalConfig} onClose={() => setModalConfig(null)} /></Modal>}
                     
@@ -568,7 +448,10 @@
                     </header>
                     <main className="container mx-auto px-4 py-6 flex-grow">
                         {carts.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-64 text-blue-400 gap-2"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div><p>系統資料載入中...</p></div>
+                            <div className="flex flex-col items-center justify-center h-64 text-blue-400 gap-2">
+                                <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                <p>系統資料載入中 (請確認 Console 無報錯)...</p>
+                            </div>
                         ) : (
                             <>
                                 {view === 'home' && <HomeView carts={carts.filter(c => c.enableOneTime)} getRealPeriodAvailability={getRealPeriodAvailability} setView={setView} />}
@@ -594,10 +477,7 @@
                 return (
                     <div>
                         <p className="text-gray-600 mb-4">{config.message}</p>
-                        <div className="flex justify-end gap-2">
-                            <button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded text-gray-700 hover:bg-gray-300">取消</button>
-                            <button onClick={() => { config.onConfirm(); onClose(); }} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">確定</button>
-                        </div>
+                        <div className="flex justify-end gap-2"><button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded text-gray-700 hover:bg-gray-300">取消</button><button onClick={() => { config.onConfirm(); onClose(); }} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">確定</button></div>
                     </div>
                 );
             }
@@ -606,265 +486,88 @@
                 <form onSubmit={handleSubmit}>
                     <p className="text-gray-600 mb-2">{config.message}</p>
                     <input type={config.type === 'password' ? 'password' : 'text'} className="w-full border rounded p-2 mb-4 focus:ring-2 focus:ring-blue-500 outline-none" value={val} onChange={e => setVal(e.target.value)} autoFocus />
-                    <div className="flex justify-end gap-2">
-                        <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 rounded text-gray-700 hover:bg-gray-300">取消</button>
-                        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">確定</button>
-                    </div>
+                    <div className="flex justify-end gap-2"><button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 rounded text-gray-700 hover:bg-gray-300">取消</button><button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">確定</button></div>
                 </form>
             );
         }
 
-        // --- Home View ---
-        /* --- 修改後的 HomeView 組件 --- */
         function HomeView({ carts, getRealPeriodAvailability, setView }) {
             const weekDays = React.useMemo(() => getCurrentWeekDays(), []);
             return (
                 <div className="space-y-8 animate-fade-in">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <button onClick={() => setView('booking')} className="bg-blue-600 text-white py-16 rounded-3xl text-3xl font-bold shadow-xl flex flex-col items-center justify-center gap-3 hover:scale-[1.02] transition-transform">
-                            <span className="text-5xl">📅</span>
-                            <span>我要預約平板</span>
-                        </button>
-                        <button onClick={() => setView('check')} className="bg-white border-4 border-blue-600 text-blue-600 py-16 rounded-3xl text-3xl font-bold shadow-xl flex flex-col items-center justify-center gap-3 hover:scale-[1.02] transition-transform">
-                            <span className="text-5xl">✅</span>
-                            <span>預約資訊確認</span>
-                        </button>
+                        <button onClick={() => setView('booking')} className="bg-blue-600 text-white py-16 rounded-3xl text-3xl font-bold shadow-xl flex flex-col items-center justify-center gap-3 hover:scale-[1.02] transition-transform"><span className="text-5xl">📅</span><span>我要預約平板</span></button>
+                        <button onClick={() => setView('check')} className="bg-white border-4 border-blue-600 text-blue-600 py-16 rounded-3xl text-3xl font-bold shadow-xl flex flex-col items-center justify-center gap-3 hover:scale-[1.02] transition-transform"><span className="text-5xl">✅</span><span>預約資訊確認</span></button>
                     </div>
-
                     <div className="bg-white rounded-xl shadow-lg overflow-hidden border">
-                        <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
-                            <h2 className="text-xl font-bold">本周借閱狀況 ({weekDays[0].slice(5)} ~ {weekDays[4].slice(5)})</h2>
-                            <span className="text-xs text-blue-200">全天剩餘量</span>
-                        </div>
+                        <div className="bg-blue-600 text-white p-4 flex justify-between items-center"><h2 className="text-xl font-bold">本周借閱狀況 ({weekDays[0].slice(5)} ~ {weekDays[4].slice(5)})</h2><span className="text-xs text-blue-200">全天剩餘量</span></div>
                         <div className="overflow-x-auto">
-                            <table className="w-full text-center table-fixed">
-                                <thead className="bg-blue-50 text-blue-900 border-b">
-                                    <tr>
-                                        <th className="p-3 w-20 md:w-32 border-r sticky left-0 bg-blue-50">車號</th>
-                                        {weekDays.map((date, idx) => (
-                                            <th key={date} className="p-2">
-                                                <div className="text-sm">週{DAY_LABELS[idx+1]}</div>
-                                                <div className="text-[10px] text-blue-400">{date.slice(5)}</div>
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y">
-                                    {carts.map(cart => (
-                                        <tr key={cart.id}>
-                                            <td className="p-3 border-r font-bold sticky left-0 bg-white">
-                                                {cart.id}車
-                                            </td>
-                                            {weekDays.map(date => {
-                                                const availabilities = PERIODS.map(p => getRealPeriodAvailability(cart.id, date, p));
-                                                const minAvail = Math.min(...availabilities);
-                                                const total = cart.total || 36;
-                                                const filledCount = Math.round((minAvail / total) * 5); // 計算5等分中填滿的格子數
-                                                
-                                                return (
-                                                    <td key={date} className="p-2 border-l align-middle">
-                                                        <div 
-                                                            className="w-full flex gap-1 h-6"
-                                                            title={`剩餘: ${minAvail} 台`}
-                                                        >
-                                                            {[...Array(5)].map((_, i) => (
-                                                                <div 
-                                                                    key={i}
-                                                                    className={`flex-1 border border-blue-600 rounded-sm transition-colors duration-300 ${i < filledCount ? 'bg-blue-600' : 'bg-white'}`}
-                                                                ></div>
-                                                            ))}
-                                                        </div>
-                                                    </td>
-                                                );
-                                            })}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                            <table className="w-full text-center table-fixed"><thead className="bg-blue-50 text-blue-900 border-b"><tr><th className="p-3 w-20 md:w-32 border-r sticky left-0 bg-blue-50">車號</th>{weekDays.map((date, idx) => (<th key={date} className="p-2"><div className="text-sm">週{DAY_LABELS[idx+1]}</div><div className="text-[10px] text-blue-400">{date.slice(5)}</div></th>))}</tr></thead><tbody className="divide-y">{carts.map(cart => (<tr key={cart.id}><td className="p-3 border-r font-bold sticky left-0 bg-white">{cart.id}車</td>{weekDays.map(date => {const availabilities = PERIODS.map(p => getRealPeriodAvailability(cart.id, date, p));const minAvail = Math.min(...availabilities);const total = cart.total || 36;const filledCount = Math.round((minAvail / total) * 5);return (<td key={date} className="p-2 border-l align-middle"><div className="w-full flex gap-1 h-6" title={`剩餘: ${minAvail} 台`}>{[...Array(5)].map((_, i) => (<div key={i} className={`flex-1 border border-blue-600 rounded-sm transition-colors duration-300 ${i < filledCount ? 'bg-blue-600' : 'bg-white'}`}></div>))}</div></td>);})}</tr>))}</tbody></table>
                         </div>
-                        <div className="p-3 text-center text-xs text-blue-500 bg-blue-50 flex flex-wrap justify-center items-center gap-4">
-                            <span className="font-bold">圖例說明：</span>
-                            <span className="flex items-center gap-1">
-                                <span className="w-4 h-4 border border-blue-600 bg-blue-600 rounded-sm"></span> 
-                                尚可借
-                            </span>
-                            <span className="flex items-center gap-1">
-                                <span className="w-4 h-4 border border-blue-600 bg-white rounded-sm"></span> 
-                                已借出
-                            </span>
-                            <span className="text-gray-400 ml-2">※ 每格 ~6 台</span>
-                        </div>
+                        <div className="p-3 text-center text-xs text-blue-500 bg-blue-50 flex flex-wrap justify-center items-center gap-4"><span className="font-bold">圖例說明：</span><span className="flex items-center gap-1"><span className="w-4 h-4 border border-blue-600 bg-blue-600 rounded-sm"></span> 尚可借</span><span className="flex items-center gap-1"><span className="w-4 h-4 border border-blue-600 bg-white rounded-sm"></span> 已借出</span><span className="text-gray-400 ml-2">※ 每格 ~6 台</span></div>
                     </div>
                 </div>
             );
         }
 
-        // --- Booking View ---
         function BookingView({ carts, calculateCartUsageScore, getAvailableDeviceIds, user, db, appId, setAnimationState, setModalConfig }) {
             const [checkResult, setCheckResult] = React.useState(null);
             const [form, setForm] = React.useState({ startDate: getMinDate(), endDate: addDays(getMinDate(), 30), cartId: '', user: '', ext: '', quantity: 17, needTeacherPad: false, note: '', selectedSlots: [], signature: null });
-            
             React.useEffect(() => { if (carts.length > 0 && !form.cartId) setForm(f => ({...f, cartId: carts[0].id})); }, [carts]);
             React.useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, []); 
-            
-            const toggleSlot = (day, period) => {
-                const exists = form.selectedSlots.find(s => s.day === day && s.period === period);
-                if (exists) setForm({ ...form, selectedSlots: form.selectedSlots.filter(s => s !== exists) });
-                else setForm({ ...form, selectedSlots: [...form.selectedSlots, { day, period }] });
-                setCheckResult(null);
-            };
-            
-            // --- UPDATE 3: Modified checkConflicts ---
-            // 1. Sorts carts by usage (prioritizes busy carts).
-            // 2. Checks Student IDs (<=33) vs Teacher IDs (>=34) availability separately.
+            const toggleSlot = (day, period) => { const exists = form.selectedSlots.find(s => s.day === day && s.period === period); if (exists) setForm({ ...form, selectedSlots: form.selectedSlots.filter(s => s !== exists) }); else setForm({ ...form, selectedSlots: [...form.selectedSlots, { day, period }] }); setCheckResult(null); };
             const checkConflicts = () => {
                 if (form.selectedSlots.length === 0) { setAnimationState({ status: 'error', message: "請至少選擇一個時段" }); return false; }
                 if (form.startDate > form.endDate) { setAnimationState({ status: 'error', message: "結束日期不能早於開始日期" }); return false; }
                 if (!form.user.trim()) { setAnimationState({ status: 'error', message: "請填寫申請人姓名" }); return false; }
-                
-                const studentQuantity = parseInt(form.quantity);
-                const teacherQuantity = form.needTeacherPad ? 1 : 0;
-                
-                // Sort carts based on existing bookings to prioritize filling up used carts
-                const sortedCarts = [...carts].sort((a, b) => {
-                    const scoreA = calculateCartUsageScore(a.id, form.startDate, form.endDate, form.selectedSlots);
-                    const scoreB = calculateCartUsageScore(b.id, form.startDate, form.endDate, form.selectedSlots);
-                    return scoreB - scoreA; // Descending: High usage first
-                });
-
-                let foundCartId = null;
-
-                for (const cart of sortedCarts) {
-                    let isCartValid = true;
-                    let curr = new Date(form.startDate);
-                    const end = new Date(form.endDate);
-                    
-                    while (curr <= end) {
-                        const dateStr = formatDate(curr);
-                        const dayOfWeek = curr.getDay(); 
-                        const daySlots = form.selectedSlots.filter(s => s.day === dayOfWeek);
-                        
-                        for (const slot of daySlots) {
-                            // Get specific IDs available
-                            const availIds = getAvailableDeviceIds(cart.id, dateStr, slot.period, null);
-                            
-                            // Split into Student Pool and Teacher Pool
-                            const availStudentCount = availIds.filter(id => id <= STUDENT_MAX_ID).length;
-                            const availTeacherCount = availIds.filter(id => TEACHER_DEVICE_IDS.includes(id)).length;
-
-                            // Strict Check
-                            if (availStudentCount < studentQuantity) {
-                                isCartValid = false;
-                                break;
-                            }
-                            if (form.needTeacherPad && availTeacherCount < teacherQuantity) {
-                                isCartValid = false;
-                                break;
-                            }
-                        }
-                        
-                        if (!isCartValid) break; 
-                        curr.setDate(curr.getDate() + 1);
-                    }
-                    
-                    if (isCartValid) {
-                        foundCartId = cart.id;
-                        break; 
-                    }
-                }
-
-                if (foundCartId) {
-                    setForm(prev => ({ ...prev, cartId: foundCartId }));
-                    return true;
-                } else {
-                    setAnimationState({ status: 'error', message: "所有車輛在指定時段皆無足夠的 [學生機] 或 [教師機] 庫存，請減少數量或更換時段" });
-                    return false;
-                }
-            };
-
-            const initiateBooking = () => {
-                if (checkConflicts()) { 
-                     setModalConfig({
-                        type: 'custom',
-                        title: '請簽名確認',
-                        render: ({ onClose }) => (
-                            <div className="h-[300px]">
-                                 <SignaturePad onEnd={(sigData) => {
-                                     if (sigData) {
-                                         setAnimationState({ status: 'loading' });
-                                         onClose();
-                                         setTimeout(() => {
-                                            finalSubmit(sigData);
-                                         }, 1500); 
-                                     }
-                                 }} />
-                            </div>
-                        )
-                    });
-                }
-            };
-
-            const finalSubmit = async (signatureData) => {
-                if (!user) {
-                     setAnimationState({ status: 'error', message: "系統連線中，請稍候再試 (User null)" });
-                     return;
-                }
-
-                // Re-run the strict check one last time before submit (Concurrency safety)
-                const studentQuantity = parseInt(form.quantity);
-                const teacherQuantity = form.needTeacherPad ? 1 : 0;
-                
-                // Re-sort to find the best cart again (or just verify current)
-                // We use the same logic as checkConflicts to ensure consistency
-                const sortedCarts = [...carts].sort((a, b) => {
-                    const scoreA = calculateCartUsageScore(a.id, form.startDate, form.endDate, form.selectedSlots);
-                    const scoreB = calculateCartUsageScore(b.id, form.startDate, form.endDate, form.selectedSlots);
-                    return scoreB - scoreA; 
-                });
-
+                const studentQuantity = parseInt(form.quantity); const teacherQuantity = form.needTeacherPad ? 1 : 0;
+                const sortedCarts = [...carts].sort((a, b) => calculateCartUsageScore(b.id, form.startDate, form.endDate, form.selectedSlots) - calculateCartUsageScore(a.id, form.startDate, form.endDate, form.selectedSlots));
                 let foundCartId = null;
                 for (const cart of sortedCarts) {
-                    let isCartValid = true;
-                    let curr = new Date(form.startDate);
-                    const end = new Date(form.endDate);
+                    let isCartValid = true; let curr = new Date(form.startDate); const end = new Date(form.endDate);
                     while (curr <= end) {
-                        const dateStr = formatDate(curr);
-                        const dayOfWeek = curr.getDay(); 
-                        const daySlots = form.selectedSlots.filter(s => s.day === dayOfWeek);
+                        const dateStr = formatDate(curr); const dayOfWeek = curr.getDay(); const daySlots = form.selectedSlots.filter(s => s.day === dayOfWeek);
                         for (const slot of daySlots) {
                             const availIds = getAvailableDeviceIds(cart.id, dateStr, slot.period, null);
                             const availStudentCount = availIds.filter(id => id <= STUDENT_MAX_ID).length;
                             const availTeacherCount = availIds.filter(id => TEACHER_DEVICE_IDS.includes(id)).length;
-
                             if (availStudentCount < studentQuantity) { isCartValid = false; break; }
                             if (form.needTeacherPad && availTeacherCount < teacherQuantity) { isCartValid = false; break; }
                         }
-                        if (!isCartValid) break; 
-                        curr.setDate(curr.getDate() + 1);
+                        if (!isCartValid) break; curr.setDate(curr.getDate() + 1);
                     }
                     if (isCartValid) { foundCartId = cart.id; break; }
                 }
-
-                if (!foundCartId) {
-                    setAnimationState({ status: 'error', message: "系統錯誤：無法確認車輛 (可能剛好被借走)" });
-                    return;
+                if (foundCartId) { setForm(prev => ({ ...prev, cartId: foundCartId })); return true; } 
+                else { setAnimationState({ status: 'error', message: "所有車輛在指定時段皆無足夠的 [學生機] 或 [教師機] 庫存，請減少數量或更換時段" }); return false; }
+            };
+            const initiateBooking = () => { if (checkConflicts()) { setModalConfig({ type: 'custom', title: '請簽名確認', render: ({ onClose }) => ( <div className="h-[300px]"><SignaturePad onEnd={(sigData) => { if (sigData) { setAnimationState({ status: 'loading' }); onClose(); setTimeout(() => { finalSubmit(sigData); }, 1500); } }} /></div> ) }); } };
+            const finalSubmit = async (signatureData) => {
+                if (!user) { setAnimationState({ status: 'error', message: "系統連線中，請稍候再試 (User null)" }); return; }
+                const studentQuantity = parseInt(form.quantity); const teacherQuantity = form.needTeacherPad ? 1 : 0;
+                const sortedCarts = [...carts].sort((a, b) => calculateCartUsageScore(b.id, form.startDate, form.endDate, form.selectedSlots) - calculateCartUsageScore(a.id, form.startDate, form.endDate, form.selectedSlots));
+                let foundCartId = null;
+                for (const cart of sortedCarts) {
+                    let isCartValid = true; let curr = new Date(form.startDate); const end = new Date(form.endDate);
+                    while (curr <= end) {
+                        const dateStr = formatDate(curr); const dayOfWeek = curr.getDay(); const daySlots = form.selectedSlots.filter(s => s.day === dayOfWeek);
+                        for (const slot of daySlots) {
+                            const availIds = getAvailableDeviceIds(cart.id, dateStr, slot.period, null);
+                            if (availIds.filter(id => id <= STUDENT_MAX_ID).length < studentQuantity) { isCartValid = false; break; }
+                            if (form.needTeacherPad && availIds.filter(id => TEACHER_DEVICE_IDS.includes(id)).length < teacherQuantity) { isCartValid = false; break; }
+                        }
+                        if (!isCartValid) break; curr.setDate(curr.getDate() + 1);
+                    }
+                    if (isCartValid) { foundCartId = cart.id; break; }
                 }
-
-                const batchId = generateUUID(); 
-                const finalForm = { ...form, signature: signatureData, cartId: foundCartId };
-                
+                if (!foundCartId) { setAnimationState({ status: 'error', message: "系統錯誤：無法確認車輛 (可能剛好被借走)" }); return; }
+                const batchId = generateUUID(); const finalForm = { ...form, signature: signatureData, cartId: foundCartId };
                 try {
-                    let curr = new Date(finalForm.startDate);
-                    const end = new Date(finalForm.endDate);
-                    
-                    // Logic to find common available IDs across all requested slots
-                    let globalIntersection = new Set(ALL_DEVICES); 
-                    const intersectionMap = {};
+                    let curr = new Date(finalForm.startDate); const end = new Date(finalForm.endDate);
+                    let globalIntersection = new Set(ALL_DEVICES); const intersectionMap = {};
                     finalForm.selectedSlots.forEach(s => intersectionMap[`${s.day}-${s.period}`] = new Set(ALL_DEVICES));
-
                     while(curr <= end) {
-                        const dStr = formatDate(curr);
-                        const dow = curr.getDay();
+                        const dStr = formatDate(curr); const dow = curr.getDay();
                         finalForm.selectedSlots.filter(s => s.day === dow).forEach(s => {
                              const idsOnDate = getAvailableDeviceIds(finalForm.cartId, dStr, s.period, finalForm.user);
                              const slotSet = intersectionMap[`${dow}-${s.period}`];
@@ -873,513 +576,111 @@
                         });
                         curr.setDate(curr.getDate() + 1);
                     }
-
-                    // --- UPDATE 4: Allocation Logic ---
-                    // Try to use global intersection first (devices available for ALL requested times)
-                    // But we must separate Student vs Teacher pools
-
                     const globalArr = Array.from(globalIntersection).sort((a,b)=>a-b);
                     const globalStudent = globalArr.filter(id => id <= STUDENT_MAX_ID);
                     const globalTeacher = globalArr.filter(id => TEACHER_DEVICE_IDS.includes(id));
-
                     const canUseGlobal = globalStudent.length >= studentQuantity && (!form.needTeacherPad || globalTeacher.length >= 1);
-                    
                     let assignedGlobal = [];
-                    if (canUseGlobal) {
-                        const sIds = globalStudent.slice(0, studentQuantity);
-                        const tIds = form.needTeacherPad ? globalTeacher.slice(0, 1) : [];
-                        assignedGlobal = [...sIds, ...tIds].sort((a,b)=>a-b);
-                    }
-
-                    const batch = writeBatch(db);
-                    let fail = false;
-                    
+                    if (canUseGlobal) { const sIds = globalStudent.slice(0, studentQuantity); const tIds = form.needTeacherPad ? globalTeacher.slice(0, 1) : []; assignedGlobal = [...sIds, ...tIds].sort((a,b)=>a-b); }
+                    const batch = writeBatch(db); let fail = false;
                     finalForm.selectedSlots.forEach(s => {
                         let assignedIds = [];
-                        if (canUseGlobal) {
-                            assignedIds = assignedGlobal;
-                        } else {
-                            // Fallback: Assign per slot (non-continuous IDs) but still respecting pools
-                            const slotSet = intersectionMap[`${s.day}-${s.period}`];
-                            const slotArr = Array.from(slotSet).sort((a,b)=>a-b);
-                            
-                            const slotStudent = slotArr.filter(id => id <= STUDENT_MAX_ID);
-                            const slotTeacher = slotArr.filter(id => TEACHER_DEVICE_IDS.includes(id));
-
+                        if (canUseGlobal) { assignedIds = assignedGlobal; } else {
+                            const slotArr = Array.from(intersectionMap[`${s.day}-${s.period}`]).sort((a,b)=>a-b);
+                            const slotStudent = slotArr.filter(id => id <= STUDENT_MAX_ID); const slotTeacher = slotArr.filter(id => TEACHER_DEVICE_IDS.includes(id));
                             if (slotStudent.length < studentQuantity) { fail = true; return; }
                             if (form.needTeacherPad && slotTeacher.length < 1) { fail = true; return; }
-
-                            const sIds = slotStudent.slice(0, studentQuantity);
-                            const tIds = form.needTeacherPad ? slotTeacher.slice(0, 1) : [];
+                            const sIds = slotStudent.slice(0, studentQuantity); const tIds = form.needTeacherPad ? slotTeacher.slice(0, 1) : [];
                             assignedIds = [...sIds, ...tIds].sort((a,b)=>a-b);
                         }
-
                         const ref = doc(collection(db, 'artifacts', appId, 'public', 'data', 'bookings'));
-                        batch.set(ref, { 
-                            type: 'long-term', 
-                            batchId: batchId, 
-                            startDate: finalForm.startDate, 
-                            endDate: finalForm.endDate, 
-                            dayOfWeek: s.day, 
-                            period: s.period, 
-                            cartId: finalForm.cartId, 
-                            cartLoc: carts.find(c => c.id === finalForm.cartId).location, 
-                            user: finalForm.user, 
-                            ext: finalForm.ext, 
-                            quantity: parseInt(finalForm.quantity), 
-                            needTeacherPad: finalForm.needTeacherPad, 
-                            note: finalForm.note, 
-                            signature: finalForm.signature,
-                            status: 'active', 
-                            deviceIds: assignedIds, 
-                            createdAt: serverTimestamp(), 
-                            createdBy: user.uid 
-                        });
+                        batch.set(ref, { type: 'long-term', batchId: batchId, startDate: finalForm.startDate, endDate: finalForm.endDate, dayOfWeek: s.day, period: s.period, cartId: finalForm.cartId, cartLoc: carts.find(c => c.id === finalForm.cartId).location, user: finalForm.user, ext: finalForm.ext, quantity: parseInt(finalForm.quantity), needTeacherPad: finalForm.needTeacherPad, note: finalForm.note, signature: finalForm.signature, status: 'active', deviceIds: assignedIds, createdAt: serverTimestamp(), createdBy: user.uid });
                     });
-                    
-                    if(fail) { 
-                        setAnimationState({ status: 'error', message: "部分時段無法取得足夠的學生機或教師機" });
-                        return; 
-                    }
-                    
-                    const todayStr = formatDate(new Date());
-                    const threeDaysLaterStr = addDays(todayStr, 3);
-                    const isUrgent = finalForm.startDate <= threeDaysLaterStr;
-                    
+                    if(fail) { setAnimationState({ status: 'error', message: "部分時段無法取得足夠的學生機或教師機" }); return; }
+                    const isUrgent = finalForm.startDate <= addDays(formatDate(new Date()), 3);
                     await batch.commit(); 
-
-                    setAnimationState({ status: isUrgent ? 'warning' : 'success' });
-                    setForm({ ...finalForm, selectedSlots: [], user: '', ext: '', note: '', signature: null }); 
-                    setCheckResult(null); 
-                } catch (e) { 
-                    console.error("Final submit error:", e);
-                    setAnimationState({ status: 'error', message: `系統錯誤: ${e.message || "未知原因"}` });
-                }
+                    setAnimationState({ status: isUrgent ? 'warning' : 'success' }); setForm({ ...finalForm, selectedSlots: [], user: '', ext: '', note: '', signature: null }); setCheckResult(null); 
+                } catch (e) { console.error("Final submit error:", e); setAnimationState({ status: 'error', message: `系統錯誤: ${e.message || "未知原因"}` }); }
             };
-
             return (
                 <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
                     <div className="bg-white p-6 rounded-lg card-shadow border border-blue-50">
-                        <div className="border-b border-blue-100 pb-4 mb-4">
-                            <h2 className="text-2xl font-bold text-blue-800 flex items-center gap-2"><i data-lucide="calendar-plus" className="w-6 h-6 text-blue-600"></i> 平板預約</h2>
-                            {/* UPDATED TEXT HERE */}
-                            <p className="text-blue-500 mt-2 bg-blue-50 p-3 rounded-lg border border-blue-100 leading-relaxed">
-                                💡 請 <b>提前一週</b> 進行預約。若為 <span className="text-red-500 font-bold underline decoration-wavy">借用急件</span>（3天內），預約後，請務必於送出後 <b>電話或當面提醒</b> 資訊秘書（分機：18），避免來不及準備！
-                            </p>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                            <div>
-                                <label className="block text-xl font-bold text-gray-700 mb-2">1. 日期區間【借出開始與結束日】 <span className="text-red-500">*</span></label>
-                                <div className="flex items-center gap-2">
-                                    <input type="date" className="border rounded p-2 text-base md:p-3 md:text-lg w-full focus:ring-2 focus:ring-blue-500 outline-none" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value, checkResult: null})} />
-                                    <span className="text-gray-400">至</span>
-                                    <input type="date" className="border rounded p-2 text-base md:p-3 md:text-lg w-full focus:ring-2 focus:ring-blue-500 outline-none" value={form.endDate} onChange={e => setForm({...form, endDate: e.target.value, checkResult: null})} />
-                                </div>
-                            </div>
-                        </div>
-                        <div className="mb-6">
-                            <label className="block text-xl font-bold text-gray-700 mb-2">2. 勾選需要時段 <span className="text-red-500">*</span></label>
-                            
-                            {/* Compact Table for Mobile/Tablet Optimization */}
-                            <div className="overflow-x-auto border border-blue-100 rounded-lg">
-                                <table className="w-full text-center text-xs md:text-sm">
-                                    <thead className="bg-blue-50 text-blue-900 font-bold">
-                                        <tr>
-                                            <th className="p-1 md:p-3 border-b border-r border-blue-100">節次</th>
-                                            {DAYS_OF_WEEK.map(d => <th key={d} className="p-1 md:p-3 border-b border-blue-100 min-w-[40px] md:min-w-[80px]">週{DAY_LABELS[d]}</th>)}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {PERIODS.map(p => (
-                                            <tr key={p} className="hover:bg-blue-50">
-                                                <td className="p-1 md:p-3 border-r border-blue-100 font-bold text-gray-500">第 {p} 節</td>
-                                                {DAYS_OF_WEEK.map(d => {
-                                                    const isSelected = form.selectedSlots.some(s => s.day === d && s.period === p);
-                                                    return (
-                                                        <td key={d} className="p-0.5 md:p-1 border border-blue-50 matrix-cell">
-                                                            <label className="cursor-pointer block h-full w-full">
-                                                                <input 
-                                                                    type="checkbox" 
-                                                                    className="hidden" 
-                                                                    checked={isSelected}
-                                                                    onChange={() => toggleSlot(d, p)}
-                                                                />
-                                                                <div className={`py-2 md:py-4 rounded transition hover:bg-blue-100 flex items-center justify-center ${isSelected ? 'bg-blue-100 text-blue-700 font-bold ring-2 ring-blue-300' : 'text-gray-300'}`}>
-                                                                    {isSelected ? '✅' : '-'}
-                                                                </div>
-                                                            </label>
-                                                        </td>
-                                                    )
-                                                })}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-6">
-                             <label className="block text-xl font-bold text-blue-800 mb-4">3. 填寫借用資訊 <span className="text-red-500">*</span></label>
-                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
-                                <div>
-                                    <label className="block text-sm font-bold text-blue-600 mb-1">申請人姓名 (全名)</label>
-                                    <input type="text" className="w-full border rounded p-2 text-sm md:p-3 md:text-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="王小明" value={form.user} onChange={e => setForm({...form, user: e.target.value})} />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-blue-600 mb-1">分機號碼</label>
-                                    <input type="text" className="w-full border rounded p-2 text-sm md:p-3 md:text-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="1234" value={form.ext} onChange={e => setForm({...form, ext: e.target.value})} />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-blue-600 mb-1">學生機數量</label>
-                                    <div className="flex gap-3 items-center">
-                                        <input type="number" className="w-24 border rounded p-2 text-sm md:p-3 md:text-lg focus:ring-2 focus:ring-blue-500 outline-none" value={form.quantity} onChange={e => setForm({...form, quantity: e.target.value})} />
-                                        <label className="flex items-center gap-2 text-base text-gray-700 cursor-pointer select-none">
-                                            <input type="checkbox" checked={form.needTeacherPad} onChange={e => setForm({...form, needTeacherPad: e.target.checked})} className="w-5 h-5 accent-blue-600"/>
-                                            需教師機 (No.34-36)
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-                             <div className="mb-4">
-                                <label className="block text-sm font-bold text-blue-600 mb-1">備註 (選填)</label>
-                                <textarea className="w-full border rounded p-2 text-sm md:p-3 md:text-lg focus:ring-2 focus:ring-blue-500 outline-none" rows="2" placeholder="用途說明..." value={form.note} onChange={e => setForm({...form, note: e.target.value})}></textarea>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-center mt-8">
-                             <button 
-                                onClick={initiateBooking}
-                                disabled={form.selectedSlots.length === 0}
-                                className="bg-blue-600 text-white px-12 py-4 rounded-xl font-bold text-2xl hover:bg-blue-700 disabled:opacity-50 transition shadow-lg transform hover:scale-105 flex items-center gap-3"
-                            >
-                                預約平板
-                            </button>
-                        </div>
+                        <div className="border-b border-blue-100 pb-4 mb-4"><h2 className="text-2xl font-bold text-blue-800 flex items-center gap-2"><i data-lucide="calendar-plus" className="w-6 h-6 text-blue-600"></i> 平板預約</h2><p className="text-blue-500 mt-2 bg-blue-50 p-3 rounded-lg border border-blue-100 leading-relaxed">💡 請 <b>提前一週</b> 進行預約。若為 <span className="text-red-500 font-bold underline decoration-wavy">借用急件</span>（3天內），預約後，請務必於送出後 <b>電話或當面提醒</b> 資訊秘書（分機：18），避免來不及準備！</p></div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6"><div><label className="block text-xl font-bold text-gray-700 mb-2">1. 日期區間 <span className="text-red-500">*</span></label><div className="flex items-center gap-2"><input type="date" className="border rounded p-2 text-base md:p-3 md:text-lg w-full focus:ring-2 focus:ring-blue-500 outline-none" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value, checkResult: null})} /><span className="text-gray-400">至</span><input type="date" className="border rounded p-2 text-base md:p-3 md:text-lg w-full focus:ring-2 focus:ring-blue-500 outline-none" value={form.endDate} onChange={e => setForm({...form, endDate: e.target.value, checkResult: null})} /></div></div></div>
+                        <div className="mb-6"><label className="block text-xl font-bold text-gray-700 mb-2">2. 勾選需要時段 <span className="text-red-500">*</span></label><div className="overflow-x-auto border border-blue-100 rounded-lg"><table className="w-full text-center text-xs md:text-sm"><thead className="bg-blue-50 text-blue-900 font-bold"><tr><th className="p-1 md:p-3 border-b border-r border-blue-100">節次</th>{DAYS_OF_WEEK.map(d => <th key={d} className="p-1 md:p-3 border-b border-blue-100 min-w-[40px] md:min-w-[80px]">週{DAY_LABELS[d]}</th>)}</tr></thead><tbody>{PERIODS.map(p => (<tr key={p} className="hover:bg-blue-50"><td className="p-1 md:p-3 border-r border-blue-100 font-bold text-gray-500">第 {p} 節</td>{DAYS_OF_WEEK.map(d => { const isSelected = form.selectedSlots.some(s => s.day === d && s.period === p); return (<td key={d} className="p-0.5 md:p-1 border border-blue-50 matrix-cell"><label className="cursor-pointer block h-full w-full"><input type="checkbox" className="hidden" checked={isSelected} onChange={() => toggleSlot(d, p)}/><div className={`py-2 md:py-4 rounded transition hover:bg-blue-100 flex items-center justify-center ${isSelected ? 'bg-blue-100 text-blue-700 font-bold ring-2 ring-blue-300' : 'text-gray-300'}`}>{isSelected ? '✅' : '-'}</div></label></td>)})}</tr>))}</tbody></table></div></div>
+                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-6"><label className="block text-xl font-bold text-blue-800 mb-4">3. 填寫借用資訊 <span className="text-red-500">*</span></label><div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4"><div><label className="block text-sm font-bold text-blue-600 mb-1">申請人姓名</label><input type="text" className="w-full border rounded p-2 text-sm md:p-3 md:text-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="王小明" value={form.user} onChange={e => setForm({...form, user: e.target.value})} /></div><div><label className="block text-sm font-bold text-blue-600 mb-1">分機號碼</label><input type="text" className="w-full border rounded p-2 text-sm md:p-3 md:text-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="1234" value={form.ext} onChange={e => setForm({...form, ext: e.target.value})} /></div><div><label className="block text-sm font-bold text-blue-600 mb-1">學生機數量</label><div className="flex gap-3 items-center"><input type="number" className="w-24 border rounded p-2 text-sm md:p-3 md:text-lg focus:ring-2 focus:ring-blue-500 outline-none" value={form.quantity} onChange={e => setForm({...form, quantity: e.target.value})} /><label className="flex items-center gap-2 text-base text-gray-700 cursor-pointer select-none"><input type="checkbox" checked={form.needTeacherPad} onChange={e => setForm({...form, needTeacherPad: e.target.checked})} className="w-5 h-5 accent-blue-600"/>需教師機</label></div></div></div><div className="mb-4"><label className="block text-sm font-bold text-blue-600 mb-1">備註</label><textarea className="w-full border rounded p-2 text-sm md:p-3 md:text-lg focus:ring-2 focus:ring-blue-500 outline-none" rows="2" placeholder="用途說明..." value={form.note} onChange={e => setForm({...form, note: e.target.value})}></textarea></div></div>
+                        <div className="flex justify-center mt-8"><button onClick={initiateBooking} disabled={form.selectedSlots.length === 0} className="bg-blue-600 text-white px-12 py-4 rounded-xl font-bold text-2xl hover:bg-blue-700 disabled:opacity-50 transition shadow-lg transform hover:scale-105 flex items-center gap-3">預約平板</button></div>
                     </div>
                 </div>
             );
         }
 
-        // --- My Bookings View (NEW - Restored) ---
         function MyBookingsView({ bookings }) {
-            const [name, setName] = React.useState('');
-            const [result, setResult] = React.useState(null);
-
+            const [name, setName] = React.useState(''); const [result, setResult] = React.useState(null);
             React.useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
-
-            const groupBookings = (list) => {
-                const groups = {};
-                const singles = [];
-                
-                list.forEach(b => {
-                    if (b.status === 'active' && b.type === 'long-term' && b.batchId) {
-                        if (!groups[b.batchId]) {
-                            groups[b.batchId] = {
-                                ...b,
-                                isGroup: true,
-                                slots: []
-                            };
-                        }
-                        groups[b.batchId].slots.push({ day: b.dayOfWeek, period: b.period });
-                    } else {
-                        singles.push(b);
-                    }
-                });
-
-                const groupArray = Object.values(groups).map(g => {
-                    g.slots.sort((a,b) => a.day - b.day || a.period - b.period);
-                    const days = {};
-                    g.slots.forEach(s => {
-                        if(!days[s.day]) days[s.day] = [];
-                        days[s.day].push(s.period);
-                    });
-                    const textParts = Object.keys(days).sort().map(d => {
-                        return `週${DAY_LABELS[d]} / 第 ${days[d].join('、')} 節`;
-                    });
-                    g.scheduleText = textParts.join(' ; ');
-                    return g;
-                });
-
-                return [...singles, ...groupArray].sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
-            };
-
-            const handleSearch = (e) => {
-                e.preventDefault();
-                if (!name.trim()) return;
-                
-                // Safe check for b.user existence to prevent crash on old data
-                const found = bookings.filter(b => b.user && b.user.trim() === name.trim() && b.status === 'active');
-                const grouped = groupBookings(found);
-                
-                setResult(grouped);
-            };
-
+            const groupBookings = (list) => { const groups = {}; const singles = []; list.forEach(b => { if (b.status === 'active' && b.type === 'long-term' && b.batchId) { if (!groups[b.batchId]) { groups[b.batchId] = { ...b, isGroup: true, slots: [] }; } groups[b.batchId].slots.push({ day: b.dayOfWeek, period: b.period }); } else { singles.push(b); } }); const groupArray = Object.values(groups).map(g => { g.slots.sort((a,b) => a.day - b.day || a.period - b.period); const days = {}; g.slots.forEach(s => { if(!days[s.day]) days[s.day] = []; days[s.day].push(s.period); }); const textParts = Object.keys(days).sort().map(d => { return `週${DAY_LABELS[d]} / 第 ${days[d].join('、')} 節`; }); g.scheduleText = textParts.join(' ; '); return g; }); return [...singles, ...groupArray].sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)); };
+            const handleSearch = (e) => { e.preventDefault(); if (!name.trim()) return; const found = bookings.filter(b => b.user && b.user.trim() === name.trim() && b.status === 'active'); setResult(groupBookings(found)); };
             return (
-                <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
-                    <div className="bg-white p-6 rounded-lg card-shadow border border-blue-50">
-                        <h2 className="text-2xl font-bold text-blue-800 mb-4 flex items-center gap-2">
-                            <i data-lucide="search" className="w-6 h-6 text-blue-600"></i>
-                            預約確認 / 查詢
-                        </h2>
-                        <form onSubmit={handleSearch} className="flex gap-2 mb-6">
-                            <input 
-                                type="text" 
-                                className="flex-1 border rounded p-3 text-lg focus:ring-2 focus:ring-blue-500 outline-none" 
-                                placeholder="請輸入申請人姓名 (全名)" 
-                                value={name} 
-                                onChange={e => setName(e.target.value)}
-                            />
-                            <button type="submit" className="bg-blue-600 text-white px-6 py-3 rounded font-bold hover:bg-blue-700">查詢</button>
-                        </form>
-
-                        {result !== null && (
-                            <div>
-                                {result.length === 0 ? (
-                                    <div className="text-center text-gray-500 py-8">查無資料，請確認姓名是否輸入正確。</div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        <h3 className="font-bold text-lg text-blue-700 border-b border-blue-100 pb-2">查詢結果：{name} 老師 ({result.length} 筆)</h3>
-                                        {result.map(b => (
-                                            <div key={b.id || b.batchId} className="border border-blue-100 rounded-lg p-4 hover:bg-blue-50 transition">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <div className="font-bold text-lg text-blue-800 flex items-center gap-2">
-                                                            {b.type === 'long-term' ? <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">長期</span> : <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">單次</span>}
-                                                            {b.type === 'long-term' ? `${b.startDate} ~ ${b.endDate}` : b.date}
-                                                        </div>
-                                                        <div className="text-gray-600 mt-1">
-                                                            <span className="font-bold mr-2 text-blue-900">{b.cartId}車 ({b.cartLoc})</span>
-                                                            {b.isGroup ? (
-                                                                <span className="block mt-1 font-medium text-gray-800">{b.scheduleText}</span>
-                                                            ) : (
-                                                                <span className="mr-2">週{['日','一','二','三','四','五','六'][b.dayOfWeek]} 第 {b.period} 節</span>
-                                                            )}
-                                                            <span className="text-sm text-gray-500 ml-2">(數量: {b.quantity})</span>
-                                                        </div>
-                                                        <div className="text-sm text-gray-500 mt-2 bg-blue-50 p-2 rounded">
-                                                            分配編號：{formatDeviceList(b.deviceIds)}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <div className="max-w-3xl mx-auto space-y-6 animate-fade-in"><div className="bg-white p-6 rounded-lg card-shadow border border-blue-50"><h2 className="text-2xl font-bold text-blue-800 mb-4 flex items-center gap-2"><i data-lucide="search" className="w-6 h-6 text-blue-600"></i>預約確認 / 查詢</h2><form onSubmit={handleSearch} className="flex gap-2 mb-6"><input type="text" className="flex-1 border rounded p-3 text-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="請輸入申請人姓名" value={name} onChange={e => setName(e.target.value)}/><button type="submit" className="bg-blue-600 text-white px-6 py-3 rounded font-bold hover:bg-blue-700">查詢</button></form>{result !== null && (<div>{result.length === 0 ? (<div className="text-center text-gray-500 py-8">查無資料</div>) : (<div className="space-y-4"><h3 className="font-bold text-lg text-blue-700 border-b border-blue-100 pb-2">查詢結果：{name} 老師 ({result.length} 筆)</h3>{result.map(b => (<div key={b.id || b.batchId} className="border border-blue-100 rounded-lg p-4 hover:bg-blue-50 transition"><div><div className="font-bold text-lg text-blue-800 flex items-center gap-2">{b.type === 'long-term' ? <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">長期</span> : <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">單次</span>}{b.type === 'long-term' ? `${b.startDate} ~ ${b.endDate}` : b.date}</div><div className="text-gray-600 mt-1"><span className="font-bold mr-2 text-blue-900">{b.cartId}車 ({b.cartLoc})</span>{b.isGroup ? (<span className="block mt-1 font-medium text-gray-800">{b.scheduleText}</span>) : (<span className="mr-2">週{['日','一','二','三','四','五','六'][b.dayOfWeek]} 第 {b.period} 節</span>)}<span className="text-sm text-gray-500 ml-2">(數量: {b.quantity})</span></div><div className="text-sm text-gray-500 mt-2 bg-blue-50 p-2 rounded">分配編號：{formatDeviceList(b.deviceIds)}</div></div></div>))}</div>)}</div>)}</div></div>
             );
         }
 
-        // --- Backend View (Updated) ---
         function BackendView({ carts, bookings, cartStatus, db, appId, showToast, setModalConfig }) {
-            const [filter, setFilter] = React.useState('all');
-            const [isAddingCart, setIsAddingCart] = React.useState(false);
-            const [newCart, setNewCart] = React.useState({ id: '', location: '', total: 36, enableOneTime: true, enableLongTerm: true });
-            const [editingMaintenance, setEditingMaintenance] = React.useState(null);
-            
-            // NEW: Pagination State
-            const [currentPage, setCurrentPage] = React.useState(1);
-            const itemsPerPage = 5;
-
+            const [filter, setFilter] = React.useState('all'); const [isAddingCart, setIsAddingCart] = React.useState(false); const [newCart, setNewCart] = React.useState({ id: '', location: '', total: 36, enableOneTime: true, enableLongTerm: true }); const [editingMaintenance, setEditingMaintenance] = React.useState(null); const [currentPage, setCurrentPage] = React.useState(1); const itemsPerPage = 5;
             React.useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
-
-            // NEW: Auto Cleanup Logic (Runs once when BackendView mounts)
             React.useEffect(() => {
                 const cleanupOldRecords = async () => {
                     try {
-                        const today = new Date();
-                        today.setFullYear(today.getFullYear() - 1); // Get date 1 year ago
-                        const cutoffDate = formatDate(today);
-
-                        // Find expired bookings locally first to avoid complex compound queries requiring indexes
-                        // Since we already sync 'bookings' via onSnapshot in App component, we can filter locally then delete
-                        // Note: For massive datasets, you'd want a server-side query, but for this scale, this is safe.
+                        const today = new Date(); today.setFullYear(today.getFullYear() - 1); const cutoffDate = formatDate(today);
                         const oldBookings = bookings.filter(b => b.endDate < cutoffDate);
-
                         if (oldBookings.length > 0) {
-                            console.log(`Cleaning up ${oldBookings.length} old records...`);
-                            const batch = writeBatch(db);
-                            oldBookings.forEach(b => {
-                                const ref = doc(db, 'artifacts', appId, 'public', 'data', 'bookings', b.id);
-                                batch.delete(ref);
-                            });
-                            await batch.commit();
-                            showToast(`已自動清理 ${oldBookings.length} 筆一年前的舊資料`);
+                            const batch = writeBatch(db); oldBookings.forEach(b => { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'bookings', b.id); batch.delete(ref); });
+                            await batch.commit(); showToast(`已自動清理 ${oldBookings.length} 筆舊資料`);
                         }
-                    } catch (e) {
-                        console.error("Auto cleanup failed:", e);
-                    }
+                    } catch (e) { console.error("Auto cleanup failed:", e); }
                 };
-                
-                // Small delay to ensure data is ready
-                if (bookings.length > 0) {
-                    cleanupOldRecords();
-                }
-            }, [bookings.length]); // Depend on length so it runs after initial load
-
-            const handleDelete = (item) => {
-                const isBatch = item.isGroup;
-                const msg = isBatch ? '確定要刪除這筆預約嗎？這將會刪除該批次的所有預約紀錄。' : '確定要刪除這筆預約紀錄嗎？';
-                setModalConfig({ type: 'confirm', title: '確認刪除', message: msg, onConfirm: async () => { try { if (isBatch) { const batch = writeBatch(db); const idsToDelete = bookings.filter(b => b.batchId === item.batchId).map(b => b.id); idsToDelete.forEach(id => batch.delete(doc(db, 'artifacts', appId, 'public', 'data', 'bookings', id))); await batch.commit(); } else { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'bookings', item.id)); } showToast("刪除成功"); } catch(e) { showToast("刪除失敗", "error"); } } });
-            };
-
-            const handleEdit = (item) => {
-                setModalConfig({ type: 'custom', title: `編輯分配 - ${item.user} (${item.cartId}車)`, render: ({ onClose }) => ( <AllocationEditor item={item} allBookings={bookings} carts={carts} cartStatus={cartStatus} onClose={onClose} onSave={async (newIds, newCartId) => { try { const targetCart = carts.find(c => c.id === newCartId); const newLoc = targetCart ? targetCart.location : item.cartLoc; if (item.isGroup) { const batch = writeBatch(db); const relatedDocs = bookings.filter(b => b.batchId === item.batchId); relatedDocs.forEach(docData => { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'bookings', docData.id); batch.update(ref, { deviceIds: newIds, quantity: newIds.length, cartId: newCartId, cartLoc: newLoc }); }); await batch.commit(); showToast(`已更新批次共 ${relatedDocs.length} 筆預約`); } else { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'bookings', item.id), { deviceIds: newIds, quantity: newIds.length, cartId: newCartId, cartLoc: newLoc }); showToast("更新成功"); } onClose(); } catch(e) { showToast("更新失敗", "error"); } }} showToast={showToast} /> ) });
-            };
-            
-            const handleViewSignature = (item) => {
-                const sig = item.signature;
-                setModalConfig({
-                    type: 'custom', title: `簽名 - ${item.user}`,
-                    render: ({ onClose }) => ( <div className="flex flex-col items-center p-4">{sig ? <img src={sig} alt="Signature" className="max-w-full border rounded mb-4 bg-white" /> : <p className="text-gray-500 py-4">無簽名資料</p>}<button onClick={onClose} className="bg-gray-200 px-6 py-2 rounded font-bold hover:bg-gray-300">關閉</button></div> )
-                });
-            };
-
+                if (bookings.length > 0) cleanupOldRecords();
+            }, [bookings.length]);
+            const handleDelete = (item) => { const isBatch = item.isGroup; const msg = isBatch ? '確定要刪除這筆預約嗎？這將會刪除該批次的所有預約紀錄。' : '確定要刪除這筆預約紀錄嗎？'; setModalConfig({ type: 'confirm', title: '確認刪除', message: msg, onConfirm: async () => { try { if (isBatch) { const batch = writeBatch(db); const idsToDelete = bookings.filter(b => b.batchId === item.batchId).map(b => b.id); idsToDelete.forEach(id => batch.delete(doc(db, 'artifacts', appId, 'public', 'data', 'bookings', id))); await batch.commit(); } else { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'bookings', item.id)); } showToast("刪除成功"); } catch(e) { showToast("刪除失敗", "error"); } } }); };
+            const handleEdit = (item) => { setModalConfig({ type: 'custom', title: `編輯分配 - ${item.user} (${item.cartId}車)`, render: ({ onClose }) => ( <AllocationEditor item={item} allBookings={bookings} carts={carts} cartStatus={cartStatus} onClose={onClose} onSave={async (newIds, newCartId) => { try { const targetCart = carts.find(c => c.id === newCartId); const newLoc = targetCart ? targetCart.location : item.cartLoc; if (item.isGroup) { const batch = writeBatch(db); const relatedDocs = bookings.filter(b => b.batchId === item.batchId); relatedDocs.forEach(docData => { const ref = doc(db, 'artifacts', appId, 'public', 'data', 'bookings', docData.id); batch.update(ref, { deviceIds: newIds, quantity: newIds.length, cartId: newCartId, cartLoc: newLoc }); }); await batch.commit(); showToast(`已更新批次共 ${relatedDocs.length} 筆預約`); } else { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'bookings', item.id), { deviceIds: newIds, quantity: newIds.length, cartId: newCartId, cartLoc: newLoc }); showToast("更新成功"); } onClose(); } catch(e) { showToast("更新失敗", "error"); } }} showToast={showToast} /> ) }); };
+            const handleViewSignature = (item) => { const sig = item.signature; setModalConfig({ type: 'custom', title: `簽名 - ${item.user}`, render: ({ onClose }) => ( <div className="flex flex-col items-center p-4">{sig ? <img src={sig} alt="Signature" className="max-w-full border rounded mb-4 bg-white" /> : <p className="text-gray-500 py-4">無簽名資料</p>}<button onClick={onClose} className="bg-gray-200 px-6 py-2 rounded font-bold hover:bg-gray-300">關閉</button></div> ) }); };
             const openMaintenanceModal = (cartId) => { const status = cartStatus[cartId] || {}; let ids = status.brokenIds || (status.brokenCount ? Array.from({length: status.brokenCount}, (_,i)=>i+1) : []); setEditingMaintenance({ cartId, brokenIds: new Set(ids) }); setModalConfig({ type: 'custom', title: `${cartId} 車 - 鎖定管理`, render: ({ onClose }) => <MaintenanceGrid cartId={cartId} initialIds={ids} onClose={onClose} db={db} appId={appId} showToast={showToast} /> }); };
-            
             const handleAddCart = async () => { if (!newCart.id || !newCart.location) return showToast("請填寫完整資訊", "error"); try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'carts', newCart.id.toUpperCase()), { ...newCart, id: newCart.id.toUpperCase() }); setIsAddingCart(false); setNewCart({ id: '', location: '', total: 36, enableOneTime: true, enableLongTerm: true }); showToast("新增成功"); } catch(e) { showToast("新增失敗", "error"); } };
             const handleUpdateCart = async (cart, field, val) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'carts', cart.id), { [field]: val });
             const handleDeleteCart = (id) => { setModalConfig({ type: 'confirm', title: '確認刪除車輛', message: `確定要刪除 ${id} 車嗎？`, onConfirm: async () => { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'carts', id)); showToast("已刪除"); } }); };
-            
-            const exportCSV = () => { const headers = ["類型,日期範圍/單日,車號,節次,申請人,分機,學生機,教師機,分配編號,備註,狀態,建立時間"]; const rows = bookings.map(b => { 
-                let type = '長期';
-                if (b.startDate === b.endDate) type = '短期';
-
-                let dateInfo = b.date; 
-                if(b.type === 'long-term') dateInfo = `${b.startDate}~${b.endDate} (週${DAY_LABELS[b.dayOfWeek]})`; 
-                const created = b.createdAt ? new Date(b.createdAt.seconds * 1000).toLocaleString() : ''; 
-                return `${type},"${dateInfo}",${b.cartId},${b.period},${b.user},${b.ext},${b.quantity},${b.needTeacherPad?'是':'否'},"${formatDeviceList(b.deviceIds)}",${b.note || ''},${b.status},${created}`; 
-            }); const link = document.createElement("a"); link.setAttribute("href", URL.createObjectURL(new Blob(["\uFEFF" + headers.concat(rows).join("\n")], { type: 'text/csv;charset=utf-8;' }))); link.setAttribute("download", `報表_${new Date().toISOString().slice(0,10)}.csv`); document.body.appendChild(link); link.click(); };
-
+            const exportCSV = () => { const headers = ["類型,日期範圍/單日,車號,節次,申請人,分機,學生機,教師機,分配編號,備註,狀態,建立時間"]; const rows = bookings.map(b => { let type = '長期'; if (b.startDate === b.endDate) type = '短期'; let dateInfo = b.date; if(b.type === 'long-term') dateInfo = `${b.startDate}~${b.endDate} (週${DAY_LABELS[b.dayOfWeek]})`; const created = b.createdAt ? new Date(b.createdAt.seconds * 1000).toLocaleString() : ''; return `${type},"${dateInfo}",${b.cartId},${b.period},${b.user},${b.ext},${b.quantity},${b.needTeacherPad?'是':'否'},"${formatDeviceList(b.deviceIds)}",${b.note || ''},${b.status},${created}`; }); const link = document.createElement("a"); link.setAttribute("href", URL.createObjectURL(new Blob(["\uFEFF" + headers.concat(rows).join("\n")], { type: 'text/csv;charset=utf-8;' }))); link.setAttribute("download", `報表_${new Date().toISOString().slice(0,10)}.csv`); document.body.appendChild(link); link.click(); };
             const groupBookings = (list) => { const groups = {}; const singles = []; list.forEach(b => { if (b.status === 'active' && b.type === 'long-term' && b.batchId) { if (!groups[b.batchId]) groups[b.batchId] = { ...b, isGroup: true, slots: [] }; groups[b.batchId].slots.push({ day: b.dayOfWeek, period: b.period }); } else singles.push(b); }); const groupArray = Object.values(groups).map(g => { g.slots.sort((a,b) => a.day - b.day || a.period - b.period); const days = {}; g.slots.forEach(s => { if(!days[s.day]) days[s.day] = []; days[s.day].push(s.period); }); const textParts = Object.keys(days).sort().map(d => `週${DAY_LABELS[d]} / 第 ${days[d].join('、')} 節`); g.scheduleText = textParts.join(' ; '); return g; }); return [...singles, ...groupArray].sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)); };
-
-            // Logic for Display List
-            const rawList = bookings.filter(b => { if (filter === 'active') return b.status === 'active'; if (filter === 'long-term') return b.type === 'long-term'; return true; });
-            const displayList = groupBookings(rawList);
-
-            // NEW: Pagination Logic
-            const indexOfLastItem = currentPage * itemsPerPage;
-            const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-            const currentItems = displayList.slice(indexOfFirstItem, indexOfLastItem);
-            const totalPages = Math.ceil(displayList.length / itemsPerPage);
-
-            // Reset page if filter changes
-            React.useEffect(() => { setCurrentPage(1); }, [filter]);
-
-            const paginate = (pageNumber) => setCurrentPage(pageNumber);
+            const rawList = bookings.filter(b => { if (filter === 'active') return b.status === 'active'; if (filter === 'long-term') return b.type === 'long-term'; return true; }); const displayList = groupBookings(rawList);
+            const indexOfLastItem = currentPage * itemsPerPage; const indexOfFirstItem = indexOfLastItem - itemsPerPage; const currentItems = displayList.slice(indexOfFirstItem, indexOfLastItem); const totalPages = Math.ceil(displayList.length / itemsPerPage);
+            React.useEffect(() => { setCurrentPage(1); }, [filter]); const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
             return (
                 <div className="space-y-8 animate-fade-in">
-                    <div className="bg-white p-5 rounded-lg card-shadow border-t-4 border-blue-600">
-                        <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg flex items-center gap-2 text-blue-800"><i data-lucide="truck" className="w-5 h-5"></i> 車輛管理設定</h3><button onClick={() => setIsAddingCart(true)} className="bg-blue-800 text-white px-3 py-1 rounded text-sm hover:bg-blue-900 transition flex items-center gap-1"><i data-lucide="plus" className="w-4 h-4"></i> 新增車輛</button></div>
-                        {isAddingCart && ( <div className="bg-blue-50 p-4 rounded mb-4 animate-fade-in"><h4 className="font-bold text-sm mb-2 text-blue-800">新增車輛</h4><div className="flex flex-wrap gap-2 items-end"><div className="w-20"><label className="text-xs text-blue-600">代號</label><input type="text" className="w-full border p-1 rounded uppercase focus:ring-1 focus:ring-blue-500" placeholder="Z" value={newCart.id} onChange={e => setNewCart({...newCart, id: e.target.value})} /></div><div className="flex-1"><label className="text-xs text-blue-600">位置</label><input type="text" className="w-full border p-1 rounded focus:ring-1 focus:ring-blue-500" placeholder="教務處" value={newCart.location} onChange={e => setNewCart({...newCart, location: e.target.value})} /></div><div className="w-20"><label className="text-xs text-blue-600">總量</label><input type="number" className="w-full border p-1 rounded focus:ring-1 focus:ring-blue-500" value={newCart.total} onChange={e => setNewCart({...newCart, total: parseInt(e.target.value)})} /></div><button onClick={handleAddCart} className="bg-green-600 text-white px-3 py-1 rounded text-sm">儲存</button><button onClick={() => setIsAddingCart(false)} className="text-gray-500 text-sm px-2">取消</button></div></div> )}
-                        <div className="overflow-x-auto"><table className="w-full text-sm text-left border-collapse"><thead className="bg-blue-50 text-blue-700"><tr><th className="p-2 border border-blue-100">ID</th><th className="p-2 border border-blue-100">出貨位置(點擊修改)</th><th className="p-2 border border-blue-100">於首頁顯示每周租借情況</th><th className="p-2 border border-blue-100">是否可以租借</th><th className="p-2 border border-blue-100 text-right">刪除整個台車</th></tr></thead><tbody>{carts.map(c => (<tr key={c.id} className="hover:bg-blue-50"><td className="p-2 border border-blue-100 font-bold text-blue-900">{c.id}</td><td className="p-2 border border-blue-100"><input type="text" className="bg-transparent border-b border-transparent hover:border-blue-300 focus:border-blue-500 outline-none w-full" defaultValue={c.location} onBlur={(e) => handleUpdateCart(c, 'location', e.target.value)} /></td><td className="p-2 border border-blue-100 text-center"><input type="checkbox" checked={c.enableOneTime} onChange={(e) => handleUpdateCart(c, 'enableOneTime', e.target.checked)} className="accent-blue-600 w-4 h-4" /></td><td className="p-2 border border-blue-100 text-center"><input type="checkbox" checked={c.enableLongTerm} onChange={(e) => handleUpdateCart(c, 'enableLongTerm', e.target.checked)} className="accent-blue-600 w-4 h-4" /></td><td className="p-2 border border-blue-100 text-right"><button onClick={() => handleDeleteCart(c.id)} className="text-red-400 hover:text-red-600 px-2"><i data-lucide="trash" className="w-4 h-4"></i></button></td></tr>))}</tbody></table></div>
-                    </div>
+                    <div className="bg-white p-5 rounded-lg card-shadow border-t-4 border-blue-600"><div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg flex items-center gap-2 text-blue-800"><i data-lucide="truck" className="w-5 h-5"></i> 車輛管理設定</h3><button onClick={() => setIsAddingCart(true)} className="bg-blue-800 text-white px-3 py-1 rounded text-sm hover:bg-blue-900 transition flex items-center gap-1"><i data-lucide="plus" className="w-4 h-4"></i> 新增車輛</button></div>{isAddingCart && ( <div className="bg-blue-50 p-4 rounded mb-4 animate-fade-in"><h4 className="font-bold text-sm mb-2 text-blue-800">新增車輛</h4><div className="flex flex-wrap gap-2 items-end"><div className="w-20"><label className="text-xs text-blue-600">代號</label><input type="text" className="w-full border p-1 rounded uppercase focus:ring-1 focus:ring-blue-500" placeholder="Z" value={newCart.id} onChange={e => setNewCart({...newCart, id: e.target.value})} /></div><div className="flex-1"><label className="text-xs text-blue-600">位置</label><input type="text" className="w-full border p-1 rounded focus:ring-1 focus:ring-blue-500" placeholder="教務處" value={newCart.location} onChange={e => setNewCart({...newCart, location: e.target.value})} /></div><div className="w-20"><label className="text-xs text-blue-600">總量</label><input type="number" className="w-full border p-1 rounded focus:ring-1 focus:ring-blue-500" value={newCart.total} onChange={e => setNewCart({...newCart, total: parseInt(e.target.value)})} /></div><button onClick={handleAddCart} className="bg-green-600 text-white px-3 py-1 rounded text-sm">儲存</button><button onClick={() => setIsAddingCart(false)} className="text-gray-500 text-sm px-2">取消</button></div></div> )}<div className="overflow-x-auto"><table className="w-full text-sm text-left border-collapse"><thead className="bg-blue-50 text-blue-700"><tr><th className="p-2 border border-blue-100">ID</th><th className="p-2 border border-blue-100">出貨位置</th><th className="p-2 border border-blue-100 text-center">首頁顯示</th><th className="p-2 border border-blue-100 text-center">可租借</th><th className="p-2 border border-blue-100 text-right">刪除</th></tr></thead><tbody>{carts.map(c => (<tr key={c.id} className="hover:bg-blue-50"><td className="p-2 border border-blue-100 font-bold text-blue-900">{c.id}</td><td className="p-2 border border-blue-100"><input type="text" className="bg-transparent border-b border-transparent hover:border-blue-300 focus:border-blue-500 outline-none w-full" defaultValue={c.location} onBlur={(e) => handleUpdateCart(c, 'location', e.target.value)} /></td><td className="p-2 border border-blue-100 text-center"><input type="checkbox" checked={c.enableOneTime} onChange={(e) => handleUpdateCart(c, 'enableOneTime', e.target.checked)} className="accent-blue-600 w-4 h-4" /></td><td className="p-2 border border-blue-100 text-center"><input type="checkbox" checked={c.enableLongTerm} onChange={(e) => handleUpdateCart(c, 'enableLongTerm', e.target.checked)} className="accent-blue-600 w-4 h-4" /></td><td className="p-2 border border-blue-100 text-right"><button onClick={() => handleDeleteCart(c.id)} className="text-red-400 hover:text-red-600 px-2"><i data-lucide="trash" className="w-4 h-4"></i></button></td></tr>))}</tbody></table></div></div>
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                         <div className="lg:col-span-1 bg-white p-5 rounded-lg card-shadow h-fit border border-blue-50"><h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-blue-800"><i data-lucide="tool" className="w-5 h-5"></i> 鎖定控制管理</h3><div className="space-y-2 max-h-[600px] overflow-y-auto pr-1 custom-scrollbar">{carts.map(cart => { const status = cartStatus[cart.id] || {}; const brokenCount = status.brokenIds ? status.brokenIds.length : (status.brokenCount || 0); return (<div key={cart.id} className="border rounded p-3 bg-blue-50/50 flex justify-between items-center hover:bg-blue-100 transition"><div><div className="font-bold text-blue-900">{cart.id} 車</div><div className="text-xs text-blue-500">{cart.location}</div></div><div className="flex items-center gap-2"><span className={`text-sm font-bold ${brokenCount > 0 ? 'text-red-600' : 'text-green-600'}`}>{brokenCount > 0 ? `鎖定 ${brokenCount}` : '正常'}</span><button onClick={() => openMaintenanceModal(cart.id)} className="text-blue-300 hover:text-blue-600"><i data-lucide="settings-2" className="w-4 h-4"></i></button></div></div>) })}</div></div>
-                        <div className="lg:col-span-3 bg-white p-5 rounded-lg card-shadow border border-blue-50">
-                            <div className="flex flex-wrap justify-between items-center mb-6 gap-4"><h3 className="font-bold text-lg flex items-center gap-2 text-blue-800"><i data-lucide="list" className="w-5 h-5"></i> 預約紀錄 (共 {displayList.length} 筆)</h3><div className="flex gap-2"><button onClick={exportCSV} className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition"><i data-lucide="download" className="w-4 h-4"></i> CSV</button><div className="bg-blue-50 rounded p-1 flex">{['all','active','long-term'].map(f => <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1 rounded text-sm transition ${filter === f ? 'bg-white shadow text-blue-600 font-bold' : 'text-blue-400 hover:text-blue-600'}`}>{f==='all'?'全部':f==='active'?'有效':'長期'}</button>)}</div></div></div>
-                            
-                            <div className="overflow-x-auto min-h-[300px]">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-blue-50 text-blue-700 uppercase"><tr><th className="p-3">類型/時間</th><th className="p-3">車號</th><th className="p-3">借用人</th><th className="p-3">數量</th><th className="p-3">分配編號</th><th className="p-3">操作</th></tr></thead>
-                                    <tbody className="divide-y divide-blue-50">
-                                        {currentItems.map(b => {
-                                            let typeLabel = '長期';
-                                            if (b.startDate === b.endDate) typeLabel = '短期';
-
-                                            return (
-                                            <tr key={b.id || b.batchId} className="hover:bg-blue-50/50">
-                                                <td className="p-3">
-                                                    {b.type === 'long-term' ? (
-                                                        <div>
-                                                            <span className={`px-2 py-0.5 rounded text-xs font-bold mr-2 ${typeLabel === '短期' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{typeLabel}</span><br/>
-                                                            {b.startDate}~{b.endDate}
-                                                            {/* UPDATED: Tooltip for Schedule Text */}
-                                                            <div className="mt-1">
-                                                                {b.isGroup ? (
-                                                                    <span title={b.scheduleText} className="text-purple-600 text-xs font-bold cursor-help underline decoration-dotted">
-                                                                        查看詳細時段 (Hover)
-                                                                    </span>
-                                                                ) : (
-                                                                    <div className="text-purple-600 text-xs font-bold">
-                                                                        週{DAY_LABELS[b.dayOfWeek]} / 第 {b.period} 節
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div><span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-bold mr-2">單次</span><br/>{b.date}<div className="text-gray-500 text-xs mt-1">第 {b.period} 節</div></div>
-                                                    )}
-                                                </td>
-                                                <td className="p-3 font-bold text-gray-700">{b.cartId} 車</td>
-                                                <td className="p-3"><div>{b.user}</div><div className="text-xs text-gray-400">分機 {b.ext}</div></td>
-                                                <td className="p-3">{b.quantity} 生 {b.needTeacherPad && '+ 1 師'}</td>
-                                                <td className="p-3 text-xs text-gray-600 max-w-[150px] truncate" title={formatDeviceList(b.deviceIds)}>{formatDeviceList(b.deviceIds)}</td>
-                                                <td className="p-3 flex gap-2"><button onClick={() => handleDelete(b)} className="text-red-500 hover:bg-red-50 p-2 rounded"><i data-lucide="trash-2" className="w-4 h-4"></i></button><button onClick={() => handleEdit(b)} className="text-blue-500 hover:bg-blue-50 p-2 rounded"><i data-lucide="edit" className="w-4 h-4"></i></button>{b.signature && <button onClick={() => handleViewSignature(b)} className="text-blue-600 hover:bg-blue-100 p-2 rounded" title="查看簽名"><i data-lucide="pen-tool" className="w-4 h-4"></i></button>}</td>
-                                            </tr>
-                                        )})}
-                                        {currentItems.length === 0 && <tr><td colSpan="6" className="p-8 text-center text-gray-400">目前沒有資料</td></tr>}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            {/* NEW: Pagination Controls */}
-                            {totalPages > 1 && (
-                                <div className="flex justify-center items-center mt-6 gap-2">
-                                    <button 
-                                        onClick={() => paginate(Math.max(1, currentPage - 1))}
-                                        disabled={currentPage === 1}
-                                        className="px-3 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50 font-bold"
-                                    >
-                                        &lt;
-                                    </button>
-                                    
-                                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(number => (
-                                        // Only show first, last, current, and surrounding pages for cleanliness if too many pages
-                                        // But for simple < 1 2 3 ... > requested, we can just list them or simplify logic
-                                        (number === 1 || number === totalPages || (number >= currentPage - 1 && number <= currentPage + 1)) ? (
-                                            <button
-                                                key={number}
-                                                onClick={() => paginate(number)}
-                                                className={`w-8 h-8 rounded-full text-sm font-bold transition ${currentPage === number ? 'bg-blue-600 text-white shadow-lg scale-110' : 'bg-white text-blue-600 border border-blue-100 hover:bg-blue-50'}`}
-                                            >
-                                                {number}
-                                            </button>
-                                        ) : (number === currentPage - 2 || number === currentPage + 2) ? <span key={number} className="text-gray-400">...</span> : null
-                                    ))}
-
-                                    <button 
-                                        onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
-                                        disabled={currentPage === totalPages}
-                                        className="px-3 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50 font-bold"
-                                    >
-                                        &gt;
-                                    </button>
-                                </div>
-                            )}
-
-                        </div>
+                        <div className="lg:col-span-3 bg-white p-5 rounded-lg card-shadow border border-blue-50"><div className="flex flex-wrap justify-between items-center mb-6 gap-4"><h3 className="font-bold text-lg flex items-center gap-2 text-blue-800"><i data-lucide="list" className="w-5 h-5"></i> 預約紀錄 (共 {displayList.length} 筆)</h3><div className="flex gap-2"><button onClick={exportCSV} className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition"><i data-lucide="download" className="w-4 h-4"></i> CSV</button><div className="bg-blue-50 rounded p-1 flex">{['all','active','long-term'].map(f => <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1 rounded text-sm transition ${filter === f ? 'bg-white shadow text-blue-600 font-bold' : 'text-blue-400 hover:text-blue-600'}`}>{f==='all'?'全部':f==='active'?'有效':'長期'}</button>)}</div></div></div><div className="overflow-x-auto min-h-[300px]"><table className="w-full text-sm text-left"><thead className="bg-blue-50 text-blue-700 uppercase"><tr><th className="p-3">類型/時間</th><th className="p-3">車號</th><th className="p-3">借用人</th><th className="p-3">數量</th><th className="p-3">分配編號</th><th className="p-3">操作</th></tr></thead><tbody className="divide-y divide-blue-50">{currentItems.map(b => { let typeLabel = '長期'; if (b.startDate === b.endDate) typeLabel = '短期'; return (<tr key={b.id || b.batchId} className="hover:bg-blue-50/50"><td className="p-3">{b.type === 'long-term' ? (<div><span className={`px-2 py-0.5 rounded text-xs font-bold mr-2 ${typeLabel === '短期' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{typeLabel}</span><br/>{b.startDate}~{b.endDate}<div className="mt-1">{b.isGroup ? (<span title={b.scheduleText} className="text-purple-600 text-xs font-bold cursor-help underline decoration-dotted">查看詳細時段</span>) : (<div className="text-purple-600 text-xs font-bold">週{DAY_LABELS[b.dayOfWeek]} / 第 {b.period} 節</div>)}</div></div>) : (<div><span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-bold mr-2">單次</span><br/>{b.date}<div className="text-gray-500 text-xs mt-1">第 {b.period} 節</div></div>)}</td><td className="p-3 font-bold text-gray-700">{b.cartId} 車</td><td className="p-3"><div>{b.user}</div><div className="text-xs text-gray-400">分機 {b.ext}</div></td><td className="p-3">{b.quantity} 生 {b.needTeacherPad && '+ 1 師'}</td><td className="p-3 text-xs text-gray-600 max-w-[150px] truncate" title={formatDeviceList(b.deviceIds)}>{formatDeviceList(b.deviceIds)}</td><td className="p-3 flex gap-2"><button onClick={() => handleDelete(b)} className="text-red-500 hover:bg-red-50 p-2 rounded"><i data-lucide="trash-2" className="w-4 h-4"></i></button><button onClick={() => handleEdit(b)} className="text-blue-500 hover:bg-blue-50 p-2 rounded"><i data-lucide="edit" className="w-4 h-4"></i></button>{b.signature && <button onClick={() => handleViewSignature(b)} className="text-blue-600 hover:bg-blue-100 p-2 rounded" title="查看簽名"><i data-lucide="pen-tool" className="w-4 h-4"></i></button>}</td></tr>)})}{currentItems.length === 0 && <tr><td colSpan="6" className="p-8 text-center text-gray-400">目前沒有資料</td></tr>}</tbody></table></div>{totalPages > 1 && (<div className="flex justify-center items-center mt-6 gap-2"><button onClick={() => paginate(Math.max(1, currentPage - 1))} disabled={currentPage === 1} className="px-3 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50 font-bold">&lt;</button>{Array.from({ length: totalPages }, (_, i) => i + 1).map(number => ((number === 1 || number === totalPages || (number >= currentPage - 1 && number <= currentPage + 1)) ? (<button key={number} onClick={() => paginate(number)} className={`w-8 h-8 rounded-full text-sm font-bold transition ${currentPage === number ? 'bg-blue-600 text-white shadow-lg scale-110' : 'bg-white text-blue-600 border border-blue-100 hover:bg-blue-50'}`}>{number}</button>) : (number === currentPage - 2 || number === currentPage + 2) ? <span key={number} className="text-gray-400">...</span> : null))} <button onClick={() => paginate(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} className="px-3 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50 font-bold">&gt;</button></div>)}</div>
                     </div>
                 </div>
             );
         }
 
-        // AllocationEditor
         function AllocationEditor({ item, allBookings, carts, cartStatus, onClose, onSave, showToast }) {
             const [selected, setSelected] = React.useState(new Set(item.deviceIds || []));
-            const [targetCartId, setTargetCartId] = React.useState(item.cartId); 
+            const [targetCartId, setTargetCartId] = React.useState(item.cartId);
             const [statusMap, setStatusMap] = React.useState({});
 
             React.useEffect(() => {
-                const map = {}; for(let i=1; i<=36; i++) map[i] = { status: 'free', label: '' };
-                const maintenance = cartStatus[targetCartId]; 
-                if (maintenance) { const broken = maintenance.brokenIds || (maintenance.brokenCount ? Array.from({length:maintenance.brokenCount},(_,i)=>i+1) : []); broken.forEach(id => { map[id].status = 'locked'; map[id].label = '維修'; }); }
-
+                const map = {};
+                for(let i=1; i<=36; i++) map[i] = { status: 'free', label: '' };
+                const maintenance = cartStatus[targetCartId];
+                if (maintenance) {
+                    const broken = maintenance.brokenIds || (maintenance.brokenCount ? Array.from({length:maintenance.brokenCount},(_,i)=>i+1) : []);
+                    broken.forEach(id => { map[id].status = 'locked'; map[id].label = '維修'; });
+                }
                 if (item.isGroup) {
                     allBookings.forEach(other => {
-                        if (other.status === 'cancelled' || other.cartId !== targetCartId) return; 
+                        if (other.status === 'cancelled' || other.cartId !== targetCartId) return;
                         if (item.isGroup && other.batchId === item.batchId) return;
                         const rangeA = item.isGroup ? { start: item.startDate, end: item.endDate } : { start: item.date, end: item.date };
                         const rangeB = other.type === 'long-term' ? { start: other.startDate, end: other.endDate } : { start: other.date, end: other.date };
@@ -1387,80 +688,181 @@
                             const itemSlots = item.isGroup ? item.slots : [{ day: getDayOfWeek(item.date), period: item.period }];
                             const otherSlots = other.type === 'long-term' ? [{ day: other.dayOfWeek, period: other.period }] : [{ day: getDayOfWeek(other.date), period: other.period }];
                             const collision = itemSlots.some(sA => otherSlots.some(sB => sA.day === (other.type==='long-term' ? other.dayOfWeek : getDayOfWeek(other.date)) && sA.period === other.period));
-                            if (collision) { other.deviceIds.forEach(id => { if (map[id]) { map[id].status = 'busy'; map[id].label = other.user; } }); }
+                            if (collision) {
+                                other.deviceIds.forEach(id => {
+                                    if (map[id]) { map[id].status = 'busy'; map[id].label = other.user; }
+                                });
+                            }
                         }
                     });
                 } else {
                     allBookings.forEach(other => {
-                        if (other.status === 'cancelled' || other.cartId !== targetCartId) return; 
+                        if (other.status === 'cancelled' || other.cartId !== targetCartId) return;
                         if (other.id === item.id) return;
                         let overlap = false;
-                        if (other.type === 'long-term') { if (getDayOfWeek(item.date) === other.dayOfWeek && item.period === other.period) { if (!other.startDate || (item.date >= other.startDate && item.date <= other.endDate)) overlap = true; } } else { if (other.date === item.date && other.period === item.period) overlap = true; }
-                        if (overlap) { other.deviceIds.forEach(id => { if(map[id]) { map[id].status = 'busy'; map[id].label = other.user; } }); }
+                        if (other.type === 'long-term') {
+                            if (getDayOfWeek(item.date) === other.dayOfWeek && item.period === other.period) {
+                                if (!other.startDate || (item.date >= other.startDate && item.date <= other.endDate)) overlap = true;
+                            }
+                        } else {
+                            if (other.date === item.date && other.period === item.period) overlap = true;
+                        }
+                        if (overlap) {
+                            other.deviceIds.forEach(id => {
+                                if(map[id]) { map[id].status = 'busy'; map[id].label = other.user; }
+                            });
+                        }
                     });
                 }
                 setStatusMap(map);
             }, [item, allBookings, cartStatus, targetCartId]);
 
-            const toggle = (id) => { const s = statusMap[id]; if (!s) return; const next = new Set(selected); if (next.has(id)) next.delete(id); else next.add(id); setSelected(next); };
+            const toggle = (id) => {
+                const s = statusMap[id];
+                if (!s) return;
+                const next = new Set(selected);
+                if (next.has(id)) next.delete(id);
+                else next.add(id);
+                setSelected(next);
+            };
+
             const handleSave = () => { onSave(Array.from(selected).sort((a,b)=>a-b), targetCartId); };
 
             return (
                 <div className="flex flex-col h-full">
-                    <div className="mb-4"><label className="block text-sm font-bold text-gray-700 mb-1">目標車輛 (更換車輛將一併更新位置)</label><select className="w-full border rounded p-2 bg-white" value={targetCartId} onChange={e => setTargetCartId(e.target.value)}>{carts.map(c => <option key={c.id} value={c.id}>{c.id} 車 ({c.location})</option>)}</select></div>
-                    <div className="mb-2 text-sm text-gray-600 bg-yellow-50 p-2 rounded"><i data-lucide="alert-triangle" className="w-3 h-3 inline mr-1"></i>您正在進行強制調度。修改後將立即生效。<br/>若為長期預約，將更新整學期該時段的分配。</div>
+                    <div className="mb-4">
+                        <label className="block text-sm font-bold text-gray-700 mb-1">目標車輛</label>
+                        <select className="w-full border rounded p-2 bg-white" value={targetCartId} onChange={e => setTargetCartId(e.target.value)}>
+                            {carts.map(c => <option key={c.id} value={c.id}>{c.id} 車 ({c.location})</option>)}
+                        </select>
+                    </div>
+                    <div className="mb-2 text-sm text-gray-600 bg-yellow-50 p-2 rounded">若為長期預約，將更新整學期該時段的分配。</div>
                     <div className="grid grid-cols-6 sm:grid-cols-6 gap-2 mb-4 overflow-y-auto max-h-[60vh] p-1">
                         {ALL_DEVICES.map(n => {
                             const isSelected = selected.has(n);
                             const info = statusMap[n] || { status: 'free' };
-                            let style = "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"; 
+                            let style = "bg-white border-gray-200 text-gray-500 hover:bg-gray-50";
                             if (isSelected) style = "bg-green-500 text-white border-green-600 ring-2 ring-green-300";
                             else if (info.status === 'busy') style = "bg-blue-100 text-blue-400 border-blue-200 opacity-60";
                             else if (info.status === 'locked') style = "bg-red-100 text-red-400 border-red-200 opacity-60";
-                            return (<button key={n} onClick={() => toggle(n)} className={`h-10 rounded border font-bold text-sm transition relative ${style}`}>{n}{isSelected && (<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="absolute top-0.5 right-0.5 w-3 h-3"><polyline points="20 6 9 17 4 12"></polyline></svg>)}</button>);
+                            return (
+                                <button key={n} onClick={() => toggle(n)} className={`h-10 rounded border font-bold text-sm transition relative ${style}`}>
+                                    {n}
+                                    {isSelected && (<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="absolute top-0.5 right-0.5 w-3 h-3"><polyline points="20 6 9 17 4 12"></polyline></svg>)}
+                                </button>
+                            );
                         })}
                     </div>
-                     <div className="mt-auto flex justify-between items-center border-t pt-3"><div className="text-sm font-bold text-blue-600">已選: {selected.size} 台</div><div className="flex gap-2"><button onClick={onClose} className="px-3 py-1.5 bg-gray-200 rounded hover:bg-gray-300 text-sm">取消</button><button onClick={handleSave} className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">儲存變更</button></div></div>
+                    <div className="mt-auto flex justify-between items-center border-t pt-3">
+                        <div className="text-sm font-bold text-blue-600">已選: {selected.size} 台</div>
+                        <div className="flex gap-2">
+                            <button onClick={onClose} className="px-3 py-1.5 bg-gray-200 rounded hover:bg-gray-300 text-sm">取消</button>
+                            <button onClick={handleSave} className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">儲存</button>
+                        </div>
+                    </div>
                 </div>
             );
         }
 
-        // Daily Report Modal
         function DailyReportModal({ bookings, onClose }) {
             const [reportDate, setReportDate] = React.useState(formatDate(new Date()));
             const generateReport = () => {
                 const targetDay = getDayOfWeek(reportDate);
-                const list = bookings.filter(b => { if (b.status === 'cancelled') return false; if (b.type === 'long-term') { return parseInt(b.dayOfWeek) === targetDay && (!b.startDate || (reportDate >= b.startDate && reportDate <= b.endDate)); } else { return b.date === reportDate; } });
-                const carts = {}; list.forEach(b => { if (!carts[b.cartId]) carts[b.cartId] = []; carts[b.cartId].push(b); });
-                let text = `【${reportDate} (週${DAY_LABELS[targetDay]}) 平板出借清單】\n`; if (Object.keys(carts).length === 0) text += "今日無預約資料。\n";
+                const list = bookings.filter(b => {
+                    if (b.status === 'cancelled') return false;
+                    if (b.type === 'long-term') {
+                        return parseInt(b.dayOfWeek) === targetDay && (!b.startDate || (reportDate >= b.startDate && reportDate <= b.endDate));
+                    } else {
+                        return b.date === reportDate;
+                    }
+                });
+                const carts = {};
+                list.forEach(b => {
+                    if (!carts[b.cartId]) carts[b.cartId] = [];
+                    carts[b.cartId].push(b);
+                });
+                let text = `【${reportDate} (週${DAY_LABELS[targetDay]}) 平板出借清單】\n`;
+                if (Object.keys(carts).length === 0) text += "今日無預約資料。\n";
                 Object.keys(carts).sort().forEach(cartId => {
                     text += `\n［${cartId}車］\n`;
                     const cartBookings = carts[cartId];
                     const groups = {};
-                    cartBookings.forEach(b => { const deviceStr = formatDeviceList(b.deviceIds); const key = `${b.user}_${b.ext}_${deviceStr}`; if (!groups[key]) groups[key] = { user: b.user, ext: b.ext, devices: deviceStr, periods: [] }; groups[key].periods.push(b.period); });
+                    cartBookings.forEach(b => {
+                        const deviceStr = formatDeviceList(b.deviceIds);
+                        const key = `${b.user}_${b.ext}_${deviceStr}`;
+                        if (!groups[key]) groups[key] = { user: b.user, ext: b.ext, devices: deviceStr, periods: [] };
+                        groups[key].periods.push(b.period);
+                    });
                     const sortedGroups = Object.values(groups).sort((a,b) => Math.min(...a.periods) - Math.min(...b.periods));
-                    sortedGroups.forEach((g, index) => { const periods = [...new Set(g.periods)].sort((a,b)=>a-b).join('、'); text += `${index + 1}.借用人: ${g.user} (分機${g.ext})：第 ${periods} 節\n`; text += `  編號: ${g.devices}\n`; });
+                    sortedGroups.forEach((g, index) => {
+                        const periods = [...new Set(g.periods)].sort((a,b)=>a-b).join('、');
+                        text += `${index + 1}.借用人: ${g.user} (分機${g.ext})：第 ${periods} 節\n  編號: ${g.devices}\n`;
+                    });
                 });
                 return text;
             };
             const text = generateReport();
             const copyToClipboard = () => { navigator.clipboard.writeText(text); alert("已複製到剪貼簿"); };
             return (
-                <div className="flex flex-col h-full"><div className="mb-4 flex items-center gap-2"><label className="font-bold">報表日期：</label><input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)} className="border rounded px-2 py-1" /></div><textarea readOnly className="flex-grow w-full border rounded p-3 font-mono text-sm bg-gray-50 h-64 mb-4" value={text}></textarea><div className="flex justify-end gap-2"><button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded text-gray-700">關閉</button><button onClick={copyToClipboard} className="px-4 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700">複製內容</button></div></div>
+                <div className="flex flex-col h-full">
+                    <div className="mb-4 flex items-center gap-2">
+                        <label className="font-bold">報表日期：</label>
+                        <input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)} className="border rounded px-2 py-1" />
+                    </div>
+                    <textarea readOnly className="flex-grow w-full border rounded p-3 font-mono text-sm bg-gray-50 h-64 mb-4" value={text}></textarea>
+                    <div className="flex justify-end gap-2">
+                        <button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded text-gray-700">關閉</button>
+                        <button onClick={copyToClipboard} className="px-4 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700">複製內容</button>
+                    </div>
+                </div>
             );
         }
 
         function MaintenanceGrid({ cartId, initialIds, onClose, db, appId, showToast }) {
             const [selected, setSelected] = React.useState(new Set(initialIds));
-            const toggle = (id) => { const next = new Set(selected); if (next.has(id)) next.delete(id); else next.add(id); setSelected(next); };
-            const save = async () => { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'cart_status', cartId), { brokenIds: Array.from(selected).sort((a,b)=>a-b), updatedAt: serverTimestamp() }); showToast(`已更新 ${cartId} 車鎖定狀態`); onClose(); };
+            const toggle = (id) => {
+                const next = new Set(selected);
+                if (next.has(id)) next.delete(id); else next.add(id);
+                setSelected(next);
+            };
+            const save = async () => {
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'cart_status', cartId), { brokenIds: Array.from(selected).sort((a,b)=>a-b), updatedAt: serverTimestamp() });
+                showToast(`已更新 ${cartId} 車鎖定狀態`);
+                onClose();
+            };
             return (
-                <div><p className="text-sm text-gray-500 mb-4">請點選 <span className="text-red-500 font-bold">鎖定中/不可借</span> 的號碼。</p><div className="grid grid-cols-6 gap-2 mb-6">{ALL_DEVICES.map(n => (<button key={n} onClick={() => toggle(n)} className={`h-10 rounded border font-bold transition ${selected.has(n) ? 'bg-red-500 text-white border-red-600' : 'bg-white text-gray-600 hover:bg-gray-100'}`}>{n}</button>))}</div><div className="flex justify-end gap-2"><button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">取消</button><button onClick={save} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">儲存設定</button></div></div>
+                <div>
+                    <p className="text-sm text-gray-500 mb-4">請點選 <span className="text-red-500 font-bold">鎖定中/不可借</span> 的號碼。</p>
+                    <div className="grid grid-cols-6 gap-2 mb-6">
+                        {ALL_DEVICES.map(n => (
+                            <button key={n} onClick={() => toggle(n)} className={`h-10 rounded border font-bold transition ${selected.has(n) ? 'bg-red-500 text-white border-red-600' : 'bg-white text-gray-600 hover:bg-gray-100'}`}>
+                                {n}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">取消</button>
+                        <button onClick={save} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">儲存設定</button>
+                    </div>
+                </div>
             );
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        try {
+            console.log("[系統啟動] 步驟 5: 準備渲染 React 組件...");
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<App />);
+            console.log("[系統啟動] 渲染完成！如果畫面是白色的，請檢查上方的 Error Log。");
+        } catch (error) {
+            console.error("[致命錯誤] React 渲染過程崩潰:", error);
+            document.getElementById('root').innerHTML = `
+                <div style="padding: 30px; font-family: sans-serif; text-align: center; color: #dc2626; background: #fee2e2; height: 100vh;">
+                    <h2 style="font-size: 2rem; margin-bottom: 10px;">網站發生嚴重錯誤</h2>
+                    <p style="font-size: 1.2rem;">React 無法順利啟動，請按 <b>F12</b> 開啟開發者工具 (Console) 並截圖提供錯誤訊息。</p>
+                    <p style="color: #7f1d1d; margin-top: 20px; font-weight: bold;">錯誤內容：${error.message}</p>
+                </div>
+            `;
+        }
     </script>
 </body>
 </html>
