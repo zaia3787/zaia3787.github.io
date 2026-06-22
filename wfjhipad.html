@@ -10,19 +10,22 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     
-    <!-- 步驟 1: Babel 設定，強制使用 classic 模式編譯，避免找不到 jsx-runtime 的錯誤 -->
+    <!-- 步驟 1: 先載入 Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- 步驟 1-2: 註冊自訂的 React Classic Preset，解決 jsx-runtime 找不到的問題 -->
     <script>
         console.log("[系統啟動] 步驟 1: 設定 Babel 編譯模式...");
-        Babel = {
-            presets: [
-                ["react", { runtime: "classic" }]
-            ]
-        };
+        if (typeof Babel !== 'undefined') {
+            Babel.registerPreset('react-classic', {
+                presets: [
+                    [Babel.availablePresets['react'], { runtime: "classic" }]
+                ]
+            });
+        }
     </script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
     <script src="https://unpkg.com/lucide@latest"></script>
-
-    <!-- 注意：已經刪除這裡多餘的 Firebase script 標籤，避免與下方的 module import 發生衝突 -->
 
     <style>
         body { font-family: "Microsoft JhengHei", "Noto Sans TC", sans-serif; background-color: #f0f9ff; overscroll-behavior: none; }
@@ -55,7 +58,11 @@
         </div>
     </div>
 
-    <script type="text/babel" data-type="module">
+    <!-- 指定使用上面註冊的 react-classic preset -->
+    <script type="text/babel" data-type="module" data-presets="react-classic">
+        /** @jsx React.createElement */
+        /** @jsxFrag React.Fragment */
+        
         console.log("[系統啟動] 步驟 2: 開始載入主要模組...");
 
         // --- 環境檢查：非常重要 ---
