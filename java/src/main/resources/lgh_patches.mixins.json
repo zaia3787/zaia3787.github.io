@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "package": "com.example.lghpatches.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "lgh_patches.refmap.json",
+  "minVersion": "0.8",
+  "mixins": [
+    "ProductionStructurePoolMixin",
+    "WorkerStructureProviderMixin"
+  ]
+}

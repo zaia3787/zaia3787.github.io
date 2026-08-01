@@ -1,0 +1,37 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="All Rights Reserved"
+issueTrackerURL="https://example.com"
+
+[[mods]]
+modId="lgh_patches"
+version="1.0.0"
+displayName="LGH Patches (Village Recruits building probability fix)"
+authors="you"
+description='''
+把 Village Recruits 的內建預設建築（醜房屋/醜農田等）機率歸零，
+只要對應類別已經有自訂結構就完全不使用內建的。
+'''
+
+[[dependencies.lgh_patches]]
+    modId="forge"
+    mandatory=true
+    versionRange="[47,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.lgh_patches]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.20.1,1.20.2)"
+    ordering="NONE"
+    side="BOTH"
+
+# 軟依賴：沒裝 village_recruits 的話這個補丁mod什麼事都不會做（Mixin目標類別不存在就不會套用），
+# 不會導致遊戲崩潰，所以不設 mandatory=true。
+[[dependencies.lgh_patches]]
+    modId="village_recruits"
+    mandatory=false
+    versionRange="[1.0.7,)"
+    ordering="AFTER"
+    side="BOTH"
